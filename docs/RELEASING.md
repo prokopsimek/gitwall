@@ -82,6 +82,32 @@ After the upload:
   TestFlight app for Mac (macOS 12 or later) and get the build there. External
   groups need a one-time Beta App Review.
 
+## 4b. Metadata, screenshots and submission through the API
+
+`Scripts/asc.py` talks to the App Store Connect API without extra dependencies. It reads
+`ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_PATH` (the `.p8` team key with the Admin role,
+stored outside the repository, for example in `~/.appstoreconnect/private_keys/`). Never
+commit the key or paste the IDs into tracked files.
+
+```sh
+Scripts/asc.py get "/v1/apps?filter[bundleId]=cz.prokopsimek.gitwall"          # app id
+Scripts/asc.py get "/v1/apps/<app>/appStoreVersions"                            # version ids
+Scripts/asc.py patch /v1/appStoreVersionLocalizations/<loc> '{"data": {...}}'   # texts from docs/appstore-listing.md
+Scripts/asc.py upload-screenshots <loc> APP_DESKTOP Scripts/out/appstore/0*.png
+Scripts/asc.py patch /v1/appStoreVersions/<version>/relationships/build '{"data": {"type": "builds", "id": "<build>"}}'
+Scripts/asc.py post /v1/reviewSubmissions '{"data": {"type": "reviewSubmissions", "attributes": {"platform": "MAC_OS"}, "relationships": {"app": {"data": {"type": "apps", "id": "<app>"}}}}}'
+```
+
+Things the API needs that are easy to miss: the price schedule (`POST /v1/appPriceSchedules`
+with the free price point of the base territory), availability (`POST /v2/appAvailabilities`
+with every territory), the age rating declaration (all enums `NONE`, all booleans `false`,
+only `ageRatingOverrideV2`, not the v1 field) and review details. App Privacy ("Data Not
+Collected") has no public API and is published once in the web UI.
+
+The same `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` flags make
+`xcodebuild -exportArchive` register missing bundle IDs, create the App Store profiles and the
+Mac Installer Distribution certificate, and upload the build without an Apple ID session in Xcode.
+
 ## 5. Developer ID build, notarization, GitHub Release
 
 Export the same archive signed with Developer ID:
