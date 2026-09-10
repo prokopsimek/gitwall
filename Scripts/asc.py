@@ -99,17 +99,24 @@ def upload_screenshots(localization_id: str, display_type: str, files: list[str]
             chunk = blob[operation["offset"]:operation["offset"] + operation["length"]]
             headers = {h["name"]: h["value"] for h in operation["requestHeaders"]}
             request(operation["method"], operation["url"], raw=chunk, headers=headers)
-        request("PATCH", f"/v1/appScreenshots/{created['id']}", {"data": {
-            "type": "appScreenshots", "id": created["id"],
-            "attributes": {"uploaded": True, "sourceFileChecksum": hashlib.md5(blob).hexdigest()},
-        }})
-        for _ in range(30):
+        # The commit occasionally does not take on the first try and the asset stays in UPLOAD_COMPLETE,
+        # which blocks submission; repeat it until App Store Connect reports the asset as processing or done.
+        checksum = hashlib.md5(blob).hexdigest()
+        state = "UPLOAD_COMPLETE"
+        for attempt in range(40):
+            if attempt % 5 == 0:
+                request("PATCH", f"/v1/appScreenshots/{created['id']}", {"data": {
+                    "type": "appScreenshots", "id": created["id"],
+                    "attributes": {"uploaded": True, "sourceFileChecksum": checksum},
+                }})
+            time.sleep(3)
             state = request("GET", f"/v1/appScreenshots/{created['id']}")["data"]["attributes"]["assetDeliveryState"]["state"]
             if state == "COMPLETE":
                 break
             if state == "FAILED":
                 sys.exit(f"{path}: asset delivery failed")
-            time.sleep(2)
+        if state != "COMPLETE":
+            sys.exit(f"{path}: still {state} after waiting; commit it again with PATCH uploaded=true")
         print(f"{os.path.basename(path)}\t{created['id']}\t{state}")
     print(f"set\t{set_id}")
 
