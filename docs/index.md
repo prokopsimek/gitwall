@@ -18,7 +18,7 @@ Gitwall is a free, open-source macOS menu bar app with desktop widgets. It gathe
 - Menu bar popover with an optional item count next to the icon
 - Local notifications for new items, review requests, approvals, requested changes, CI failures, merges and closes
 - Refresh interval from 1 to 30 minutes, manual refresh from the menu bar and the widget
-- Sign in with a personal access token, or with GitHub.com and GitLab.com OAuth
+- Sign in with a personal access token (OAuth sign-in for GitHub.com and GitLab.com is planned)
 - No account with the developer, no analytics, no third-party services. Tokens stay in your Keychain.
 
 ## Requirements

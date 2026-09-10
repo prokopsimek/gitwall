@@ -10,3 +10,4 @@ show_downloads: false
 exclude:
   - PLAN.md
   - RELEASING.md
+  - appstore-listing.md
