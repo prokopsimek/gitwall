@@ -1,0 +1,101 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4992,
+      "resetAt": "2026-09-10T06:43:24Z"
+    },
+    "search": {
+      "issueCount": 5269,
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "Y3Vyc29yOjM="
+      },
+      "nodes": [
+        {
+          "__typename": "Issue",
+          "number": 2253,
+          "title": "[Bug]: `container build` under `/tmp` fails to copy directories",
+          "url": "https://github.com/apple/container/issues/2253",
+          "createdAt": "2026-09-09T17:30:57Z",
+          "updatedAt": "2026-09-09T17:30:57Z",
+          "author": {
+            "login": "JaewonHur",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/57657645?v=4",
+            "name": "jwhur"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "repository": {
+            "nameWithOwner": "apple/container"
+          }
+        },
+        {
+          "__typename": "Issue",
+          "number": 2847,
+          "title": "PyPI sdist missing C++ source — cannot build native libraries from source",
+          "url": "https://github.com/apple/coremltools/issues/2847",
+          "createdAt": "2026-09-04T19:16:48Z",
+          "updatedAt": "2026-09-09T15:00:34Z",
+          "author": {
+            "login": "mikedep333",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/1698741?u=dee92b3495f5c34e777cb076062d0067c58952c5&v=4",
+            "name": "Mike DePaulo"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "bug",
+                "color": "c10f47"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 4
+          },
+          "repository": {
+            "nameWithOwner": "apple/coremltools"
+          }
+        },
+        {
+          "__typename": "Issue",
+          "number": 27,
+          "title": "Stale empty checkpoint file src/.ipynb_checkpoints/__init__-checkpoint.py   committed to the repo",
+          "url": "https://github.com/apple/GCGC/issues/27",
+          "createdAt": "2026-09-09T14:06:38Z",
+          "updatedAt": "2026-09-09T14:06:38Z",
+          "author": {
+            "login": "ivankrylov",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/9809602?u=45ebdbf77b7b343138b10f226cc89b5e4758e965&v=4",
+            "name": "Ivan Krylov"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "repository": {
+            "nameWithOwner": "apple/GCGC"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,58 @@
+[
+  {
+    "login": "Revolgy-Business-Solutions",
+    "id": 706722,
+    "node_id": "MDEyOk9yZ2FuaXphdGlvbjcwNjcyMg==",
+    "url": "https://api.github.com/orgs/Revolgy-Business-Solutions",
+    "repos_url": "https://api.github.com/orgs/Revolgy-Business-Solutions/repos",
+    "events_url": "https://api.github.com/orgs/Revolgy-Business-Solutions/events",
+    "hooks_url": "https://api.github.com/orgs/Revolgy-Business-Solutions/hooks",
+    "issues_url": "https://api.github.com/orgs/Revolgy-Business-Solutions/issues",
+    "members_url": "https://api.github.com/orgs/Revolgy-Business-Solutions/members{/member}",
+    "public_members_url": "https://api.github.com/orgs/Revolgy-Business-Solutions/public_members{/member}",
+    "avatar_url": "https://avatars.githubusercontent.com/u/706722?v=4",
+    "description": "Solving real-world cloud challenges in migration, data management, and remote work enablement with scalable, secure solutions"
+  },
+  {
+    "login": "Applifting",
+    "id": 6222217,
+    "node_id": "MDEyOk9yZ2FuaXphdGlvbjYyMjIyMTc=",
+    "url": "https://api.github.com/orgs/Applifting",
+    "repos_url": "https://api.github.com/orgs/Applifting/repos",
+    "events_url": "https://api.github.com/orgs/Applifting/events",
+    "hooks_url": "https://api.github.com/orgs/Applifting/hooks",
+    "issues_url": "https://api.github.com/orgs/Applifting/issues",
+    "members_url": "https://api.github.com/orgs/Applifting/members{/member}",
+    "public_members_url": "https://api.github.com/orgs/Applifting/public_members{/member}",
+    "avatar_url": "https://avatars.githubusercontent.com/u/6222217?v=4",
+    "description": ""
+  },
+  {
+    "login": "DXHeroes",
+    "id": 46089594,
+    "node_id": "MDEyOk9yZ2FuaXphdGlvbjQ2MDg5NTk0",
+    "url": "https://api.github.com/orgs/DXHeroes",
+    "repos_url": "https://api.github.com/orgs/DXHeroes/repos",
+    "events_url": "https://api.github.com/orgs/DXHeroes/events",
+    "hooks_url": "https://api.github.com/orgs/DXHeroes/hooks",
+    "issues_url": "https://api.github.com/orgs/DXHeroes/issues",
+    "members_url": "https://api.github.com/orgs/DXHeroes/members{/member}",
+    "public_members_url": "https://api.github.com/orgs/DXHeroes/public_members{/member}",
+    "avatar_url": "https://avatars.githubusercontent.com/u/46089594?v=4",
+    "description": ""
+  },
+  {
+    "login": "developerexperiencemanifesto",
+    "id": 48474786,
+    "node_id": "MDEyOk9yZ2FuaXphdGlvbjQ4NDc0Nzg2",
+    "url": "https://api.github.com/orgs/developerexperiencemanifesto",
+    "repos_url": "https://api.github.com/orgs/developerexperiencemanifesto/repos",
+    "events_url": "https://api.github.com/orgs/developerexperiencemanifesto/events",
+    "hooks_url": "https://api.github.com/orgs/developerexperiencemanifesto/hooks",
+    "issues_url": "https://api.github.com/orgs/developerexperiencemanifesto/issues",
+    "members_url": "https://api.github.com/orgs/developerexperiencemanifesto/members{/member}",
+    "public_members_url": "https://api.github.com/orgs/developerexperiencemanifesto/public_members{/member}",
+    "avatar_url": "https://avatars.githubusercontent.com/u/48474786?v=4",
+    "description": ""
+  }
+]

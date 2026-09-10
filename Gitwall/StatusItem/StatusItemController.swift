@@ -1,0 +1,129 @@
+import AppKit
+import Observation
+import SwiftUI
+
+/// Owns the menu bar item: left click toggles the popover, right click shows the actions menu.
+@MainActor
+final class StatusItemController: NSObject, NSPopoverDelegate {
+    private let environment: AppEnvironment
+    private let statusItem: NSStatusItem
+    private let popover = NSPopover()
+    private lazy var menu = makeMenu()
+
+    init(environment: AppEnvironment) {
+        self.environment = environment
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        super.init()
+
+        if let button = statusItem.button {
+            button.image = NSImage(systemSymbolName: "arrow.triangle.pull", accessibilityDescription: "Gitwall")
+            button.image?.isTemplate = true
+            button.imagePosition = .imageLeading
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .medium)
+            button.target = self
+            button.action = #selector(handleClick(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.setAccessibilityIdentifier("gitwall-status-item")
+        }
+
+        popover.behavior = .transient
+        popover.animates = false
+        popover.delegate = self
+        popover.contentViewController = NSHostingController(rootView: PopoverView(environment: environment))
+
+        environment.onShowPopover = { [weak self] in self?.showPopover() }
+        observeBadge()
+    }
+
+    // MARK: - Actions
+
+    @objc private func handleClick(_ sender: Any?) {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showMenu()
+        } else {
+            togglePopover()
+        }
+    }
+
+    func togglePopover() {
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            showPopover()
+        }
+    }
+
+    func showPopover() {
+        guard let button = statusItem.button else { return }
+        if popover.isShown { return }
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+    }
+
+    private func showMenu() {
+        popover.performClose(nil)
+        refreshMenuState()
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    // MARK: - Badge
+
+    private func observeBadge() {
+        withObservationTracking {
+            statusItem.button?.title = environment.menuBarBadge.isEmpty ? "" : " \(environment.menuBarBadge)"
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeBadge() }
+        }
+    }
+
+    // MARK: - Menu
+
+    private func makeMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Open Gitwall", action: #selector(openPopover), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Refresh Now", action: #selector(refresh), keyEquivalent: "r").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        let login = menu.addItem(withTitle: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        login.target = self
+        login.tag = MenuTag.launchAtLogin.rawValue
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "About Gitwall", action: #selector(showAbout), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Quit Gitwall", action: #selector(quit), keyEquivalent: "q").target = self
+        return menu
+    }
+
+    private enum MenuTag: Int {
+        case launchAtLogin = 1
+    }
+
+    private func refreshMenuState() {
+        menu.item(withTag: MenuTag.launchAtLogin.rawValue)?.state = environment.launchesAtLogin ? .on : .off
+    }
+
+    @objc private func openPopover() {
+        showPopover()
+    }
+
+    @objc private func refresh() {
+        Task { await environment.refresh() }
+    }
+
+    @objc private func openSettings() {
+        environment.openSettings(environment.needsOnboarding ? .accounts : .presets)
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        environment.launchesAtLogin.toggle()
+    }
+
+    @objc private func showAbout() {
+        environment.openSettings(.about)
+    }
+
+    @objc private func quit() {
+        NSApp.terminate(nil)
+    }
+}

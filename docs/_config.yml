@@ -1,0 +1,12 @@
+title: Gitwall
+description: Pull requests and issues on your desktop
+theme: jekyll-theme-minimal
+lang: en
+url: https://prokopsimek.github.io
+baseurl: /gitwall
+show_downloads: false
+
+# Internal documents live in this folder too; keep them out of the public site.
+exclude:
+  - PLAN.md
+  - RELEASING.md

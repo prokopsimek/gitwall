@@ -1,0 +1,139 @@
+name: Gitwall
+
+options:
+  bundleIdPrefix: cz.prokopsimek
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+  groupSortPosition: top
+  generateEmptyDirectories: true
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: ZHU9NYW7PP
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    ENABLE_HARDENED_RUNTIME: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+    DEAD_CODE_STRIPPING: YES
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+      ONLY_ACTIVE_ARCH: YES
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+
+packages:
+  GitwallCore:
+    path: Packages/GitwallCore
+  GitwallUI:
+    path: Packages/GitwallUI
+  GitwallAuth:
+    path: Packages/GitwallAuth
+  GitwallGitHub:
+    path: Packages/GitwallGitHub
+
+targets:
+  Gitwall:
+    type: application
+    platform: macOS
+    sources:
+      - path: Gitwall
+        excludes:
+          - "Info.plist"
+    dependencies:
+      - target: GitwallWidget
+      - package: GitwallCore
+      - package: GitwallUI
+      - package: GitwallAuth
+      - package: GitwallGitHub
+    entitlements:
+      path: Config/Gitwall.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.application-groups:
+          - ZHU9NYW7PP.cz.prokopsimek.gitwall
+    info:
+      path: Gitwall/Info.plist
+      properties:
+        CFBundleName: Gitwall
+        CFBundleDisplayName: Gitwall
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: "Copyright 2026 Prokop Simek. MIT License."
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: cz.prokopsimek.gitwall
+            CFBundleTypeRole: Viewer
+            CFBundleURLSchemes:
+              - gitwall
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cz.prokopsimek.gitwall
+        PRODUCT_NAME: Gitwall
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: YES
+        COMBINE_HIDPI_IMAGES: YES
+    scheme:
+      testTargets:
+        - GitwallTests
+      gatherCoverageData: true
+
+  GitwallWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: GitwallWidget
+        excludes:
+          - "Info.plist"
+    dependencies:
+      - package: GitwallCore
+      - package: GitwallUI
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    entitlements:
+      path: Config/GitwallWidget.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - ZHU9NYW7PP.cz.prokopsimek.gitwall
+    info:
+      path: GitwallWidget/Info.plist
+      properties:
+        CFBundleName: GitwallWidget
+        CFBundleDisplayName: Gitwall
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cz.prokopsimek.gitwall.widget
+        PRODUCT_NAME: GitwallWidget
+        SKIP_INSTALL: YES
+        ENABLE_PREVIEWS: YES
+
+  GitwallTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - GitwallTests
+    dependencies:
+      - target: Gitwall
+      - package: GitwallCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cz.prokopsimek.gitwall.tests
+        GENERATE_INFOPLIST_FILE: YES

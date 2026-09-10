@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- xcodebuild -exportArchive options for the direct-download build published on
+	     GitHub Releases. Exports Gitwall.app signed with Developer ID Application;
+	     notarization is a separate step (xcrun notarytool). See docs/RELEASING.md. -->
+	<key>method</key>
+	<string>developer-id</string>
+	<key>destination</key>
+	<string>export</string>
+	<key>teamID</key>
+	<string>ZHU9NYW7PP</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+</dict>
+</plist>

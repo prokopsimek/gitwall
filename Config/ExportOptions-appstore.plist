@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- xcodebuild -exportArchive options for App Store Connect / TestFlight.
+	     destination=upload signs with the Apple Distribution certificate and uploads
+	     in one step. See docs/RELEASING.md. -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>upload</string>
+	<key>teamID</key>
+	<string>ZHU9NYW7PP</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<!-- Build numbers come from CURRENT_PROJECT_VERSION in project.yml; do not let
+	     Xcode rewrite them on upload. -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "fetchedAt": "2026-09-10T06:35:00.000Z",
+  "accountStatus": {
+    "8A2F7C1E-1111-2222-3333-444455556666": {
+      "state": "ok",
+      "lastSuccessAt": "2026-09-10T06:35:00.000Z",
+      "message": null
+    }
+  },
+  "items": [
+    {
+      "id": "8A2F7C1E-1111-2222-3333-444455556666/dxheroes/mcp-gateway#42/pullRequest",
+      "accountID": "8A2F7C1E-1111-2222-3333-444455556666",
+      "kind": "pullRequest",
+      "repoFullName": "dxheroes/mcp-gateway",
+      "number": 42,
+      "title": "Add GitLab provider",
+      "url": "https://github.com/dxheroes/mcp-gateway/pull/42",
+      "author": { "login": "prokopsimek", "displayName": "Prokop Simek", "avatarURL": "https://avatars.githubusercontent.com/u/1?v=4" },
+      "createdAt": "2026-09-09T18:00:00.000Z",
+      "updatedAt": "2026-09-10T06:30:00.000Z",
+      "isDraft": false,
+      "labels": [
+        { "name": "provider", "colorHex": "0E8A16" },
+        { "name": "gitlab", "colorHex": "FC6D26" }
+      ],
+      "assignees": [],
+      "milestone": null,
+      "commentCount": 3,
+      "reviewState": "approved",
+      "ciState": "success",
+      "mergeState": "clean",
+      "reviewers": [ { "login": "alice", "displayName": null, "avatarURL": null } ],
+      "requestedReviewers": [ { "login": "alice", "displayName": null, "avatarURL": null } ],
+      "additions": 120,
+      "deletions": 7
+    },
+    {
+      "id": "8A2F7C1E-1111-2222-3333-444455556666/dxheroes/mcp-gateway#7/issue",
+      "accountID": "8A2F7C1E-1111-2222-3333-444455556666",
+      "kind": "issue",
+      "repoFullName": "dxheroes/mcp-gateway",
+      "number": 7,
+      "title": "Widget shows stale data after sleep",
+      "url": "https://github.com/dxheroes/mcp-gateway/issues/7",
+      "author": { "login": "bob", "displayName": null, "avatarURL": null },
+      "createdAt": "2026-09-01T09:00:00.000Z",
+      "updatedAt": "2026-09-08T12:00:00.000Z",
+      "isDraft": false,
+      "labels": [ { "name": "bug", "colorHex": "D73A4A" } ],
+      "assignees": [ { "login": "bob", "displayName": null, "avatarURL": null } ],
+      "milestone": "v0.1",
+      "commentCount": 0,
+      "reviewState": null,
+      "ciState": null,
+      "mergeState": null,
+      "reviewers": [],
+      "requestedReviewers": [],
+      "additions": null,
+      "deletions": null
+    }
+  ]
+}

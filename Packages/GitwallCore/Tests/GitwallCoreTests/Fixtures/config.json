@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "accounts": [
+    {
+      "id": "8A2F7C1E-1111-2222-3333-444455556666",
+      "kind": "github",
+      "baseURL": "https://github.com",
+      "displayName": "GitHub",
+      "me": { "login": "prokopsimek", "displayName": "Prokop Simek", "avatarURL": null },
+      "authMethod": { "personalAccessToken": {} },
+      "nativeQuery": null,
+      "sources": [
+        { "repository": { "fullName": "dxheroes/mcp-gateway" } },
+        { "organization": { "login": "dxheroes" } }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "id": "0B6C4D2A-0000-0000-0000-000000000001",
+      "name": "All open",
+      "icon": "tray.full",
+      "scopes": [],
+      "kinds": ["pullRequest", "issue"],
+      "filter": {
+        "relations": [],
+        "includeDrafts": true,
+        "labelsAny": [],
+        "labelsNone": [],
+        "reviewStates": [],
+        "ciStates": [],
+        "mergeStates": [],
+        "updatedWithinDays": null,
+        "milestone": null,
+        "text": null
+      },
+      "sort": "lastActivity",
+      "notifications": ["newItem", "reviewRequested", "approved", "changesRequested", "ciFailed", "merged", "closed"],
+      "showCountInMenuBar": false
+    },
+    {
+      "id": "0B6C4D2A-0000-0000-0000-000000000002",
+      "name": "Waiting for my review",
+      "icon": "eye",
+      "scopes": [ { "accountID": "8A2F7C1E-1111-2222-3333-444455556666", "repositories": null } ],
+      "kinds": ["pullRequest"],
+      "filter": {
+        "relations": ["reviewRequestedFromMe"],
+        "includeDrafts": false,
+        "labelsAny": [],
+        "labelsNone": [],
+        "reviewStates": [],
+        "ciStates": [],
+        "mergeStates": [],
+        "updatedWithinDays": null,
+        "milestone": null,
+        "text": null
+      },
+      "sort": "lastActivity",
+      "notifications": ["reviewRequested", "ciFailed"],
+      "showCountInMenuBar": true
+    }
+  ],
+  "settings": {
+    "refreshIntervalMinutes": 5,
+    "onboardingCompleted": true
+  }
+}
