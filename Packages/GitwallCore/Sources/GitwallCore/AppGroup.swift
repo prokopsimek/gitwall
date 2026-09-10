@@ -12,12 +12,7 @@ public enum AppGroup {
     public static let widgetKindList = "cz.prokopsimek.gitwall.list"
     public static let widgetKindBoard = "cz.prokopsimek.gitwall.board"
     public static let widgetKindWideBoard = "cz.prokopsimek.gitwall.wideboard"
-    /// Configurable widget that supports every size (the original configurable kind, kept for placed widgets).
-    public static let widgetKindAnySize = "cz.prokopsimek.gitwall.preset"
-    public static let widgetKinds = [widgetKindCounter, widgetKindList, widgetKindBoard, widgetKindWideBoard, widgetKindAnySize]
-    /// Kind of the original static widget. WidgetKit cannot turn a static widget into a configurable one
-    /// in place, so this kind keeps serving the first preset for widgets placed with early builds.
-    public static let legacyWidgetKind = "cz.prokopsimek.gitwall.overview"
+    public static let widgetKinds = [widgetKindCounter, widgetKindList, widgetKindBoard, widgetKindWideBoard]
 
     /// Root of the shared container. `nil` when the process is not entitled to the group.
     public static func containerURL(fileManager: FileManager = .default) -> URL? {

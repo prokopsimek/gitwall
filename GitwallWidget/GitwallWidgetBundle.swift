@@ -8,7 +8,5 @@ struct GitwallWidgetBundle: WidgetBundle {
         ListWidget()
         BoardWidget()
         WideBoardWidget()
-        AnySizeWidget()
-        GitwallLegacyWidget()
     }
 }

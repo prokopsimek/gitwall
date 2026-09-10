@@ -48,8 +48,9 @@ launch arguments (see AppDelegate) so an end-to-end run needs no clicking:
 Widgets and the widget gallery (chronod) are picky during development:
 - Only one copy of the app may be registered with Launch Services. `make run` (Debug, DerivedData) and
   `make install` (Release, ~/Applications) unregister the other copy; archives under `build/` are unregistered too.
-- Never rename a widget `kind` (`AppGroup.widgetKind`, `AppGroup.legacyWidgetKind`). A static widget cannot
-  become a configurable one in place (error 1103), which is why the legacy static kind still exists.
+- Never rename a widget `kind` (`AppGroup.widgetKinds`): placed widgets are bound to it and a widget whose
+  kind disappears fails with error 1100, after which chronod backs off for a day. A static widget also cannot
+  become a configurable one in place (error 1103). One kind per size keeps gallery names meaningful.
 - After a widget change the gallery may show stale or no Gitwall entries until the user opens
   "Edit Widgets…" (that triggers a fresh descriptor fetch). `make register` restarts chronod.
 Unified log: `/usr/bin/log stream --predicate 'subsystem == "cz.prokopsimek.gitwall"' --info` (note the full path; zsh has a `log` builtin).

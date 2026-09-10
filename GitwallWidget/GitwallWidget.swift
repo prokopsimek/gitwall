@@ -54,20 +54,6 @@ struct PresetTimelineProvider: AppIntentTimelineProvider {
     }
 }
 
-/// Serves the original static widget kind: always the first preset. Kept so widgets placed with early
-/// builds keep working; new widgets use the configurable `GitwallWidget`.
-struct LegacyTimelineProvider: TimelineProvider {
-    func placeholder(in context: Context) -> PresetEntry { .placeholder }
-
-    func getSnapshot(in context: Context, completion: @escaping @Sendable (PresetEntry) -> Void) {
-        completion(context.isPreview ? .placeholder : PresetEntry.load(presetID: nil))
-    }
-
-    func getTimeline(in context: Context, completion: @escaping @Sendable (Timeline<PresetEntry>) -> Void) {
-        completion(PresetEntry.timeline(PresetEntry.load(presetID: nil)))
-    }
-}
-
 extension PresetEntry {
     /// The app reloads timelines after every sync; the timeline policy only keeps relative times fresh.
     static func timeline(_ entry: PresetEntry) -> Timeline<PresetEntry> {
@@ -289,9 +275,6 @@ struct PresetWidgetSpec {
                          description: "Up to nine items with labels, comments and changed lines."),
         PresetWidgetSpec(kind: AppGroup.widgetKindWideBoard, family: .systemExtraLarge, name: "Gitwall Wide Board",
                          description: "Two columns with up to eighteen items. Made for large desktops."),
-        PresetWidgetSpec(kind: AppGroup.widgetKindAnySize, families: [.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge],
-                         name: "Gitwall (any size)",
-                         description: "The same preset widget in one entry for every size, if you prefer to resize later. Counter, List, Board and Wide Board show the same content."),
     ]
 }
 
@@ -324,20 +307,6 @@ struct WideBoardWidget: Widget {
     var body: some WidgetConfiguration { PresetWidgetSpec.all[3].configuration() }
 }
 
-struct AnySizeWidget: Widget {
-    var body: some WidgetConfiguration { PresetWidgetSpec.all[4].configuration() }
-}
-
-struct GitwallLegacyWidget: Widget {
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: AppGroup.legacyWidgetKind, provider: LegacyTimelineProvider()) { entry in
-            GitwallWidgetView(entry: entry)
-        }
-        .configurationDisplayName("Gitwall – First Preset (legacy)")
-        .description("Kept for widgets placed with early versions: always shows your first preset. New widgets should use Counter, List, Board or Wide Board.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
-    }
-}
 
 enum PreviewData {
     static let items: [WorkItem] = {
