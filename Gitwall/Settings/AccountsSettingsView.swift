@@ -75,7 +75,7 @@ private struct AccountRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: account.kind == .github ? "cat" : "fossil.shell")
+            Image(systemName: account.kind == .github ? "cat" : "hare")
                 .font(.title2)
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
@@ -113,8 +113,8 @@ private struct AccountRow: View {
         switch (repos, dynamic) {
         case (0, 0): return "No repositories selected yet"
         case (_, 0): return "\(repos) repositories"
-        case (0, _): return "\(dynamic) organizations"
-        default: return "\(repos) repositories, \(dynamic) organizations"
+        case (0, _): return "\(dynamic) \(account.kind == .gitlab ? "groups" : "organizations")"
+        default: return "\(repos) repositories, \(dynamic) \(account.kind == .gitlab ? "groups" : "organizations")"
         }
     }
 }
@@ -136,7 +136,7 @@ struct AddAccountSheet: View {
 
             Picker("Provider", selection: $kind) {
                 Text("GitHub").tag(ProviderKind.github)
-                Text("GitLab (coming soon)").tag(ProviderKind.gitlab)
+                Text("GitLab").tag(ProviderKind.gitlab)
             }
             .pickerStyle(.segmented)
             .onChange(of: kind) { _, newValue in
@@ -158,8 +158,8 @@ struct AddAccountSheet: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(scopeHelp).font(.caption).foregroundStyle(.secondary)
-                if kind == .github, let url = tokenURL {
-                    Link("Create a token on GitHub…", destination: url).font(.caption)
+                if let url = tokenURL {
+                    Link(kind == .github ? "Create a token on GitHub…" : "Create a token on GitLab…", destination: url).font(.caption)
                 }
             }
 
@@ -174,7 +174,7 @@ struct AddAccountSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(isWorking ? "Verifying…" : "Verify and Add") { Task { await add() } }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(isWorking || token.isEmpty || baseURL == nil || kind == .gitlab)
+                    .disabled(isWorking || token.isEmpty || baseURL == nil)
                     .accessibilityIdentifier("account-verify")
             }
         }
@@ -194,13 +194,16 @@ struct AddAccountSheet: View {
     private var scopeHelp: String {
         switch kind {
         case .github: "Classic token: scopes repo and read:org. Fine-grained token: read access to Pull requests, Issues, Metadata (and Members for organizations)."
-        case .gitlab: "GitLab support with read_api tokens arrives in the next update."
+        case .gitlab: "Personal access token with the read_api scope (classic token). Works with gitlab.com and self-managed GitLab 16 or newer."
         }
     }
 
     private var tokenURL: URL? {
         guard let baseURL else { return nil }
-        return URL(string: "\(baseURL.absoluteString)/settings/tokens/new?scopes=repo,read:org&description=Gitwall")
+        switch kind {
+        case .github: return URL(string: "\(baseURL.absoluteString)/settings/tokens/new?scopes=repo,read:org&description=Gitwall")
+        case .gitlab: return URL(string: "\(baseURL.absoluteString)/-/user_settings/personal_access_tokens?name=Gitwall&scopes=read_api")
+        }
     }
 
     private func add() async {

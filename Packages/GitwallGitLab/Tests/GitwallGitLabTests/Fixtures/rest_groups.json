@@ -1,0 +1,22 @@
+[
+ {
+  "id": 10,
+  "name": "Applifting",
+  "full_name": "Applifting",
+  "full_path": "applifting",
+  "path": "applifting",
+  "visibility": "private",
+  "avatar_url": "https://git.applifting.cz/uploads/-/system/group/avatar/10/logo.png",
+  "web_url": "https://git.applifting.cz/groups/applifting"
+ },
+ {
+  "id": 42,
+  "name": "dx-heroes",
+  "full_name": "Applifting / DX Heroes",
+  "full_path": "applifting/dx-heroes",
+  "path": "dx-heroes",
+  "visibility": "private",
+  "avatar_url": null,
+  "web_url": "https://git.applifting.cz/groups/applifting/dx-heroes"
+ }
+]

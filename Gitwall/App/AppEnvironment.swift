@@ -2,6 +2,7 @@ import AppKit
 import GitwallAuth
 import GitwallCore
 import GitwallGitHub
+import GitwallGitLab
 import Observation
 import OSLog
 import ServiceManagement
@@ -50,7 +51,7 @@ final class AppEnvironment {
     init(defaults: UserDefaults = .standard, tokenStore: (any TokenStore)? = nil) {
         self.defaults = defaults
         self.tokenStore = tokenStore ?? KeychainTokenStore()
-        self.providers = [.github: GitHubProvider()]
+        self.providers = [.github: GitHubProvider(), .gitlab: GitLabProvider()]
         container = AppGroup.containerURL()
         if let container {
             configStore = ConfigStore(directoryURL: container)

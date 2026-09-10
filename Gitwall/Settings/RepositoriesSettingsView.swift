@@ -82,7 +82,7 @@ struct RepositoriesSettingsView: View {
                 }
                 List {
                     if !containers.isEmpty {
-                        Section("Organizations (all repositories, including new ones)") {
+                        Section(account.kind == .gitlab ? "Groups (all projects, including subgroups and new ones)" : "Organizations (all repositories, including new ones)") {
                             ForEach(containers) { container in
                                 Toggle(isOn: sourceBinding(container.source, account: account)) {
                                     Label(container.name, systemImage: "building.2")
@@ -90,7 +90,7 @@ struct RepositoriesSettingsView: View {
                             }
                         }
                     }
-                    Section(repositories.isEmpty ? "Repositories" : "Repositories (\(filteredRepositories.count))") {
+                    Section(repositories.isEmpty ? (account.kind == .gitlab ? "Projects" : "Repositories") : "\(account.kind == .gitlab ? "Projects" : "Repositories") (\(filteredRepositories.count))") {
                         if repositories.isEmpty, !isLoading {
                             Text("No repositories found for this token. You can add one manually on the right.")
                                 .foregroundStyle(.secondary)
@@ -139,7 +139,7 @@ struct RepositoriesSettingsView: View {
                 }
                 .listStyle(.inset)
                 HStack {
-                    TextField("owner/repository", text: $manualEntry)
+                    TextField(account.kind == .gitlab ? "group/project" : "owner/repository", text: $manualEntry)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit { addManual(account) }
                     Button("Add") { addManual(account) }
@@ -161,8 +161,9 @@ struct RepositoriesSettingsView: View {
     }
 
     private var isValidManualEntry: Bool {
-        let parts = manualEntry.trimmingCharacters(in: .whitespaces).split(separator: "/")
-        return parts.count == 2 && parts.allSatisfy { !$0.isEmpty }
+        let parts = manualEntry.trimmingCharacters(in: .whitespaces).split(separator: "/", omittingEmptySubsequences: false)
+        let allowed = account?.kind == .gitlab ? parts.count >= 2 : parts.count == 2
+        return allowed && parts.allSatisfy { !$0.isEmpty }
     }
 
     private func addManual(_ account: Account) {

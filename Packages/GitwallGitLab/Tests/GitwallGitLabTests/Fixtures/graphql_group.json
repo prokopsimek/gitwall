@@ -1,0 +1,422 @@
+{
+ "data": {
+  "queryComplexity": {
+   "score": 102,
+   "limit": 200
+  },
+  "g0": {
+   "fullPath": "gitlab-org/ci-cd",
+   "mergeRequests": {
+    "pageInfo": {
+     "hasNextPage": true,
+     "endCursor": "eyJ1cGRhdGVkX2F0IjoiMjAyNi0wOS0xMCAwNzoyODo1MC4wMTY0NzAwMDAgKzAwMDAiLCJpZCI6IjUyNjY2NzIzNCJ9"
+    },
+    "nodes": [
+     {
+      "iid": "434",
+      "title": "Draft: fix(deployer): fail wait-healthy fast on a stopped runner process",
+      "webUrl": "https://gitlab.com/gitlab-org/ci-cd/runner-tools/grit/-/merge_requests/434",
+      "draft": true,
+      "createdAt": "2026-09-10T10:37:03Z",
+      "updatedAt": "2026-09-10T10:37:07Z",
+      "author": {
+       "username": "joe-shaw",
+       "name": "Joe Shaw",
+       "avatarUrl": "https://secure.gravatar.com/avatar/f7da92c2499a2ed72750a2505024930e3c976aaf226313a90557fe0ebea4aee8?s=80&d=identicon"
+      },
+      "labels": {
+       "nodes": [
+        {
+         "title": "type::bug",
+         "color": "#cc0000"
+        }
+       ]
+      },
+      "assignees": {
+       "nodes": [
+        {
+         "username": "joe-shaw",
+         "name": "Joe Shaw",
+         "avatarUrl": "https://secure.gravatar.com/avatar/f7da92c2499a2ed72750a2505024930e3c976aaf226313a90557fe0ebea4aee8?s=80&d=identicon"
+        }
+       ]
+      },
+      "reviewers": {
+       "nodes": []
+      },
+      "milestone": null,
+      "userNotesCount": 0,
+      "approved": false,
+      "conflicts": false,
+      "detailedMergeStatus": "DRAFT_STATUS",
+      "approvedBy": {
+       "nodes": []
+      },
+      "headPipeline": {
+       "status": "RUNNING"
+      },
+      "diffStatsSummary": {
+       "additions": 136,
+       "deletions": 1
+      },
+      "project": {
+       "fullPath": "gitlab-org/ci-cd/runner-tools/grit"
+      }
+     },
+     {
+      "iid": "174",
+      "title": "fix(rules): Reject an unparseable `if:` instead of dropping the job",
+      "webUrl": "https://gitlab.com/gitlab-org/ci-cd/runner-tools/glci/-/merge_requests/174",
+      "draft": false,
+      "createdAt": "2026-09-01T15:13:28Z",
+      "updatedAt": "2026-09-10T07:28:51Z",
+      "author": {
+       "username": "vertisan",
+       "name": "Pawe\u0142 Farys",
+       "avatarUrl": "/uploads/-/system/user/avatar/939514/avatar.png?v=1789035695"
+      },
+      "labels": {
+       "nodes": [
+        {
+         "title": "Category:Runner Core",
+         "color": "#6699cc"
+        },
+        {
+         "title": "Community contribution",
+         "color": "#a8d695"
+        },
+        {
+         "title": "backend",
+         "color": "#D10069"
+        },
+        {
+         "title": "bug::functional",
+         "color": "#CC0000"
+        },
+        {
+         "title": "devops::verify",
+         "color": "#E44D2A"
+        },
+        {
+         "title": "group::runner core",
+         "color": "#a8d695"
+        },
+        {
+         "title": "idle",
+         "color": "#dc143c"
+        },
+        {
+         "title": "linked-issue",
+         "color": "#6699cc"
+        },
+        {
+         "title": "section::ci",
+         "color": "#f0ad4e"
+        },
+        {
+         "title": "type::bug",
+         "color": "#cc0000"
+        },
+        {
+         "title": "workflow::ready for review",
+         "color": "#428BCA"
+        }
+       ]
+      },
+      "assignees": {
+       "nodes": [
+        {
+         "username": "vertisan",
+         "name": "Pawe\u0142 Farys",
+         "avatarUrl": "/uploads/-/system/user/avatar/939514/avatar.png?v=1789035695"
+        }
+       ]
+      },
+      "reviewers": {
+       "nodes": [
+        {
+         "username": "ggeorgiev_gitlab",
+         "name": "Georgi N. Georgiev | GitLab",
+         "avatarUrl": "https://secure.gravatar.com/avatar/d2189187f4fef769508fc45200db57168431557e367631fbbeee519edfce0c37?s=80&d=identicon",
+         "mergeRequestInteraction": {
+          "reviewState": "UNREVIEWED",
+          "approved": false
+         }
+        },
+        {
+         "username": "GitLabDuo",
+         "name": "GitLab Duo",
+         "avatarUrl": "/uploads/-/system/user/avatar/21826781/duo-bot.png?v=1781708173",
+         "mergeRequestInteraction": {
+          "reviewState": "REVIEWED",
+          "approved": false
+         }
+        }
+       ]
+      },
+      "milestone": null,
+      "userNotesCount": 10,
+      "approved": true,
+      "conflicts": false,
+      "detailedMergeStatus": "MERGEABLE",
+      "approvedBy": {
+       "nodes": []
+      },
+      "headPipeline": {
+       "status": "SUCCESS"
+      },
+      "diffStatsSummary": {
+       "additions": 1327,
+       "deletions": 27
+      },
+      "project": {
+       "fullPath": "gitlab-org/ci-cd/runner-tools/glci"
+      }
+     },
+     {
+      "iid": "175",
+      "title": "fix(rules): Evaluate a job's rules against its own scope",
+      "webUrl": "https://gitlab.com/gitlab-org/ci-cd/runner-tools/glci/-/merge_requests/175",
+      "draft": false,
+      "createdAt": "2026-09-01T16:09:10Z",
+      "updatedAt": "2026-09-10T07:28:50Z",
+      "author": {
+       "username": "vertisan",
+       "name": "Pawe\u0142 Farys",
+       "avatarUrl": "/uploads/-/system/user/avatar/939514/avatar.png?v=1789035695"
+      },
+      "labels": {
+       "nodes": [
+        {
+         "title": "Category:Runner Core",
+         "color": "#6699cc"
+        },
+        {
+         "title": "Community contribution",
+         "color": "#a8d695"
+        },
+        {
+         "title": "backend",
+         "color": "#D10069"
+        },
+        {
+         "title": "bug::functional",
+         "color": "#CC0000"
+        },
+        {
+         "title": "devops::verify",
+         "color": "#E44D2A"
+        },
+        {
+         "title": "group::runner core",
+         "color": "#a8d695"
+        },
+        {
+         "title": "idle",
+         "color": "#dc143c"
+        },
+        {
+         "title": "linked-issue",
+         "color": "#6699cc"
+        },
+        {
+         "title": "section::ci",
+         "color": "#f0ad4e"
+        },
+        {
+         "title": "type::bug",
+         "color": "#cc0000"
+        },
+        {
+         "title": "workflow::ready for review",
+         "color": "#428BCA"
+        }
+       ]
+      },
+      "assignees": {
+       "nodes": [
+        {
+         "username": "vertisan",
+         "name": "Pawe\u0142 Farys",
+         "avatarUrl": "/uploads/-/system/user/avatar/939514/avatar.png?v=1789035695"
+        }
+       ]
+      },
+      "reviewers": {
+       "nodes": [
+        {
+         "username": "ggeorgiev_gitlab",
+         "name": "Georgi N. Georgiev | GitLab",
+         "avatarUrl": "https://secure.gravatar.com/avatar/d2189187f4fef769508fc45200db57168431557e367631fbbeee519edfce0c37?s=80&d=identicon",
+         "mergeRequestInteraction": {
+          "reviewState": "UNREVIEWED",
+          "approved": false
+         }
+        },
+        {
+         "username": "GitLabDuo",
+         "name": "GitLab Duo",
+         "avatarUrl": "/uploads/-/system/user/avatar/21826781/duo-bot.png?v=1781708173",
+         "mergeRequestInteraction": {
+          "reviewState": "REVIEWED",
+          "approved": false
+         }
+        }
+       ]
+      },
+      "milestone": null,
+      "userNotesCount": 13,
+      "approved": true,
+      "conflicts": false,
+      "detailedMergeStatus": "MERGEABLE",
+      "approvedBy": {
+       "nodes": []
+      },
+      "headPipeline": {
+       "status": "SUCCESS"
+      },
+      "diffStatsSummary": {
+       "additions": 1243,
+       "deletions": 196
+      },
+      "project": {
+       "fullPath": "gitlab-org/ci-cd/runner-tools/glci"
+      }
+     }
+    ]
+   },
+   "issues": {
+    "pageInfo": {
+     "hasNextPage": true,
+     "endCursor": "eyJ1cGRhdGVkX2F0IjoiMjAyNi0wOS0wOSAwODoxMTozMC40MTQ5MDYwMDAgKzAwMDAiLCJpZCI6IjE4NDQzODU5NyJ9"
+    },
+    "nodes": [
+     {
+      "iid": "226",
+      "title": "Dependency Dashboard",
+      "webUrl": "https://gitlab.com/gitlab-org/ci-cd/runner-tools/grit/-/work_items/226",
+      "createdAt": "2026-02-18T09:11:30Z",
+      "updatedAt": "2026-09-10T04:12:49Z",
+      "author": {
+       "username": "gitlab-dependency-update-bot",
+       "name": "GitLab Dependency Bot",
+       "avatarUrl": "https://secure.gravatar.com/avatar/3d0463f813f54718127bf38acba616ef6bc5160fea8111c47dd4088fcacdb91a?s=80&d=identicon"
+      },
+      "labels": {
+       "nodes": [
+        {
+         "title": "Category:Runner Core  [DEPRECATED]",
+         "color": "#428bca"
+        },
+        {
+         "title": "devops::verify",
+         "color": "#E44D2A"
+        },
+        {
+         "title": "group::runner core",
+         "color": "#a8d695"
+        },
+        {
+         "title": "section::ci",
+         "color": "#f0ad4e"
+        }
+       ]
+      },
+      "assignees": {
+       "nodes": []
+      },
+      "milestone": null,
+      "userNotesCount": 0,
+      "projectId": 48756626
+     },
+     {
+      "iid": "222",
+      "title": "Pipeline Authoring 19.5 Planning",
+      "webUrl": "https://gitlab.com/gitlab-org/ci-cd/pipeline-authoring/-/work_items/222",
+      "createdAt": "2026-06-26T11:43:30Z",
+      "updatedAt": "2026-09-09T12:13:39Z",
+      "author": {
+       "username": "manuelgrabowski",
+       "name": "Manuel Grabowski",
+       "avatarUrl": "/uploads/-/system/user/avatar/10339034/avatar.png?v=1789001620"
+      },
+      "labels": {
+       "nodes": [
+        {
+         "title": "FY27-Q3",
+         "color": "#808080"
+        },
+        {
+         "title": "Planning Issue",
+         "color": "#44AD8E"
+        }
+       ]
+      },
+      "assignees": {
+       "nodes": [
+        {
+         "username": "DarrenEastman",
+         "name": "Darren Eastman",
+         "avatarUrl": "/uploads/-/system/user/avatar/4228834/avatar.png?v=1789032008"
+        },
+        {
+         "username": "manuelgrabowski",
+         "name": "Manuel Grabowski",
+         "avatarUrl": "/uploads/-/system/user/avatar/10339034/avatar.png?v=1789001620"
+        },
+        {
+         "username": "conchosaez",
+         "name": "Concho Saez",
+         "avatarUrl": "/uploads/-/system/user/avatar/32539390/avatar.png?v=1788998456"
+        }
+       ]
+      },
+      "milestone": {
+       "title": "19.5"
+      },
+      "userNotesCount": 0,
+      "projectId": 21531004
+     },
+     {
+      "iid": "1",
+      "title": "Dependency Dashboard",
+      "webUrl": "https://gitlab.com/gitlab-org/ci-cd/runner-tools/runner-linters/-/work_items/1",
+      "createdAt": "2026-02-18T09:10:06Z",
+      "updatedAt": "2026-09-09T08:11:30Z",
+      "author": {
+       "username": "gitlab-dependency-update-bot",
+       "name": "GitLab Dependency Bot",
+       "avatarUrl": "https://secure.gravatar.com/avatar/3d0463f813f54718127bf38acba616ef6bc5160fea8111c47dd4088fcacdb91a?s=80&d=identicon"
+      },
+      "labels": {
+       "nodes": [
+        {
+         "title": "Category:Runner Core  [DEPRECATED]",
+         "color": "#428bca"
+        },
+        {
+         "title": "devops::verify",
+         "color": "#E44D2A"
+        },
+        {
+         "title": "group::runner core",
+         "color": "#a8d695"
+        },
+        {
+         "title": "section::ci",
+         "color": "#f0ad4e"
+        }
+       ]
+      },
+      "assignees": {
+       "nodes": []
+      },
+      "milestone": null,
+      "userNotesCount": 0,
+      "projectId": 19533665
+     }
+    ]
+   }
+  }
+ }
+}

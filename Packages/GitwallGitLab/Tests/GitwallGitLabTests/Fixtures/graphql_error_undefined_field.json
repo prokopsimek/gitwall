@@ -1,0 +1,27 @@
+{
+ "errors": [
+  {
+   "message": "Field 'mergeRequestInteraction' doesn't exist on type 'UserCore'",
+   "locations": [
+    {
+     "line": 3,
+     "column": 9
+    }
+   ],
+   "path": [
+    "query",
+    "project",
+    "mergeRequests",
+    "nodes",
+    "reviewers",
+    "nodes",
+    "mergeRequestInteraction"
+   ],
+   "extensions": {
+    "code": "undefinedField",
+    "typeName": "UserCore",
+    "fieldName": "mergeRequestInteraction"
+   }
+  }
+ ]
+}

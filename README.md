@@ -20,10 +20,10 @@ Requires macOS 14 Sonoma or later.
 
 ## Status
 
-Beta. GitHub (github.com and GitHub Enterprise Server) with personal access tokens works
-end to end: accounts, repository and organization discovery, presets with filters, menu bar
-popover, configurable desktop widgets in four sizes, notifications. GitLab, OAuth sign-in
-and App Store release are the next milestones (see `docs/PLAN.md`).
+Beta. GitHub (github.com and GitHub Enterprise Server) and GitLab (gitlab.com and self-managed,
+GitLab 16 or newer) with personal access tokens work end to end: accounts, repository, organization
+and group discovery, presets with filters, menu bar popover, configurable desktop widgets in four
+sizes, notifications. OAuth sign-in and the App Store release are the next milestones (see `docs/PLAN.md`).
 
 ## Widgets
 

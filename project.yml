@@ -47,6 +47,8 @@ packages:
     path: Packages/GitwallAuth
   GitwallGitHub:
     path: Packages/GitwallGitHub
+  GitwallGitLab:
+    path: Packages/GitwallGitLab
 
 targets:
   Gitwall:
@@ -62,6 +64,7 @@ targets:
       - package: GitwallUI
       - package: GitwallAuth
       - package: GitwallGitHub
+      - package: GitwallGitLab
     entitlements:
       path: Config/Gitwall.entitlements
       properties:
