@@ -35,6 +35,8 @@ final class AppEnvironment {
     let container: URL?
     let configStore: ConfigStore?
     let snapshotStore: SnapshotStore?
+    /// `--debug-demo`: fictional accounts and items from `DemoData`, kept in memory only (screenshots, UI work).
+    let isDemo: Bool
     let tokenStore: any TokenStore
     let providers: [ProviderKind: any GitProvider]
     let notifications = NotificationDispatcher()
@@ -48,12 +50,18 @@ final class AppEnvironment {
     @ObservationIgnored private let avatars: AvatarDownloader?
     @ObservationIgnored private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard, tokenStore: (any TokenStore)? = nil) {
+    init(defaults: UserDefaults = .standard, tokenStore: (any TokenStore)? = nil, demo: Bool = false) {
         self.defaults = defaults
         self.tokenStore = tokenStore ?? KeychainTokenStore()
         self.providers = [.github: GitHubProvider(), .gitlab: GitLabProvider()]
-        container = AppGroup.containerURL()
-        if let container {
+        isDemo = demo
+        container = demo ? nil : AppGroup.containerURL()
+        if demo {
+            configStore = nil
+            snapshotStore = nil
+            avatars = nil
+            log.info("Demo mode: in-memory sample data, no App Group or Keychain access")
+        } else if let container {
             configStore = ConfigStore(directoryURL: container)
             snapshotStore = SnapshotStore(directoryURL: container)
             avatars = AvatarDownloader(container: container)
@@ -66,11 +74,18 @@ final class AppEnvironment {
         }
     }
 
-    var containerAvailable: Bool { container != nil }
+    var containerAvailable: Bool { container != nil || isDemo }
 
     // MARK: Lifecycle
 
     func start() {
+        if isDemo {
+            config = DemoData.config
+            snapshot = DemoData.snapshot()
+            selectedPresetID = config.presets.first?.id
+            applyActivationPolicy()
+            return
+        }
         do {
             config = try configStore?.load() ?? .empty
         } catch {
@@ -315,6 +330,10 @@ final class AppEnvironment {
     }
 
     private func persist(_ updated: AppConfig, refresh: Bool = true) throws {
+        if isDemo {
+            config = updated
+            return
+        }
         guard let configStore else { throw AppError.containerUnavailable }
         try configStore.save(updated)
         config = updated

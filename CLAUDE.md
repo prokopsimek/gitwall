@@ -43,7 +43,8 @@ make test            # packages + xcodebuild test
 ```
 
 Debug builds accept `--debug-reset`, `--debug-github-token <pat>` and `--debug-repos a/b,c/d`
-launch arguments (see AppDelegate) so an end-to-end run needs no clicking:
+launch arguments (see AppDelegate) so an end-to-end run needs no clicking, and `--debug-demo`
+(in-memory sample data from `GitwallCore.DemoData`, used for App Store screenshots via `Scripts/screenshots.swift`):
 `open build/DerivedData/Build/Products/Debug/Gitwall.app --args --debug-reset --debug-github-token "$(gh auth token)" --debug-repos owner/repo`.
 Widgets and the widget gallery (chronod) are picky during development:
 - Only one copy of the app may be registered with Launch Services. `make run` (Debug, DerivedData) and

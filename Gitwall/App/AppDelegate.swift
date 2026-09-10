@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         app.run()
     }
 
-    let environment = AppEnvironment()
+    let environment = AppEnvironment(demo: AppDelegate.isDemoLaunch)
     private var statusItem: StatusItemController?
     private var mainWindow: MainWindowController?
     private var settingsWindow: SettingsWindowController?
@@ -47,8 +47,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = StatusItemController(environment: environment)
         environment.start()
         applyDebugArguments()
-        if environment.needsOnboarding {
+        if environment.isDemo {
+            presentDemoWindows()
+        } else if environment.needsOnboarding {
             showMainWindow(presetID: nil)
+        }
+    }
+
+    /// `--debug-demo`: sample data instead of the user's; Debug builds only. Used for App Store screenshots.
+    private static var isDemoLaunch: Bool {
+        #if DEBUG
+        return CommandLine.arguments.contains("--debug-demo")
+        #else
+        return false
+        #endif
+    }
+
+    /// Opens every window the screenshot script captures, at a fixed size so shots are reproducible.
+    /// `--debug-demo-preset <index>` picks the preset shown in the main window and popover.
+    private func presentDemoWindows() {
+        let args = CommandLine.arguments
+        if let index = args.firstIndex(of: "--debug-demo-preset"), args.indices.contains(index + 1),
+           let position = Int(args[index + 1]), environment.config.presets.indices.contains(position) {
+            environment.selectedPresetID = environment.config.presets[position].id
+        }
+        showMainWindow(presetID: environment.selectedPresetID)
+        if let window = mainWindow?.window {
+            window.setContentSize(NSSize(width: 1180, height: 760))
+            window.center()
+        }
+        showSettings(.presets)
+        if let window = settingsWindow?.window {
+            window.setContentSize(NSSize(width: 920, height: 720))
+            window.center()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.statusItem?.showPopover()
+            // The popover stays open in demo mode; hand focus back so the main window is captured as active.
+            self?.mainWindow?.window?.makeKeyAndOrderFront(nil)
         }
     }
 
@@ -99,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// creates a GitHub account without going through the UI. Debug builds only.
     private func applyDebugArguments() {
         #if DEBUG
+        guard !environment.isDemo else { return }
         let args = CommandLine.arguments
         if args.contains("--debug-reset") {
             environment.resetAllData()

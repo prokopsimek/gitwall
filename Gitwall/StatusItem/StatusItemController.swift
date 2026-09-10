@@ -26,7 +26,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             button.setAccessibilityIdentifier("gitwall-status-item")
         }
 
-        popover.behavior = .transient
+        // Demo mode pins the popover so the screenshot script can capture it next to the other windows,
+        // and forces the light appearance because a window-only capture flattens the dark material to grey.
+        popover.behavior = environment.isDemo ? .applicationDefined : .transient
+        if environment.isDemo { popover.appearance = NSAppearance(named: .aqua) }
         popover.animates = false
         popover.delegate = self
         popover.contentViewController = NSHostingController(rootView: PopoverView(environment: environment))
