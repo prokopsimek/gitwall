@@ -1,0 +1,6 @@
+{"title": "Filter by anything",
+ "subtitle": "Relation to you, drafts, review and check state, conflicts, labels, age, milestone, text, plus notifications per preset",
+ "layers": [
+  {"file": "../out/shots/D/window-1-gitwall-settings.png", "crop": [600, 1020, 1210, 790], "radius": 24, "x": 200, "y": 470, "width": 1210},
+  {"file": "../out/shots/D/window-1-gitwall-settings.png", "crop": [600, 1860, 1210, 1140], "radius": 24, "x": 1470, "y": 470, "width": 1210}
+ ]}

@@ -10,6 +10,8 @@
 //       Same background, but a headline and several layers placed by hand:
 //       {"title": "...", "subtitle": "...", "layers": [{"file": "a.png", "x": 140, "y": 460, "width": 1800}]}
 //       Coordinates are canvas pixels from the top-left; "width" scales the layer, height follows.
+//       An optional "crop": [x, y, width, height] (source pixels, top-left origin) shows part of a capture,
+//       and "radius" rounds the crop's corners.
 //
 // Run the Debug app with `--debug-demo` first; see docs/RELEASING.md.
 
@@ -156,6 +158,19 @@ func render(layers: [Layer], title: String?, subtitle: String?, output: URL) {
     print("\(output.path)\t\(Int(canvasSize.width))x\(Int(canvasSize.height))\tno alpha")
 }
 
+/// Re-draws an image with rounded, transparent corners (crops lose the window's own outline).
+func roundedCorners(_ image: CGImage, radius: CGFloat) -> CGImage {
+    guard radius > 0 else { return image }
+    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    guard let ctx = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+                              space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return image }
+    let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+    ctx.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+    ctx.clip()
+    ctx.draw(image, in: rect)
+    return ctx.makeImage() ?? image
+}
+
 /// Single window, centered, never upscaled (captures are already 2x on Retina).
 func compose(window: URL, output: URL) {
     let shot = loadImage(window)
@@ -175,7 +190,12 @@ func compose(spec: URL, output: URL) {
     var layers: [Layer] = []
     for item in layerSpecs {
         guard let file = item["file"] as? String, let x = item["x"] as? Double, let y = item["y"] as? Double else { fail("layer needs file, x, y") }
-        let image = loadImage(URL(fileURLWithPath: file, relativeTo: base))
+        var image = loadImage(URL(fileURLWithPath: file, relativeTo: base))
+        if let crop = item["crop"] as? [Double], crop.count == 4 {
+            let rect = CGRect(x: crop[0], y: crop[1], width: crop[2], height: crop[3])
+            guard let cropped = image.cropping(to: rect) else { fail("crop outside \(file)") }
+            image = roundedCorners(cropped, radius: CGFloat((item["radius"] as? Double) ?? 0))
+        }
         let width: CGFloat = (item["width"] as? Double).map { CGFloat($0) } ?? CGFloat(image.width)
         let height: CGFloat = width * CGFloat(image.height) / CGFloat(image.width)
         // Spec uses top-left coordinates; CoreGraphics draws from the bottom-left.

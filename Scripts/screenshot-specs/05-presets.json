@@ -1,5 +1,6 @@
-{"title": "Presets you define",
- "subtitle": "Accounts, repositories, item kinds and filters, saved as named views",
+{"title": "Presets: your accounts, your rules",
+ "subtitle": "Any mix of accounts and repositories, pull requests and issues, saved as a named view",
  "layers": [
-  {"file": "../out/shots/w/window-2-gitwall-settings.png", "x": 690, "y": 440, "width": 1500}
+  {"file": "../out/shots/D/window-2-gitwall.png", "x": 140, "y": 470, "width": 1500},
+  {"file": "../out/shots/D/window-1-gitwall-settings.png", "crop": [600, 120, 1210, 870], "radius": 24, "x": 1720, "y": 530, "width": 1020}
  ]}

@@ -1,0 +1,6 @@
+{"title": "Issues too, not just pull requests",
+ "subtitle": "A preset can mix pull requests and issues, or follow just the bugs you care about",
+ "layers": [
+  {"file": "../out/shots/C/window-2-gitwall.png", "x": 140, "y": 440, "width": 1820},
+  {"file": "../out/shots/A/window-6-widget-board.png", "x": 2040, "y": 640, "width": 700}
+ ]}

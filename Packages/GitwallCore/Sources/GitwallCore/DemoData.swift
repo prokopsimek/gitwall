@@ -25,10 +25,18 @@ public enum DemoData {
                kinds: [.pullRequest], filter: ItemFilter(relations: [.reviewRequestedFromMe], includeDrafts: false),
                showCountInMenuBar: true),
         Preset(id: fixedID(0x12), name: "All open", icon: "tray.full", kinds: [.pullRequest, .issue]),
-        Preset(id: fixedID(0x13), name: "Failing CI", icon: "xmark.octagon",
+        Preset(id: fixedID(0x13), name: "Failing CI", icon: "flame",
                kinds: [.pullRequest], filter: ItemFilter(ciStates: [.failure])),
         Preset(id: fixedID(0x14), name: "Release 2.4", icon: "shippingbox",
                kinds: [.pullRequest, .issue], filter: ItemFilter(milestone: "2.4")),
+        Preset(id: fixedID(0x15), name: "Open bugs", icon: "ladybug",
+               kinds: [.issue], filter: ItemFilter(labelsAny: ["bug"])),
+        // Deliberately busy: shows the filter editor with several options in use.
+        Preset(id: fixedID(0x16), name: "Needs my attention", icon: "exclamationmark.triangle",
+               scopes: [PresetScope(accountID: fixedID(0x01)), PresetScope(accountID: fixedID(0x02))],
+               kinds: [.pullRequest],
+               filter: ItemFilter(relations: [.reviewRequestedFromMe, .assignedToMe], includeDrafts: false,
+                                  labelsNone: ["dependencies"], ciStates: [.failure, .running], updatedWithinDays: 7)),
     ]
 
     public static let config = AppConfig(accounts: [github, gitlab], presets: presets)

@@ -85,7 +85,8 @@ struct PresetsSettingsView: View {
             }
             .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { if selection == nil { selection = environment.config.presets.first?.id } }
+        // Open on the preset the user is looking at in the window or popover.
+        .onAppear { if selection == nil { selection = environment.selectedPreset?.id ?? environment.config.presets.first?.id } }
     }
 
     private var selected: Preset? {

@@ -1,7 +1,7 @@
 {"title": "Every pull request, one glance away",
- "subtitle": "GitHub and GitLab, cloud or self-hosted, sorted by latest activity",
+ "subtitle": "Pull requests, merge requests and issues from GitHub and GitLab, sorted by latest activity",
  "layers": [
-  {"file": "../out/shots/w/window-1-gitwall.png", "x": 140, "y": 440, "width": 1820},
-  {"file": "../out/shots/w/window-7-widget-list.png", "x": 2040, "y": 520, "width": 700},
-  {"file": "../out/shots/w/window-6-widget-board.png", "x": 2040, "y": 900, "width": 700}
+  {"file": "../out/shots/A/window-2-gitwall.png", "x": 140, "y": 440, "width": 1820},
+  {"file": "../out/shots/A/window-7-widget-list.png", "x": 2040, "y": 520, "width": 700},
+  {"file": "../out/shots/A/window-6-widget-board.png", "x": 2040, "y": 900, "width": 700}
  ]}

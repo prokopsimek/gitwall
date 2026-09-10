@@ -13,7 +13,7 @@ enum DemoRenderer {
     private static let families: [(WidgetFamily, String, CGSize, Int)] = [
         (.systemSmall, "counter", CGSize(width: 170, height: 170), 3),
         (.systemMedium, "list", CGSize(width: 364, height: 170), 0),
-        (.systemLarge, "board", CGSize(width: 364, height: 382), 2),
+        (.systemLarge, "board", CGSize(width: 364, height: 382), 5),
         (.systemExtraLarge, "wideboard", CGSize(width: 748, height: 382), 2),
     ]
     private static var windows: [NSWindow] = []

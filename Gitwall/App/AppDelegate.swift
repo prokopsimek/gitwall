@@ -83,7 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         showSettings(.presets)
         if let window = settingsWindow?.window {
-            window.setContentSize(NSSize(width: 920, height: 720))
+            // Tall enough for the whole preset editor, so a screenshot can show every filter without scrolling.
+            window.setContentSize(NSSize(width: 920, height: 1600))
             window.center()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
