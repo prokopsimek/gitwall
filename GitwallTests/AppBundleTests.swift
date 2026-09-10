@@ -18,7 +18,7 @@ struct AppBundleTests {
 
     @Test("widget kinds are stable so widgets on desktops keep working across updates")
     func widgetKind() {
-        #expect(AppGroup.widgetKind == "cz.prokopsimek.gitwall.preset")
+        #expect(AppGroup.widgetKinds == ["cz.prokopsimek.gitwall.counter", "cz.prokopsimek.gitwall.list", "cz.prokopsimek.gitwall.board", "cz.prokopsimek.gitwall.wideboard", "cz.prokopsimek.gitwall.preset"])
         #expect(AppGroup.legacyWidgetKind == "cz.prokopsimek.gitwall.overview")
     }
 

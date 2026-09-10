@@ -31,6 +31,8 @@ let outDir = repoRoot.appendingPathComponent("Scripts/out", isDirectory: true)
 let appIconSet = repoRoot.appendingPathComponent(
     "Gitwall/Resources/Assets.xcassets/AppIcon.appiconset", isDirectory: true)
 let docsIcon = repoRoot.appendingPathComponent("docs/icon.png")
+/// The widget gallery shows the extension's own icon, so the same set lives in the widget target too.
+let widgetIconSet = repoRoot.appendingPathComponent("GitwallWidget/Assets.xcassets/AppIcon.appiconset", isDirectory: true)
 
 // MARK: - Design constants (macOS icon grid on a 1024 canvas)
 
@@ -265,6 +267,7 @@ func main() throws {
     let fm = FileManager.default
     try fm.createDirectory(at: outDir, withIntermediateDirectories: true)
     try fm.createDirectory(at: appIconSet, withIntermediateDirectories: true)
+    try fm.createDirectory(at: widgetIconSet, withIntermediateDirectories: true)
 
     // 1. Masters.
     let fullMaster = outDir.appendingPathComponent("icon-1024.png")
@@ -285,16 +288,19 @@ func main() throws {
         let master = slot.usesSmallMaster ? smallMaster : fullMaster
         let target = outDir.appendingPathComponent(slot.filename)
         try run("/usr/bin/sips", ["-z", "\(slot.pixels)", "\(slot.pixels)", master.path, "--out", target.path])
-        let dest = appIconSet.appendingPathComponent(slot.filename)
-        if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
-        try fm.copyItem(at: target, to: dest)
+        for set in [appIconSet, widgetIconSet] {
+            let dest = set.appendingPathComponent(slot.filename)
+            if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
+            try fm.copyItem(at: target, to: dest)
+        }
         produced.append((slot.pixels, target))
         print("  \(slot.filename)  \(slot.pixels)×\(slot.pixels)  ← \(master.lastPathComponent)")
     }
 
     // 3. Contents.json with filenames.
-    try contentsJSON().write(to: appIconSet.appendingPathComponent("Contents.json"),
-                             atomically: true, encoding: .utf8)
+    for set in [appIconSet, widgetIconSet] {
+        try contentsJSON().write(to: set.appendingPathComponent("Contents.json"), atomically: true, encoding: .utf8)
+    }
     print("wrote \(appIconSet.appendingPathComponent("Contents.json").path)")
 
     // 4. docs/icon.png.

@@ -7,8 +7,14 @@ public enum AppGroup {
     /// failed to produce for this Mac target. Mac App Store accepts both styles.
     public static let identifier = "ZHU9NYW7PP.cz.prokopsimek.gitwall"
     public static let urlScheme = "gitwall"
-    /// WidgetKit kind of the configurable (AppIntent) widget. Never rename: placed widgets are bound to it.
-    public static let widgetKind = "cz.prokopsimek.gitwall.preset"
+    /// WidgetKit kinds, one per size so the gallery can name each widget. Never rename: placed widgets are bound to them.
+    public static let widgetKindCounter = "cz.prokopsimek.gitwall.counter"
+    public static let widgetKindList = "cz.prokopsimek.gitwall.list"
+    public static let widgetKindBoard = "cz.prokopsimek.gitwall.board"
+    public static let widgetKindWideBoard = "cz.prokopsimek.gitwall.wideboard"
+    /// Configurable widget that supports every size (the original configurable kind, kept for placed widgets).
+    public static let widgetKindAnySize = "cz.prokopsimek.gitwall.preset"
+    public static let widgetKinds = [widgetKindCounter, widgetKindList, widgetKindBoard, widgetKindWideBoard, widgetKindAnySize]
     /// Kind of the original static widget. WidgetKit cannot turn a static widget into a configurable one
     /// in place, so this kind keeps serving the first preset for widgets placed with early builds.
     public static let legacyWidgetKind = "cz.prokopsimek.gitwall.overview"

@@ -107,12 +107,13 @@ struct GitwallWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: PresetEntry
 
+    /// Compact rows are ~34 pt with the divider; these counts fit the standard widget heights with margins.
     private var rowLimit: Int {
         switch family {
         case .systemSmall: 1
         case .systemMedium: 3
-        case .systemLarge: 9
-        case .systemExtraLarge: 18
+        case .systemLarge: 7
+        case .systemExtraLarge: 14
         default: 3
         }
     }
@@ -139,6 +140,8 @@ struct GitwallWidgetView: View {
             }
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipped()
         .containerBackground(.fill.tertiary, for: .widget)
         .widgetURL(headerURL)
     }
@@ -154,7 +157,8 @@ struct GitwallWidgetView: View {
             Text(entry.preset?.name ?? "Gitwall")
                 .font(.headline)
                 .lineLimit(1)
-            if entry.problem == nil {
+                .minimumScaleFactor(0.85)
+            if entry.problem == nil, family != .systemSmall {
                 Text("\(entry.items.count)")
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 6)
@@ -167,7 +171,7 @@ struct GitwallWidgetView: View {
             }
             if family != .systemSmall {
                 if let fetchedAt = entry.fetchedAt {
-                    Text(fetchedAt, style: .relative)
+                    Text(ItemPresentation.compactAge(since: fetchedAt, now: entry.date))
                         .font(.caption2)
                         .foregroundStyle(entry.isStale ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
                         .lineLimit(1)
@@ -204,15 +208,16 @@ struct GitwallWidgetView: View {
         let perColumn = Int((Double(items.count) / Double(columns)).rounded(.up))
         return HStack(alignment: .top, spacing: 16) {
             ForEach(0..<columns, id: \.self) { column in
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     ForEach(items.dropFirst(column * perColumn).prefix(perColumn)) { item in
                         Link(destination: DeepLink.item(id: item.id).url) {
                             WorkItemRow(
                                 item: item,
                                 avatar: AvatarCache.image(for: item.author.avatarURL, in: entry.container),
-                                style: family == .systemMedium ? .compact : .regular,
+                                style: .compact,
                                 now: entry.date
                             )
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.plain)
                         if item.id != items.last?.id { Divider() }
@@ -257,18 +262,70 @@ struct GitwallWidgetView: View {
     }
 }
 
-struct GitwallWidget: Widget {
-    static let kind = AppGroup.widgetKind
+/// One widget per size so each entry in the gallery says what it shows.
+struct PresetWidgetSpec {
+    let kind: String
+    let families: [WidgetFamily]
+    let name: LocalizedStringResource
+    let description: LocalizedStringResource
 
-    var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: Self.kind, intent: SelectPresetIntent.self, provider: PresetTimelineProvider()) { entry in
+    init(kind: String, family: WidgetFamily, name: LocalizedStringResource, description: LocalizedStringResource) {
+        self.init(kind: kind, families: [family], name: name, description: description)
+    }
+
+    init(kind: String, families: [WidgetFamily], name: LocalizedStringResource, description: LocalizedStringResource) {
+        self.kind = kind
+        self.families = families
+        self.name = name
+        self.description = description
+    }
+
+    static let all: [PresetWidgetSpec] = [
+        PresetWidgetSpec(kind: AppGroup.widgetKindCounter, family: .systemSmall, name: "Gitwall Counter",
+                         description: "How many items match a preset, plus the newest one. Small square."),
+        PresetWidgetSpec(kind: AppGroup.widgetKindList, family: .systemMedium, name: "Gitwall List",
+                         description: "The three latest items of a preset with review, checks and merge state."),
+        PresetWidgetSpec(kind: AppGroup.widgetKindBoard, family: .systemLarge, name: "Gitwall Board",
+                         description: "Up to nine items with labels, comments and changed lines."),
+        PresetWidgetSpec(kind: AppGroup.widgetKindWideBoard, family: .systemExtraLarge, name: "Gitwall Wide Board",
+                         description: "Two columns with up to eighteen items. Made for large desktops."),
+        PresetWidgetSpec(kind: AppGroup.widgetKindAnySize, families: [.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge],
+                         name: "Gitwall (any size)",
+                         description: "The same preset widget in one entry for every size, if you prefer to resize later. Counter, List, Board and Wide Board show the same content."),
+    ]
+}
+
+extension PresetWidgetSpec {
+    /// `Widget` types need a parameterless init, so each size is its own type built from a spec.
+    @MainActor
+    func configuration() -> some WidgetConfiguration {
+        AppIntentConfiguration(kind: kind, intent: SelectPresetIntent.self, provider: PresetTimelineProvider()) { entry in
             GitwallWidgetView(entry: entry)
         }
-        .configurationDisplayName("Gitwall")
-        .description("Pull requests and issues for a preset you choose. Add several widgets, each with its own preset and size.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
-        .contentMarginsDisabled()
+        .configurationDisplayName(name)
+        .description(description)
+        .supportedFamilies(families)
     }
+}
+
+struct CounterWidget: Widget {
+    var body: some WidgetConfiguration { PresetWidgetSpec.all[0].configuration() }
+}
+
+struct ListWidget: Widget {
+    var body: some WidgetConfiguration { PresetWidgetSpec.all[1].configuration() }
+}
+
+struct BoardWidget: Widget {
+    var body: some WidgetConfiguration { PresetWidgetSpec.all[2].configuration() }
+}
+
+struct WideBoardWidget: Widget {
+    var body: some WidgetConfiguration { PresetWidgetSpec.all[3].configuration() }
+}
+
+struct AnySizeWidget: Widget {
+    var body: some WidgetConfiguration { PresetWidgetSpec.all[4].configuration() }
 }
 
 struct GitwallLegacyWidget: Widget {
@@ -276,10 +333,9 @@ struct GitwallLegacyWidget: Widget {
         StaticConfiguration(kind: AppGroup.legacyWidgetKind, provider: LegacyTimelineProvider()) { entry in
             GitwallWidgetView(entry: entry)
         }
-        .configurationDisplayName("Gitwall – First Preset")
-        .description("Always shows your first preset. Use the configurable Gitwall widget to pick a different one.")
+        .configurationDisplayName("Gitwall – First Preset (legacy)")
+        .description("Kept for widgets placed with early versions: always shows your first preset. New widgets should use Counter, List, Board or Wide Board.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
-        .contentMarginsDisabled()
     }
 }
 
@@ -287,32 +343,47 @@ enum PreviewData {
     static let items: [WorkItem] = {
         let account = UUID()
         let now = Date()
+        func pr(_ number: Int, _ repo: String, _ title: String, _ author: String, minutesAgo: Double, review: ReviewState, ci: CIState,
+                merge: MergeState = .clean, draft: Bool = false, labels: [GitwallCore.Label] = [], comments: Int = 0, add: Int? = nil, del: Int? = nil) -> WorkItem {
+            WorkItem(accountID: account, kind: .pullRequest, repoFullName: repo, number: number, title: title,
+                     url: URL(string: "https://github.com")!, author: UserRef(login: author),
+                     createdAt: now.addingTimeInterval(-minutesAgo * 60 - 86_400), updatedAt: now.addingTimeInterval(-minutesAgo * 60),
+                     isDraft: draft, labels: labels, commentCount: comments,
+                     reviewState: review, ciState: ci, mergeState: merge, additions: add, deletions: del)
+        }
+        func issue(_ number: Int, _ repo: String, _ title: String, _ author: String, minutesAgo: Double, labels: [GitwallCore.Label] = [], comments: Int = 0) -> WorkItem {
+            WorkItem(accountID: account, kind: .issue, repoFullName: repo, number: number, title: title,
+                     url: URL(string: "https://github.com")!, author: UserRef(login: author),
+                     createdAt: now.addingTimeInterval(-minutesAgo * 60 - 3 * 86_400), updatedAt: now.addingTimeInterval(-minutesAgo * 60),
+                     labels: labels, commentCount: comments)
+        }
         return [
-            WorkItem(accountID: account, kind: .pullRequest, repoFullName: "dxheroes/mcp-gateway", number: 42,
-                     title: "Add GitLab provider", url: URL(string: "https://github.com")!, author: UserRef(login: "prokopsimek"),
-                     createdAt: now.addingTimeInterval(-86_400), updatedAt: now.addingTimeInterval(-600),
-                     labels: [Label(name: "provider", colorHex: "0E8A16")], commentCount: 3,
-                     reviewState: .approved, ciState: .success, mergeState: .clean, additions: 120, deletions: 7),
-            WorkItem(accountID: account, kind: .pullRequest, repoFullName: "dxheroes/web", number: 17,
-                     title: "Fix hero layout on narrow screens", url: URL(string: "https://github.com")!, author: UserRef(login: "alice"),
-                     createdAt: now.addingTimeInterval(-3 * 86_400), updatedAt: now.addingTimeInterval(-5_400),
-                     isDraft: true, reviewState: .pending, ciState: .failure, mergeState: .conflict),
-            WorkItem(accountID: account, kind: .issue, repoFullName: "dxheroes/mcp-gateway", number: 7,
-                     title: "Widget shows stale data after sleep", url: URL(string: "https://github.com")!, author: UserRef(login: "bob"),
-                     createdAt: now.addingTimeInterval(-9 * 86_400), updatedAt: now.addingTimeInterval(-2 * 86_400),
-                     labels: [Label(name: "bug", colorHex: "D73A4A")], commentCount: 1),
+            pr(42, "dxheroes/mcp-gateway", "Add GitLab provider", "prokopsimek", minutesAgo: 9, review: .approved, ci: .success,
+               labels: [GitwallCore.Label(name: "provider", colorHex: "0E8A16")], comments: 3, add: 120, del: 7),
+            pr(17, "dxheroes/web", "Fix hero layout on narrow screens", "alice", minutesAgo: 75, review: .pending, ci: .failure, merge: .conflict, draft: true),
+            issue(7, "dxheroes/mcp-gateway", "Widget shows stale data after sleep", "bob", minutesAgo: 60 * 26,
+                  labels: [GitwallCore.Label(name: "bug", colorHex: "D73A4A")], comments: 1),
+            pr(311, "dxheroes/dx-scanner", "Bump TypeScript to 5.9 and fix strict warnings", "renovate", minutesAgo: 60 * 30, review: ReviewState.none, ci: .running,
+               labels: [GitwallCore.Label(name: "dependencies", colorHex: "0366D6")]),
+            pr(88, "dxheroes/knowledge-base", "Document the OAuth device flow", "carol", minutesAgo: 60 * 41, review: .changesRequested, ci: .success, comments: 5, add: 64, del: 3),
+            issue(102, "dxheroes/web", "Pricing page renders twice on first load", "dave", minutesAgo: 60 * 50,
+                  labels: [GitwallCore.Label(name: "bug", colorHex: "D73A4A"), GitwallCore.Label(name: "frontend", colorHex: "FBCA04")], comments: 2),
+            pr(203, "dxheroes/mcp-gateway", "Retry failed audits with exponential backoff", "erin", minutesAgo: 60 * 70, review: .approved, ci: .success, add: 210, del: 48),
+            pr(9, "prokopsimek/gitwall", "Widget: compact rows for medium size", "prokopsimek", minutesAgo: 60 * 90, review: .pending, ci: .success, draft: true),
+            issue(15, "dxheroes/dx-scanner", "Support Bitbucket Data Center", "frank", minutesAgo: 60 * 120,
+                  labels: [GitwallCore.Label(name: "enhancement", colorHex: "A2EEEF")], comments: 8),
         ]
     }()
 }
 
 #Preview(as: .systemMedium) {
-    GitwallWidget()
+    ListWidget()
 } timeline: {
     PresetEntry.placeholder
 }
 
 #Preview(as: .systemLarge) {
-    GitwallWidget()
+    BoardWidget()
 } timeline: {
     PresetEntry.placeholder
 }

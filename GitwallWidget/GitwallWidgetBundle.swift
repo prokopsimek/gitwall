@@ -4,7 +4,11 @@ import WidgetKit
 @main
 struct GitwallWidgetBundle: WidgetBundle {
     var body: some Widget {
-        GitwallWidget()
+        CounterWidget()
+        ListWidget()
+        BoardWidget()
+        WideBoardWidget()
+        AnySizeWidget()
         GitwallLegacyWidget()
     }
 }

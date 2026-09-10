@@ -22,7 +22,12 @@ public enum ItemPresentation {
 
     /// Compact relative age: now, 5m, 3h, 2d, 4w.
     public static func age(of item: WorkItem, now: Date = Date()) -> String {
-        let seconds = max(0, now.timeIntervalSince(item.updatedAt))
+        compactAge(since: item.updatedAt, now: now)
+    }
+
+    /// Compact relative age of any date: now, 5m, 3h, 2d, 4w.
+    public static func compactAge(since date: Date, now: Date = Date()) -> String {
+        let seconds = max(0, now.timeIntervalSince(date))
         switch seconds {
         case ..<60: return "now"
         case ..<3600: return "\(Int(seconds / 60))m"

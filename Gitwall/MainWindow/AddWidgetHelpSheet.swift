@@ -8,7 +8,7 @@ struct AddWidgetHelpSheet: View {
         ("rectangle.3.group", "Open the widget gallery",
          "Right-click the desktop and choose “Edit Widgets…”, or click the date in the menu bar and scroll down to “Edit Widgets”."),
         ("magnifyingglass", "Find Gitwall",
-         "Type “Git” in the gallery search, pick a size (small, medium, large or extra large) and drag the widget to the desktop."),
+         "Type “Git” in the gallery search and drag a widget to the desktop: Counter (small), List (medium), Board (large) or Wide Board (extra large)."),
         ("slider.horizontal.3", "Choose a preset",
          "Right-click the widget and choose “Edit Gitwall”, then pick the preset it should show. Presets are managed in Settings › Presets."),
     ]

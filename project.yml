@@ -21,7 +21,7 @@ settings:
     DEVELOPMENT_TEAM: ZHU9NYW7PP
     CODE_SIGN_STYLE: Automatic
     MARKETING_VERSION: 0.1.0
-    CURRENT_PROJECT_VERSION: 3
+    CURRENT_PROJECT_VERSION: 4
     ENABLE_HARDENED_RUNTIME: YES
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
@@ -129,6 +129,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cz.prokopsimek.gitwall.widget
         PRODUCT_NAME: GitwallWidget
+        # The widget gallery shows the extension's own icon, not the app's.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SKIP_INSTALL: YES
         ENABLE_PREVIEWS: YES
 

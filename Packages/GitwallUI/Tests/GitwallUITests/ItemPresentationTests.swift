@@ -28,6 +28,12 @@ struct ItemPresentationTests {
         #expect(ItemPresentation.age(of: item(ageSeconds: 30 * 86_400), now: now) == "4w")
     }
 
+    @Test("compact age works for arbitrary dates")
+    func compactAge() {
+        #expect(ItemPresentation.compactAge(since: now.addingTimeInterval(-1196), now: now) == "19m")
+        #expect(ItemPresentation.compactAge(since: now.addingTimeInterval(60), now: now) == "now")
+    }
+
     @Test("status badges list draft, review, CI and merge problems in that order")
     func badges() {
         let pr = item(reviewState: .changesRequested, ciState: .failure, mergeState: .conflict, isDraft: true)
