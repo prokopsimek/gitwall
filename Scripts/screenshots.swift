@@ -106,10 +106,21 @@ func compose(window: URL, output: URL) {
     let scale = min(1, available.width / CGFloat(shot.width), available.height / CGFloat(shot.height))
     let size = CGSize(width: CGFloat(shot.width) * scale, height: CGFloat(shot.height) * scale)
     let origin = CGPoint(x: (canvasSize.width - size.width) / 2, y: (canvasSize.height - size.height) / 2)
+    let frame = CGRect(origin: origin, size: size)
+    ctx.interpolationQuality = .high
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -28), blur: 70, color: rgb(0x000000, 0.5))
-    ctx.interpolationQuality = .high
-    ctx.draw(shot, in: CGRect(origin: origin, size: size))
+    // One transparency layer so the shadow follows the window's real outline (rounded corners, popover arrow).
+    ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+    // Translucent materials (popover, sidebar) are captured with alpha; back them with a light fill so
+    // they read as they do over a light desktop instead of sinking into the dark background.
+    ctx.saveGState()
+    ctx.clip(to: frame, mask: shot)
+    ctx.setFillColor(rgb(0xF2F2F5))
+    ctx.fill(frame)
+    ctx.restoreGState()
+    ctx.draw(shot, in: frame)
+    ctx.endTransparencyLayer()
     ctx.restoreGState()
 
     guard let image = ctx.makeImage() else { fail("cannot render canvas") }

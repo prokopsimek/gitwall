@@ -61,6 +61,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if popover.isShown { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
+        if environment.isDemo { addDemoBackdrop() }
+    }
+
+    /// Demo mode: an opaque content background. A window-only capture renders the popover's translucent
+    /// material as dark grey whatever sits behind it, which makes the screenshot unreadable.
+    private func addDemoBackdrop() {
+        guard let view = popover.contentViewController?.view else { return }
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
     }
 
     private func showMenu() {
