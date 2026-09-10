@@ -16,6 +16,12 @@ struct AppBundleTests {
         #expect(schemes.contains(AppGroup.urlScheme))
     }
 
+    @Test("widget kinds are stable so widgets on desktops keep working across updates")
+    func widgetKind() {
+        #expect(AppGroup.widgetKind == "cz.prokopsimek.gitwall.preset")
+        #expect(AppGroup.legacyWidgetKind == "cz.prokopsimek.gitwall.overview")
+    }
+
     @Test("starts as a regular app so the Dock shows the real icon; agent mode is a runtime switch")
     func isRegularApp() throws {
         let value = hostInfo["LSUIElement"]

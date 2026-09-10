@@ -9,7 +9,8 @@ desktop widgets only read that snapshot. Product decisions and milestones live i
 
 - `project.yml` – XcodeGen spec, the only source of truth for targets, entitlements,
   Info.plist. Never edit `Gitwall.xcodeproj` (it is generated and git-ignored).
-- `Gitwall/` – app target: AppDelegate, status item, popover, settings, onboarding, URL handling.
+- `Gitwall/` – app target: AppDelegate (`@main`, AppKit run loop, programmatic main menu), status item
+  with popover, main window (`MainWindow/`), settings window, shared list components (`Shared/`), URL handling.
 - `GitwallWidget/` – widget extension: configuration intent, timeline provider, views.
 - `Packages/GitwallCore` – models, `GitProvider` protocol, filters, snapshot/config stores, diff, deep links.
 - `Packages/GitwallGitHub`, `Packages/GitwallGitLab` – providers; depend only on GitwallCore.
@@ -44,6 +45,13 @@ make test            # packages + xcodebuild test
 Debug builds accept `--debug-reset`, `--debug-github-token <pat>` and `--debug-repos a/b,c/d`
 launch arguments (see AppDelegate) so an end-to-end run needs no clicking:
 `open build/DerivedData/Build/Products/Debug/Gitwall.app --args --debug-reset --debug-github-token "$(gh auth token)" --debug-repos owner/repo`.
+Widgets and the widget gallery (chronod) are picky during development:
+- Only one copy of the app may be registered with Launch Services. `make run` (Debug, DerivedData) and
+  `make install` (Release, ~/Applications) unregister the other copy; archives under `build/` are unregistered too.
+- Never rename a widget `kind` (`AppGroup.widgetKind`, `AppGroup.legacyWidgetKind`). A static widget cannot
+  become a configurable one in place (error 1103), which is why the legacy static kind still exists.
+- After a widget change the gallery may show stale or no Gitwall entries until the user opens
+  "Edit Widgets…" (that triggers a fresh descriptor fetch). `make register` restarts chronod.
 Unified log: `/usr/bin/log stream --predicate 'subsystem == "cz.prokopsimek.gitwall"' --info` (note the full path; zsh has a `log` builtin).
 
 Communicate with Prokop in Czech; code, commits and identifiers in English.

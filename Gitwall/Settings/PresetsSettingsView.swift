@@ -59,6 +59,12 @@ struct PresetsSettingsView: View {
                     }
                     .disabled(selected == nil)
                     Spacer()
+                    Button {
+                        environment.showWidgetHelp()
+                    } label: {
+                        Label("Add Widget…", systemImage: "rectangle.3.group")
+                    }
+                    .help("How to place Gitwall widgets on the desktop")
                 }
                 .buttonStyle(.borderless)
                 .padding(8)

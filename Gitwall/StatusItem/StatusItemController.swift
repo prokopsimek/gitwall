@@ -82,7 +82,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Open Gitwall", action: #selector(openPopover), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Open Gitwall Window", action: #selector(openPopover), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Refresh Now", action: #selector(refresh), keyEquivalent: "r").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
@@ -104,7 +104,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     @objc private func openPopover() {
-        showPopover()
+        environment.openMainWindow()
     }
 
     @objc private func refresh() {

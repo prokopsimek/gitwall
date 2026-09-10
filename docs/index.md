@@ -36,3 +36,13 @@ Gitwall is a free, open-source macOS menu bar app with desktop widgets. It gathe
 - [Source code](https://github.com/prokopsimek/gitwall) (MIT license)
 - [Privacy policy](privacy.md)
 - [Report an issue](https://github.com/prokopsimek/gitwall/issues)
+
+## Widgets
+
+1. Right-click the desktop and choose **Edit Widgets…** (or click the clock in the menu bar and scroll to
+   **Edit Widgets**).
+2. Search for **Git**, pick a size and drag the Gitwall widget to the desktop.
+3. Right-click the widget → **Edit “Gitwall”** → choose the preset it should show.
+
+Add as many widgets as you like; each keeps its own preset and size. Presets (which accounts,
+repositories, item kinds and filters) are managed in the app under Settings › Presets.

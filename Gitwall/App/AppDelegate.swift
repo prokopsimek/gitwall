@@ -5,11 +5,26 @@ import UserNotifications
 
 private let log = Logger(subsystem: "cz.prokopsimek.gitwall", category: "app")
 
+/// Entry point. The app is AppKit-driven (status item, main window, settings window are all
+/// `NSWindowController`s) so every window can be opened from the menu bar, the Dock and deep links alike.
+@main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static var shared: AppDelegate?
+
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        shared = delegate
+        app.delegate = delegate
+        app.run()
+    }
+
     let environment = AppEnvironment()
     private var statusItem: StatusItemController?
+    private var mainWindow: MainWindowController?
     private var settingsWindow: SettingsWindowController?
+    private var mainMenu: MainMenuController?
     private var notificationDelegate: NotificationCenterDelegate?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -18,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let icon = NSImage(named: "AppIcon") {
             NSApp.applicationIconImage = icon
         }
+        mainMenu = MainMenuController(environment: environment)
         // Must be installed before launch finishes so notification clicks that launch the app are delivered.
         let delegate = NotificationCenterDelegate(environment: environment)
         notificationDelegate = delegate
@@ -26,11 +42,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         environment.onOpenSettings = { [weak self] tab in self?.showSettings(tab) }
+        environment.onOpenMainWindow = { [weak self] presetID in self?.showMainWindow(presetID: presetID) }
+        environment.onShowWidgetHelp = { [weak self] in self?.showWidgetHelp() }
         statusItem = StatusItemController(environment: environment)
         environment.start()
         applyDebugArguments()
         if environment.needsOnboarding {
-            showSettings(.accounts)
+            showMainWindow(presetID: nil)
         }
     }
 
@@ -46,13 +64,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Dock icon click.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if environment.needsOnboarding {
-            showSettings(.accounts)
-        } else {
-            environment.showPopover()
-        }
+        showMainWindow(presetID: nil)
         return false
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    // MARK: Windows
+
+    func showMainWindow(presetID: UUID?) {
+        if mainWindow == nil {
+            mainWindow = MainWindowController(environment: environment)
+        }
+        mainWindow?.show(presetID: presetID)
     }
 
     func showSettings(_ tab: SettingsTab) {
@@ -62,7 +90,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.show(tab: tab)
     }
 
-    /// Development helper: `Gitwall --debug-github-token <pat> [--debug-repos owner/a,owner/b]`
+    func showWidgetHelp() {
+        showMainWindow(presetID: nil)
+        mainWindow?.showWidgetHelp()
+    }
+
+    /// Development helper: `Gitwall --debug-reset --debug-github-token <pat> [--debug-repos owner/a,owner/b]`
     /// creates a GitHub account without going through the UI. Debug builds only.
     private func applyDebugArguments() {
         #if DEBUG

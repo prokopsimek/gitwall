@@ -40,6 +40,8 @@ final class AppEnvironment {
 
     @ObservationIgnored var onShowPopover: (() -> Void)?
     @ObservationIgnored var onOpenSettings: ((SettingsTab) -> Void)?
+    @ObservationIgnored var onOpenMainWindow: ((UUID?) -> Void)?
+    @ObservationIgnored var onShowWidgetHelp: (() -> Void)?
     @ObservationIgnored private var refreshLoop: Task<Void, Never>?
     @ObservationIgnored private var syncEngine: SyncEngine?
     @ObservationIgnored private let avatars: AvatarDownloader?
@@ -328,8 +330,7 @@ final class AppEnvironment {
         case .item(let id):
             open(itemID: id)
         case .view(let id):
-            if config.preset(id: id) != nil { selectedPresetID = id }
-            showPopover()
+            openMainWindow(presetID: id)
         case .refresh:
             Task { await refresh() }
         case .settings(let tab):
@@ -345,6 +346,26 @@ final class AppEnvironment {
 
     func showPopover() {
         onShowPopover?()
+    }
+
+    func openMainWindow(presetID: UUID? = nil) {
+        onOpenMainWindow?(presetID)
+    }
+
+    func showWidgetHelp() {
+        onShowWidgetHelp?()
+    }
+
+    /// What a list for `preset` should show right now. Shared by the popover and the main window.
+    func listState(for preset: Preset?) -> ListState {
+        guard containerAvailable else { return .empty(.containerUnavailable) }
+        guard !needsOnboarding else { return .empty(.noAccounts) }
+        guard let preset else { return .empty(.noPresets) }
+        let items = items(for: preset)
+        if !items.isEmpty { return .items(items) }
+        if snapshot == nil || isRefreshing { return .empty(.loading) }
+        if config.accounts.allSatisfy(\.sources.isEmpty) { return .empty(.noRepositories) }
+        return .empty(.nothingMatches(presetName: preset.name))
     }
 
     func openSettings(_ tab: SettingsTab = .accounts) {
@@ -404,6 +425,11 @@ final class AppEnvironment {
     var launchAtLoginRequiresApproval: Bool {
         SMAppService.mainApp.status == .requiresApproval
     }
+}
+
+enum ListState: Equatable {
+    case items([WorkItem])
+    case empty(EmptyStateKind)
 }
 
 enum AppError: LocalizedError {

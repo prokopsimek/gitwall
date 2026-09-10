@@ -25,6 +25,16 @@ end to end: accounts, repository and organization discovery, presets with filter
 popover, configurable desktop widgets in four sizes, notifications. GitLab, OAuth sign-in
 and App Store release are the next milestones (see `docs/PLAN.md`).
 
+## Widgets
+
+1. Right-click the desktop and choose **Edit Widgets…** (or click the clock in the menu bar and scroll to
+   **Edit Widgets**).
+2. Search for **Git**, pick a size and drag the Gitwall widget to the desktop.
+3. Right-click the widget → **Edit “Gitwall”** → choose the preset it should show.
+
+Add as many widgets as you like; each keeps its own preset and size. Presets (which accounts,
+repositories, item kinds and filters) are managed in the app under Settings › Presets.
+
 ## Building from source
 
 Prerequisites: Xcode 26, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).

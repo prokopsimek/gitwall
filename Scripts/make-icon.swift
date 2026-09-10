@@ -86,8 +86,10 @@ struct TileStyle {
     let detail: CGFloat     // alpha of the card details drawn on top of the tile
 
     static let paper = TileStyle(top: 0xFFFFFF, bottom: 0xE4EAF2, detail: 0)
-    static let green = TileStyle(top: 0x5EEA9B, bottom: 0x22C55E, detail: 1)
-    static let amber = TileStyle(top: 0xFDD264, bottom: 0xF59E0B, detail: 1)
+    /// DX Heroes brand teal (#2AD8BF).
+    static let teal = TileStyle(top: 0x86F2E0, bottom: 0x2AD8BF, detail: 1)
+    /// Secondary accent, a light blue that sits well on the navy.
+    static let blue = TileStyle(top: 0x9CC3FF, bottom: 0x4F8BFF, detail: 1)
 }
 
 /// Draws the icon into `ctx` (assumed 1024×1024, origin bottom-left).
@@ -102,14 +104,14 @@ func drawIcon(into ctx: CGContext, grid: Int, highlights: [[Int]: TileStyle], de
     let shape = CGPath(roundedRect: shapeRect, cornerWidth: shapeCornerRadius,
                        cornerHeight: shapeCornerRadius, transform: nil)
 
-    // Background: deep indigo (top) → teal (bottom), clipped to the icon shape.
+    // Background: DX Heroes navy (#131A39, top) → deep teal (bottom), clipped to the icon shape.
     ctx.saveGState()
     ctx.addPath(shape)
     ctx.clip()
     let base = gradient([
-        (rgb(0x3A2E9E), 0.0),
-        (rgb(0x2C4BA6), 0.52),
-        (rgb(0x0F9C90), 1.0),
+        (rgb(0x131A39), 0.0),
+        (rgb(0x1C2C63), 0.55),
+        (rgb(0x0F5D62), 1.0),
     ])
     ctx.drawLinearGradient(base,
                            start: CGPoint(x: canvas / 2, y: shapeRect.maxY),
@@ -117,7 +119,7 @@ func drawIcon(into ctx: CGContext, grid: Int, highlights: [[Int]: TileStyle], de
                            options: [])
 
     // Soft top light.
-    let light = gradient([(rgb(0xFFFFFF, 0.26), 0.0), (rgb(0xFFFFFF, 0.0), 1.0)])
+    let light = gradient([(rgb(0xFFFFFF, 0.16), 0.0), (rgb(0xFFFFFF, 0.0), 1.0)])
     ctx.drawRadialGradient(light,
                            startCenter: CGPoint(x: canvas / 2, y: shapeRect.maxY + 120), startRadius: 0,
                            endCenter: CGPoint(x: canvas / 2, y: shapeRect.maxY + 120), endRadius: 820,
@@ -203,6 +205,23 @@ func drawIcon(into ctx: CGContext, grid: Int, highlights: [[Int]: TileStyle], de
             ctx.setFillColor(weak)
             ctx.fillPath()
         }
+    }
+
+    // DX Heroes bracket motif ("[DXH]") framing the wall, in brand teal.
+    let bracket = rgb(0x2AD8BF)
+    let thickness = grid == 3 ? tile * 0.16 : tile * 0.14
+    let reach = grid == 3 ? tile * 0.42 : tile * 0.34
+    let inset = grid == 3 ? gap * 1.2 : gap * 0.9
+    let top = origin.y + area + inset
+    let bottom = origin.y - inset
+    let leftX = origin.x - inset - thickness
+    let rightX = origin.x + area + inset
+    ctx.setFillColor(bracket)
+    for (x, opensRight) in [(leftX, true), (rightX, false)] {
+        ctx.fill(CGRect(x: x, y: bottom, width: thickness, height: top - bottom))
+        let armX = opensRight ? x : x + thickness - reach
+        ctx.fill(CGRect(x: armX, y: top - thickness, width: reach, height: thickness))
+        ctx.fill(CGRect(x: armX, y: bottom, width: reach, height: thickness))
     }
 }
 
@@ -302,14 +321,14 @@ func main() throws {
     let fullMaster = outDir.appendingPathComponent("icon-1024.png")
     let full = makeContext(size: Int(canvas))
     drawIcon(into: full, grid: 3,
-             highlights: [[0, 0]: .green, [1, 2]: .amber],
+             highlights: [[0, 0]: .teal, [1, 2]: .blue],
              details: true)
     try writePNG(full, to: fullMaster)
 
     let smallMaster = outDir.appendingPathComponent("icon-small-1024.png")
     let small = makeContext(size: Int(canvas))
     drawIcon(into: small, grid: 2,
-             highlights: [[0, 0]: .green],
+             highlights: [[0, 0]: .teal],
              details: false)
     try writePNG(small, to: smallMaster)
     print("rendered \(fullMaster.path)")

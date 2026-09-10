@@ -5,5 +5,6 @@ import WidgetKit
 struct GitwallWidgetBundle: WidgetBundle {
     var body: some Widget {
         GitwallWidget()
+        GitwallLegacyWidget()
     }
 }
