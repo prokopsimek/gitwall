@@ -16,9 +16,9 @@ struct AppBundleTests {
         #expect(schemes.contains(AppGroup.urlScheme))
     }
 
-    @Test("runs as a menu bar agent by default")
-    func isAgent() throws {
-        let value = try #require(hostInfo["LSUIElement"])
-        #expect((value as? Bool) == true || (value as? NSNumber)?.boolValue == true)
+    @Test("starts as a regular app so the Dock shows the real icon; agent mode is a runtime switch")
+    func isRegularApp() throws {
+        let value = hostInfo["LSUIElement"]
+        #expect(value == nil || (value as? NSNumber)?.boolValue == false)
     }
 }

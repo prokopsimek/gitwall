@@ -13,6 +13,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notificationDelegate: NotificationCenterDelegate?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Decide Dock visibility before the Dock registers the process, otherwise the icon flickers or stays generic.
+        environment.applyActivationPolicy()
+        if let icon = NSImage(named: "AppIcon") {
+            NSApp.applicationIconImage = icon
+        }
         // Must be installed before launch finishes so notification clicks that launch the app are delivered.
         let delegate = NotificationCenterDelegate(environment: environment)
         notificationDelegate = delegate

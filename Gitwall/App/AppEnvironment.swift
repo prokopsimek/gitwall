@@ -371,11 +371,14 @@ final class AppEnvironment {
         }
     }
 
+    /// The app is a regular app in Info.plist (Dock icon on by default) and drops to an accessory when the
+    /// user hides the Dock icon; going the other way at runtime leaves the Dock with a generic icon.
     func applyActivationPolicy() {
         let policy: NSApplication.ActivationPolicy = showsDockIcon ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
         if policy == .regular {
+            if let icon = NSImage(named: "AppIcon") { NSApp.applicationIconImage = icon }
             // Known AppKit quirk: after .accessory -> .regular the main menu stays inactive until re-activation.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 NSApp.activate(ignoringOtherApps: true)

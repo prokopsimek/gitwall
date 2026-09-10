@@ -71,7 +71,7 @@ targets:
       properties:
         CFBundleName: Gitwall
         CFBundleDisplayName: Gitwall
-        LSUIElement: true
+        LSUIElement: false
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: "Copyright 2026 Prokop Simek. MIT License."
