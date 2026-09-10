@@ -5,7 +5,7 @@
 //     swift Scripts/make-icon.swift
 //
 // Outputs:
-//     Scripts/out/icon-1024.png            full design (3×3 tile wall), 1024×1024
+//     Scripts/out/icon-1024.png            full design (brick texture + pull-request glyph), 1024×1024
 //     Scripts/out/icon-small-1024.png      simplified design (2×2) used for the 16 pt slot
 //     Scripts/out/preview.png              contact sheet of every size on light + dark
 //     Gitwall/Resources/Assets.xcassets/AppIcon.appiconset/icon_*.png + Contents.json
@@ -78,151 +78,100 @@ func writePNG(_ ctx: CGContext, to url: URL) throws {
     try data.write(to: url, options: .atomic)
 }
 
-// MARK: - Icon
+// MARK: - Icon (concept F: faint brick wall behind a teal pull-request glyph, DX Heroes palette)
 
-struct TileStyle {
-    let top: UInt32
-    let bottom: UInt32
-    let detail: CGFloat     // alpha of the card details drawn on top of the tile
+let navy: UInt32 = 0x131A39
+let teal: UInt32 = 0x2AD8BF
 
-    static let paper = TileStyle(top: 0xFFFFFF, bottom: 0xE4EAF2, detail: 0)
-    /// DX Heroes brand teal (#2AD8BF).
-    static let teal = TileStyle(top: 0x86F2E0, bottom: 0x2AD8BF, detail: 1)
-    /// Secondary accent, a light blue that sits well on the navy.
-    static let blue = TileStyle(top: 0x9CC3FF, bottom: 0x4F8BFF, detail: 1)
+/// Rounded, staggered bricks clipped to `rect` (used as a faint texture).
+@MainActor
+func drawBricks(into ctx: CGContext, in rect: CGRect, rows: Int, perRow: Int, gap: CGFloat, alpha: CGFloat) {
+    ctx.saveGState()
+    ctx.clip(to: rect)
+    ctx.setAlpha(alpha)
+    ctx.setFillColor(rgb(0xFFFFFF))
+    let brickH = (rect.height - CGFloat(rows - 1) * gap) / CGFloat(rows)
+    let brickW = (rect.width - CGFloat(perRow - 1) * gap) / CGFloat(perRow)
+    for row in 0..<rows {
+        let y = rect.minY + CGFloat(rows - 1 - row) * (brickH + gap)
+        var x = rect.minX + (row.isMultiple(of: 2) ? 0 : -(brickW + gap) / 2)
+        while x < rect.maxX {
+            let brick = CGRect(x: x, y: y, width: brickW, height: brickH)
+            ctx.addPath(CGPath(roundedRect: brick, cornerWidth: brickH * 0.18, cornerHeight: brickH * 0.18, transform: nil))
+            ctx.fillPath()
+            x += brickW + gap
+        }
+    }
+    ctx.restoreGState()
 }
 
-/// Draws the icon into `ctx` (assumed 1024×1024, origin bottom-left).
-/// - Parameters:
-///   - grid: number of tile columns/rows (3 for the full icon, 2 for the small variant)
-///   - highlights: tiles rendered in a status colour, keyed by (row from top, column)
-///   - details: draw the abstract "card" marks (avatar dot + title bar) on each tile
+/// Git pull-request glyph: trunk with two nodes on the left, a branch curving into a node on the right.
 @MainActor
-func drawIcon(into ctx: CGContext, grid: Int, highlights: [[Int]: TileStyle], details: Bool) {
+func drawPullRequestGlyph(into ctx: CGContext, in rect: CGRect, lineFactor: CGFloat, nodeFactor: CGFloat) {
+    let w = rect.width
+    let lineW = w * lineFactor
+    let r = w * nodeFactor
+    let leftX = rect.minX + w * 0.28
+    let rightX = rect.minX + w * 0.72
+    let topY = rect.maxY - w * 0.22
+    let bottomY = rect.minY + w * 0.22
+
+    ctx.setLineWidth(lineW)
+    ctx.setLineCap(.round)
+    ctx.setStrokeColor(rgb(teal))
+    ctx.move(to: CGPoint(x: leftX, y: topY))
+    ctx.addLine(to: CGPoint(x: leftX, y: bottomY))
+    ctx.strokePath()
+    ctx.move(to: CGPoint(x: leftX + r, y: topY))
+    ctx.addCurve(to: CGPoint(x: rightX, y: topY - w * 0.22),
+                 control1: CGPoint(x: leftX + w * 0.30, y: topY),
+                 control2: CGPoint(x: rightX, y: topY - w * 0.02))
+    ctx.addLine(to: CGPoint(x: rightX, y: bottomY))
+    ctx.strokePath()
+    for center in [CGPoint(x: leftX, y: topY), CGPoint(x: leftX, y: bottomY), CGPoint(x: rightX, y: bottomY)] {
+        let ring = CGRect(x: center.x - r, y: center.y - r, width: 2 * r, height: 2 * r)
+        ctx.setFillColor(rgb(teal))
+        ctx.fillEllipse(in: ring)
+        ctx.setFillColor(rgb(navy))
+        ctx.fillEllipse(in: ring.insetBy(dx: r * 0.42, dy: r * 0.42))
+    }
+}
+
+/// Draws the icon into `ctx` (1024×1024, origin bottom-left).
+/// `small` renders the master for the 16 pt slot: no brick texture, bolder glyph.
+@MainActor
+func drawIcon(into ctx: CGContext, small: Bool) {
     let shapeRect = CGRect(x: shapeInset, y: shapeInset,
                            width: canvas - 2 * shapeInset, height: canvas - 2 * shapeInset)
     let shape = CGPath(roundedRect: shapeRect, cornerWidth: shapeCornerRadius,
                        cornerHeight: shapeCornerRadius, transform: nil)
 
-    // Background: DX Heroes navy (#131A39, top) → deep teal (bottom), clipped to the icon shape.
     ctx.saveGState()
     ctx.addPath(shape)
     ctx.clip()
-    let base = gradient([
-        (rgb(0x131A39), 0.0),
-        (rgb(0x1C2C63), 0.55),
-        (rgb(0x0F5D62), 1.0),
-    ])
-    ctx.drawLinearGradient(base,
+    ctx.drawLinearGradient(gradient([(rgb(navy), 0.0), (rgb(0x1A2A5C), 0.6), (rgb(0x10425A), 1.0)]),
                            start: CGPoint(x: canvas / 2, y: shapeRect.maxY),
-                           end: CGPoint(x: canvas / 2, y: shapeRect.minY),
-                           options: [])
-
-    // Soft top light.
-    let light = gradient([(rgb(0xFFFFFF, 0.16), 0.0), (rgb(0xFFFFFF, 0.0), 1.0)])
-    ctx.drawRadialGradient(light,
+                           end: CGPoint(x: canvas / 2, y: shapeRect.minY), options: [])
+    ctx.drawRadialGradient(gradient([(rgb(0xFFFFFF, 0.14), 0.0), (rgb(0xFFFFFF, 0.0), 1.0)]),
                            startCenter: CGPoint(x: canvas / 2, y: shapeRect.maxY + 120), startRadius: 0,
-                           endCenter: CGPoint(x: canvas / 2, y: shapeRect.maxY + 120), endRadius: 820,
-                           options: [])
-
-    // Slight darkening at the bottom edge so the tiles keep contrast on the teal.
-    let shade = gradient([(rgb(0x000000, 0.0), 0.0), (rgb(0x000000, 0.14), 1.0)])
-    ctx.drawLinearGradient(shade,
-                           start: CGPoint(x: canvas / 2, y: shapeRect.midY),
-                           end: CGPoint(x: canvas / 2, y: shapeRect.minY),
-                           options: [])
-    ctx.restoreGState()
-
-    // Inner edge highlight (1.5 px) to lift the shape off dark backgrounds.
-    ctx.saveGState()
+                           endCenter: CGPoint(x: canvas / 2, y: shapeRect.maxY + 120), endRadius: 820, options: [])
+    if !small {
+        drawBricks(into: ctx, in: shapeRect.insetBy(dx: -40, dy: -40), rows: 7, perRow: 4, gap: 22, alpha: 0.07)
+    }
     ctx.addPath(shape)
-    ctx.clip()
-    ctx.addPath(shape)
-    ctx.setStrokeColor(rgb(0xFFFFFF, 0.18))
+    ctx.setStrokeColor(rgb(0xFFFFFF, 0.16))
     ctx.setLineWidth(3)
     ctx.strokePath()
     ctx.restoreGState()
 
-    // Tile wall.
-    let area: CGFloat = grid == 3 ? 560 : 540
-    let gap: CGFloat = grid == 3 ? 40 : 60
-    let tile = (area - CGFloat(grid - 1) * gap) / CGFloat(grid)
-    let radius = tile * 0.21
-    let origin = CGPoint(x: (canvas - area) / 2, y: (canvas - area) / 2)
-
-    for row in 0..<grid {
-        for col in 0..<grid {
-            let style = highlights[[row, col]] ?? .paper
-            let x = origin.x + CGFloat(col) * (tile + gap)
-            let y = origin.y + area - tile - CGFloat(row) * (tile + gap)   // row 0 = top
-            let rect = CGRect(x: x, y: y, width: tile, height: tile)
-            let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
-
-            // Shadow pass.
-            ctx.saveGState()
-            ctx.setShadow(offset: CGSize(width: 0, height: -tile * 0.07), blur: tile * 0.16,
-                          color: rgb(0x000000, 0.30))
-            ctx.addPath(path)
-            ctx.setFillColor(rgb(style.top))
-            ctx.fillPath()
-            ctx.restoreGState()
-
-            // Fill pass (vertical gradient).
-            ctx.saveGState()
-            ctx.addPath(path)
-            ctx.clip()
-            ctx.drawLinearGradient(gradient([(rgb(style.top), 0), (rgb(style.bottom), 1)]),
-                                   start: CGPoint(x: rect.midX, y: rect.maxY),
-                                   end: CGPoint(x: rect.midX, y: rect.minY),
-                                   options: [])
-            ctx.restoreGState()
-
-            guard details else { continue }
-
-            // Abstract card marks: avatar dot + title bar + shorter second line.
-            let pad = tile * 0.17
-            let dot = tile * 0.15
-            let barH = tile * 0.075
-            let onPaper = style.detail == 0
-            let strong = onPaper ? rgb(0xB8C3D3) : rgb(0xFFFFFF, 0.78)
-            let weak = onPaper ? rgb(0xD5DDE8) : rgb(0xFFFFFF, 0.50)
-
-            let dotRect = CGRect(x: rect.minX + pad, y: rect.maxY - pad - dot, width: dot, height: dot)
-            ctx.setFillColor(strong)
-            ctx.fillEllipse(in: dotRect)
-
-            let barRect = CGRect(x: dotRect.maxX + tile * 0.08,
-                                 y: dotRect.midY - barH / 2,
-                                 width: rect.maxX - pad - (dotRect.maxX + tile * 0.08),
-                                 height: barH)
-            ctx.addPath(CGPath(roundedRect: barRect, cornerWidth: barH / 2, cornerHeight: barH / 2, transform: nil))
-            ctx.setFillColor(strong)
-            ctx.fillPath()
-
-            let line2 = CGRect(x: rect.minX + pad, y: dotRect.minY - tile * 0.14 - barH,
-                               width: tile * 0.46, height: barH)
-            ctx.addPath(CGPath(roundedRect: line2, cornerWidth: barH / 2, cornerHeight: barH / 2, transform: nil))
-            ctx.setFillColor(weak)
-            ctx.fillPath()
-        }
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 40, color: rgb(0x000000, 0.45))
+    if small {
+        drawPullRequestGlyph(into: ctx, in: CGRect(x: 232, y: 222, width: 560, height: 580), lineFactor: 0.12, nodeFactor: 0.15)
+    } else {
+        drawPullRequestGlyph(into: ctx, in: CGRect(x: 262, y: 252, width: 500, height: 520), lineFactor: 0.085, nodeFactor: 0.115)
     }
-
-    // DX Heroes bracket motif ("[DXH]") framing the wall, in brand teal.
-    let bracket = rgb(0x2AD8BF)
-    let thickness = grid == 3 ? tile * 0.16 : tile * 0.14
-    let reach = grid == 3 ? tile * 0.42 : tile * 0.34
-    let inset = grid == 3 ? gap * 1.2 : gap * 0.9
-    let top = origin.y + area + inset
-    let bottom = origin.y - inset
-    let leftX = origin.x - inset - thickness
-    let rightX = origin.x + area + inset
-    ctx.setFillColor(bracket)
-    for (x, opensRight) in [(leftX, true), (rightX, false)] {
-        ctx.fill(CGRect(x: x, y: bottom, width: thickness, height: top - bottom))
-        let armX = opensRight ? x : x + thickness - reach
-        ctx.fill(CGRect(x: armX, y: top - thickness, width: reach, height: thickness))
-        ctx.fill(CGRect(x: armX, y: bottom, width: reach, height: thickness))
-    }
+    ctx.restoreGState()
 }
 
 // MARK: - Asset catalog slots
@@ -320,16 +269,12 @@ func main() throws {
     // 1. Masters.
     let fullMaster = outDir.appendingPathComponent("icon-1024.png")
     let full = makeContext(size: Int(canvas))
-    drawIcon(into: full, grid: 3,
-             highlights: [[0, 0]: .teal, [1, 2]: .blue],
-             details: true)
+    drawIcon(into: full, small: false)
     try writePNG(full, to: fullMaster)
 
     let smallMaster = outDir.appendingPathComponent("icon-small-1024.png")
     let small = makeContext(size: Int(canvas))
-    drawIcon(into: small, grid: 2,
-             highlights: [[0, 0]: .teal],
-             details: false)
+    drawIcon(into: small, small: true)
     try writePNG(small, to: smallMaster)
     print("rendered \(fullMaster.path)")
     print("rendered \(smallMaster.path)")
