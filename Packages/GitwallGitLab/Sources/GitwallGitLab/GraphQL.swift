@@ -50,9 +50,12 @@ enum GitLabQueries {
         if kinds.contains(.issue) {
             connections.append("issues(\(scope)state: opened, first: \(pageSize), after: $issueAfter, sort: UPDATED_DESC) { pageInfo { hasNextPage endCursor } nodes { \(issueFragment) } }")
         }
-        let variables = isGroup
-            ? "$path: ID!, $subgroups: Boolean!, $mrAfter: String, $issueAfter: String"
-            : "$path: ID!, $mrAfter: String, $issueAfter: String"
+        // GitLab rejects queries that declare a variable without using it, so declare only what the connections use.
+        var declared = ["$path: ID!"]
+        if isGroup { declared.append("$subgroups: Boolean!") }
+        if kinds.contains(.pullRequest) { declared.append("$mrAfter: String") }
+        if kinds.contains(.issue) { declared.append("$issueAfter: String") }
+        let variables = declared.joined(separator: ", ")
         let root = isGroup ? "group(fullPath: $path)" : "project(fullPath: $path)"
         return """
         query(\(variables)) {

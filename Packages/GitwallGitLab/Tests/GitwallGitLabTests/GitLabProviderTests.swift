@@ -236,6 +236,20 @@ struct GitLabGraphQLTests {
         let query = try await transport.graphQLQuery(at: 0)
         #expect(query.contains("mergeRequests("))
         #expect(!query.contains("issues("))
+        // GitLab rejects declared-but-unused variables.
+        #expect(!query.contains("$issueAfter"))
+        #expect(query.contains("$mrAfter"))
+    }
+
+    @Test("query declarations match the requested connections and source type")
+    func queryVariables() {
+        let issuesOnly = GitLabQueries.query(for: .repository(fullName: "a/b"), kinds: [.issue], interaction: true)
+        #expect(issuesOnly.contains("$issueAfter: String"))
+        #expect(!issuesOnly.contains("$mrAfter"))
+        #expect(!issuesOnly.contains("$subgroups"))
+        let group = GitLabQueries.query(for: .group(fullPath: "g", includeSubgroups: true), kinds: [.pullRequest, .issue], interaction: false)
+        #expect(group.contains("$path: ID!, $subgroups: Boolean!, $mrAfter: String, $issueAfter: String"))
+        #expect(!group.contains("mergeRequestInteraction"))
     }
 
     @Test("follows pagination per connection up to three extra pages")
@@ -346,5 +360,11 @@ struct GitLabIntegrationTests {
         let sources: [RepoSource] = Array(repos.prefix(3)).map { .repository(fullName: $0.fullName) }
         let items = try await provider.fetchItems(account: Account(kind: .gitlab, baseURL: baseURL, displayName: "GitLab", me: me, sources: sources), token: token, kinds: [.pullRequest, .issue])
         print("integration: \(items.count) items from \(sources.count) projects")
+        let onlyMRs = try await provider.fetchItems(account: Account(kind: .gitlab, baseURL: baseURL, displayName: "GitLab", me: me, sources: sources), token: token, kinds: [.pullRequest])
+        #expect(onlyMRs.allSatisfy { $0.kind == .pullRequest })
+        if let group = groups.first {
+            let grouped = try await provider.fetchItems(account: Account(kind: .gitlab, baseURL: baseURL, displayName: "GitLab", me: me, sources: [group.source]), token: token, kinds: [.issue])
+            print("integration: \(grouped.count) issues from group \(group.id)")
+        }
     }
 }

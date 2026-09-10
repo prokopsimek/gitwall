@@ -133,8 +133,8 @@ public struct GitLabProvider: GitProvider {
         while !wanted.isEmpty, pages <= GitLabQueries.maxExtraPages {
             pages += 1
             var vars = variables
-            vars["mrAfter"] = mrAfter
-            vars["issueAfter"] = issueAfter
+            if wanted.contains(.pullRequest) { vars["mrAfter"] = mrAfter }
+            if wanted.contains(.issue) { vars["issueAfter"] = issueAfter }
             let data = try await run(source: source, kinds: wanted, variables: vars, token: token, endpoints: endpoints)
             guard let node = data.container else {
                 gitLabLog.error("GitLab could not resolve \(path, privacy: .public); skipping")
