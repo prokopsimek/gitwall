@@ -6,6 +6,10 @@
 //       and prints "<file>\t<title>\t<width>x<height>" per window.
 //   swift Scripts/screenshots.swift compose <window.png> <out.png>
 //       Places the window on a 2880x1800 brand background (Mac App Store size, no alpha channel).
+//   swift Scripts/screenshots.swift compose <spec.json> <out.png>
+//       Same background, but a headline and several layers placed by hand:
+//       {"title": "...", "subtitle": "...", "layers": [{"file": "a.png", "x": 140, "y": 460, "width": 1800}]}
+//       Coordinates are canvas pixels from the top-left; "width" scales the layer, height follows.
 //
 // Run the Debug app with `--debug-demo` first; see docs/RELEASING.md.
 
@@ -45,7 +49,7 @@ func visibleWindows(of pid: pid_t) -> [WindowInfo] {
         let rect = CGRect(x: bounds["X"] ?? 0, y: bounds["Y"] ?? 0, width: bounds["Width"] ?? 0, height: bounds["Height"] ?? 0)
         // Skip the menu bar item, tooltips and menus; real windows and the popover are bigger and on low layers.
         let layer = info[kCGWindowLayer as String] as? Int ?? 0
-        guard rect.width >= 200, rect.height >= 100, layer < 100 else { return nil }
+        guard rect.width >= 150, rect.height >= 100, layer < 100 else { return nil }
         let title = info[kCGWindowName as String] as? String ?? ""
         return WindowInfo(id: id, title: title, bounds: rect)
     }
@@ -84,30 +88,22 @@ func writePNG(_ image: CGImage, to url: URL) {
     guard CGImageDestinationFinalize(destination) else { fail("cannot write \(url.path)") }
 }
 
-func compose(window: URL, output: URL) {
-    let shot = loadImage(window)
-    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
-    guard let ctx = CGContext(data: nil, width: Int(canvasSize.width), height: Int(canvasSize.height), bitsPerComponent: 8,
-                              bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
-        fail("cannot create canvas")
-    }
-    let canvas = CGRect(origin: .zero, size: canvasSize)
+struct Layer {
+    let image: CGImage
+    let frame: CGRect   // canvas coordinates, origin bottom-left (CoreGraphics)
+}
 
-    // Background: the icon's navy-to-teal gradient with a soft highlight, so shots read as one family.
+func drawBackground(_ ctx: CGContext, colorSpace: CGColorSpace) {
+    // The icon's navy-to-teal gradient with a soft highlight, so shots read as one family.
     let stops: [(CGColor, CGFloat)] = [(rgb(0x131A39), 0), (rgb(0x1A2A5C), 0.55), (rgb(0x10425A), 1)]
     let gradient = CGGradient(colorsSpace: colorSpace, colors: stops.map(\.0) as CFArray, locations: stops.map(\.1))!
     ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: canvasSize.height), end: CGPoint(x: canvasSize.width, y: 0), options: [])
     let glow = CGGradient(colorsSpace: colorSpace, colors: [rgb(0x2AD8BF, 0.22), rgb(0x2AD8BF, 0)] as CFArray, locations: [0, 1])!
-    ctx.drawRadialGradient(glow, startCenter: CGPoint(x: canvasSize.width * 0.75, y: canvasSize.height * 0.15), startRadius: 0,
-                           endCenter: CGPoint(x: canvasSize.width * 0.75, y: canvasSize.height * 0.15), endRadius: canvasSize.width * 0.6, options: [])
+    let center = CGPoint(x: canvasSize.width * 0.75, y: canvasSize.height * 0.15)
+    ctx.drawRadialGradient(glow, startCenter: center, startRadius: 0, endCenter: center, endRadius: canvasSize.width * 0.6, options: [])
+}
 
-    // Fit the window into the safe area without upscaling; captures are already 2x on Retina.
-    let available = canvas.insetBy(dx: margin, dy: margin)
-    let scale = min(1, available.width / CGFloat(shot.width), available.height / CGFloat(shot.height))
-    let size = CGSize(width: CGFloat(shot.width) * scale, height: CGFloat(shot.height) * scale)
-    let origin = CGPoint(x: (canvasSize.width - size.width) / 2, y: (canvasSize.height - size.height) / 2)
-    let frame = CGRect(origin: origin, size: size)
-    ctx.interpolationQuality = .high
+func drawLayer(_ ctx: CGContext, _ layer: Layer) {
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -28), blur: 70, color: rgb(0x000000, 0.5))
     // One transparency layer so the shadow follows the window's real outline (rounded corners, popover arrow).
@@ -115,18 +111,78 @@ func compose(window: URL, output: URL) {
     // Translucent materials (popover, sidebar) are captured with alpha; back them with a light fill so
     // they read as they do over a light desktop instead of sinking into the dark background.
     ctx.saveGState()
-    ctx.clip(to: frame, mask: shot)
+    ctx.clip(to: layer.frame, mask: layer.image)
     ctx.setFillColor(rgb(0xF2F2F5))
-    ctx.fill(frame)
+    ctx.fill(layer.frame)
     ctx.restoreGState()
-    ctx.draw(shot, in: frame)
+    ctx.draw(layer.image, in: layer.frame)
     ctx.endTransparencyLayer()
     ctx.restoreGState()
+}
 
+func drawHeadline(_ ctx: CGContext, title: String, subtitle: String?) {
+    let previous = NSGraphicsContext.current
+    NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+    defer { NSGraphicsContext.current = previous }
+    let paragraph = NSMutableParagraphStyle()
+    paragraph.alignment = .center
+    let titleAttributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.systemFont(ofSize: 92, weight: .bold), .foregroundColor: NSColor.white, .paragraphStyle: paragraph, .kern: -1.5,
+    ]
+    let subtitleAttributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.systemFont(ofSize: 42, weight: .medium), .foregroundColor: NSColor(white: 1, alpha: 0.74), .paragraphStyle: paragraph,
+    ]
+    let titleRect = CGRect(x: margin, y: canvasSize.height - 130 - 120, width: canvasSize.width - 2 * margin, height: 120)
+    NSAttributedString(string: title, attributes: titleAttributes).draw(in: titleRect)
+    if let subtitle {
+        let subtitleRect = CGRect(x: margin, y: titleRect.minY - 70, width: canvasSize.width - 2 * margin, height: 60)
+        NSAttributedString(string: subtitle, attributes: subtitleAttributes).draw(in: subtitleRect)
+    }
+}
+
+func render(layers: [Layer], title: String?, subtitle: String?, output: URL) {
+    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    guard let ctx = CGContext(data: nil, width: Int(canvasSize.width), height: Int(canvasSize.height), bitsPerComponent: 8,
+                              bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+        fail("cannot create canvas")
+    }
+    ctx.interpolationQuality = .high
+    drawBackground(ctx, colorSpace: colorSpace)
+    for layer in layers { drawLayer(ctx, layer) }
+    if let title { drawHeadline(ctx, title: title, subtitle: subtitle) }
     guard let image = ctx.makeImage() else { fail("cannot render canvas") }
     try? FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
     writePNG(image, to: output)
     print("\(output.path)\t\(Int(canvasSize.width))x\(Int(canvasSize.height))\tno alpha")
+}
+
+/// Single window, centered, never upscaled (captures are already 2x on Retina).
+func compose(window: URL, output: URL) {
+    let shot = loadImage(window)
+    let available = CGRect(origin: .zero, size: canvasSize).insetBy(dx: margin, dy: margin)
+    let scale = min(1, available.width / CGFloat(shot.width), available.height / CGFloat(shot.height))
+    let size = CGSize(width: CGFloat(shot.width) * scale, height: CGFloat(shot.height) * scale)
+    let origin = CGPoint(x: (canvasSize.width - size.width) / 2, y: (canvasSize.height - size.height) / 2)
+    render(layers: [Layer(image: shot, frame: CGRect(origin: origin, size: size))], title: nil, subtitle: nil, output: output)
+}
+
+/// Headline plus hand-placed layers from a JSON spec (paths relative to the spec file).
+func compose(spec: URL, output: URL) {
+    guard let data = try? Data(contentsOf: spec),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let layerSpecs = json["layers"] as? [[String: Any]] else { fail("cannot read spec \(spec.path)") }
+    let base = spec.deletingLastPathComponent()
+    var layers: [Layer] = []
+    for item in layerSpecs {
+        guard let file = item["file"] as? String, let x = item["x"] as? Double, let y = item["y"] as? Double else { fail("layer needs file, x, y") }
+        let image = loadImage(URL(fileURLWithPath: file, relativeTo: base))
+        let width: CGFloat = (item["width"] as? Double).map { CGFloat($0) } ?? CGFloat(image.width)
+        let height: CGFloat = width * CGFloat(image.height) / CGFloat(image.width)
+        // Spec uses top-left coordinates; CoreGraphics draws from the bottom-left.
+        let frame = CGRect(x: CGFloat(x), y: canvasSize.height - CGFloat(y) - height, width: width, height: height)
+        layers.append(Layer(image: image, frame: frame))
+    }
+    render(layers: layers, title: json["title"] as? String, subtitle: json["subtitle"] as? String, output: output)
 }
 
 let arguments = CommandLine.arguments
@@ -135,8 +191,13 @@ case "capture":
     guard arguments.count == 4, let pid = Int32(arguments[2]) else { fail("usage: capture <pid> <outdir>") }
     capture(pid: pid, outDir: URL(fileURLWithPath: arguments[3]))
 case "compose":
-    guard arguments.count == 4 else { fail("usage: compose <window.png> <out.png>") }
-    compose(window: URL(fileURLWithPath: arguments[2]), output: URL(fileURLWithPath: arguments[3]))
+    guard arguments.count == 4 else { fail("usage: compose <window.png|spec.json> <out.png>") }
+    let input = URL(fileURLWithPath: arguments[2])
+    if input.pathExtension.lowercased() == "json" {
+        compose(spec: input, output: URL(fileURLWithPath: arguments[3]))
+    } else {
+        compose(window: input, output: URL(fileURLWithPath: arguments[3]))
+    }
 default:
-    fail("usage: screenshots.swift capture <pid> <outdir> | compose <window.png> <out.png>")
+    fail("usage: screenshots.swift capture <pid> <outdir> | compose <window.png|spec.json> <out.png>")
 }

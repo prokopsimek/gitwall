@@ -1,0 +1,7 @@
+{"title": "Right there in your menu bar",
+ "subtitle": "A popover with your preset, and the count next to the icon",
+ "layers": [
+  {"file": "../out/shots/p1/window-4-untitled.png", "x": 560, "y": 440, "width": 852},
+  {"file": "../out/shots/w/window-8-widget-counter.png", "x": 1560, "y": 560, "width": 340},
+  {"file": "../out/shots/w/window-7-widget-list.png", "x": 1560, "y": 980, "width": 728}
+ ]}

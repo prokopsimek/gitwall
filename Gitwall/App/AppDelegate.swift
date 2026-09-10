@@ -71,6 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
            let position = Int(args[index + 1]), environment.config.presets.indices.contains(position) {
             environment.selectedPresetID = environment.config.presets[position].id
         }
+        #if DEBUG
+        if args.contains("--debug-demo-widgets"), let snapshot = environment.snapshot {
+            DemoRenderer.presentWidgetWindows(config: environment.config, snapshot: snapshot)
+        }
+        #endif
         showMainWindow(presetID: environment.selectedPresetID)
         if let window = mainWindow?.window {
             window.setContentSize(NSSize(width: 1180, height: 760))

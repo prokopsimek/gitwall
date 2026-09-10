@@ -31,3 +31,6 @@ xcuserdata/
 
 # Icon generator output
 Scripts/out/
+
+# Python bytecode from Scripts/asc.py
+__pycache__/

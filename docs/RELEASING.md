@@ -209,8 +209,19 @@ make install   # make build re-pointed Launch Services at the Debug build
 ```
 
 `compose` centers the capture on a 2880×1800 brand background and writes a PNG without alpha,
-which is what App Store Connect accepts. Repeat with other presets and windows; the required
-set is listed in `docs/appstore-listing.md`.
+which is what App Store Connect accepts. Add `--debug-demo-widgets` to the demo launch and the
+four widget sizes appear as transparent windows that `capture` saves like any other window.
+The published set is defined by the JSON layouts in `Scripts/screenshot-specs/` (headline plus
+hand-placed layers); regenerate it with:
+
+```sh
+for spec in Scripts/screenshot-specs/*.json; do
+  swift Scripts/screenshots.swift compose "$spec" "Scripts/out/wall/$(basename "${spec%.json}").png"
+done
+```
+
+The layouts expect captures in `Scripts/out/shots/w` (preset "All open" with widgets) and
+`Scripts/out/shots/p1` (preset "Waiting for my review"); see `docs/appstore-listing.md` for the order.
 
 ## After the release
 

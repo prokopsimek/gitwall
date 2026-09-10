@@ -1,0 +1,8 @@
+{"title": "Widgets in four sizes",
+ "subtitle": "Counter, List, Board and Wide Board, each showing the preset you pick",
+ "layers": [
+  {"file": "../out/shots/w/window-3-widget-wideboard.png", "x": 292, "y": 440, "width": 1496},
+  {"file": "../out/shots/w/window-6-widget-board.png", "x": 1860, "y": 440, "width": 728},
+  {"file": "../out/shots/w/window-8-widget-counter.png", "x": 870, "y": 1290, "width": 340},
+  {"file": "../out/shots/w/window-7-widget-list.png", "x": 1282, "y": 1290, "width": 728}
+ ]}

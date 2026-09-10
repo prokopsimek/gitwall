@@ -56,6 +56,8 @@ targets:
     platform: macOS
     sources:
       - path: Gitwall
+      # Widget views double as demo renderers for App Store screenshots (`--debug-demo-render`).
+      - path: GitwallWidget/WidgetViews.swift
         excludes:
           - "Info.plist"
     dependencies:
