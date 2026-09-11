@@ -1,4 +1,5 @@
 import AppKit
+import GitwallAuth
 import GitwallCore
 import OSLog
 import UserNotifications
@@ -156,7 +157,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !environment.config.accounts.contains(where: { $0.kind == .github }) else { return }
         Task {
             do {
-                var account = try await environment.addAccount(kind: .github, baseURL: Account.defaultBaseURL(for: .github), token: token)
+                var account = try await environment.addAccount(
+                    kind: .github,
+                    baseURL: Account.defaultBaseURL(for: .github),
+                    credential: StoredToken(accessToken: token, obtainedAt: Date())
+                )
                 account.sources = repos.map { .repository(fullName: $0) }
                 environment.updateAccount(account)
                 log.info("Debug account created with \(repos.count) repositories")

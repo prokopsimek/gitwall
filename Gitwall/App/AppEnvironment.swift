@@ -96,9 +96,15 @@ final class AppEnvironment {
         previousSnapshot = try? snapshotStore?.loadPrevious()
         if selectedPresetID == nil { selectedPresetID = config.presets.first?.id }
         if let configStore, let snapshotStore {
+            // The reader refreshes OAuth tokens behind the sync engine's back, so a signed-in account never
+            // asks the user to sign in again just because its access token expired.
+            let refresher = TokenRefresher(store: tokenStore, flows: { account in
+                guard let client = OAuthClients.client(for: account), client.kind == .gitlab else { return nil }
+                return GitLabPKCEFlow(client: client)
+            })
             syncEngine = SyncEngine(
                 providers: providers,
-                tokens: TokenReader(store: tokenStore),
+                tokens: RefreshingTokenReader(refresher: refresher, accounts: { (try? configStore.load().accounts) ?? [] }),
                 configStore: configStore,
                 snapshotStore: snapshotStore
             )
@@ -203,9 +209,28 @@ final class AppEnvironment {
 
     var accountsNeedingAttention: [(Account, FetchStatus)] {
         config.accounts.compactMap { account in
-            guard let status = snapshot?.accountStatus[account.id], status.state != .ok else { return nil }
-            return (account, status)
+            if let status = snapshot?.accountStatus[account.id], status.state != .ok {
+                return (account, status)
+            }
+            // A working token that runs out next week is worth a quiet heads-up before it breaks the sync.
+            if let expiresAt = expiry(for: account), expiresAt.timeIntervalSinceNow < 7 * 24 * 3600 {
+                let when = expiresAt.formatted(date: .abbreviated, time: .omitted)
+                let message = expiresAt.timeIntervalSinceNow <= 0 ? "The token expired on \(when)." : "The token expires on \(when)."
+                return (account, FetchStatus(state: .needsReauth, lastSuccessAt: snapshot?.accountStatus[account.id]?.lastSuccessAt, message: message))
+            }
+            return nil
         }
+    }
+
+    /// Expiry of the stored credential, when it has one.
+    func expiry(for account: Account) -> Date? {
+        (try? tokenStore.token(for: account.id))?.expiresAt
+    }
+
+    /// OAuth accounts can be repaired by signing in again; token accounts need a new token pasted in.
+    func usesOAuth(_ account: Account) -> Bool {
+        if case .oauth = account.authMethod { return true }
+        return false
     }
 
     func provider(for account: Account) -> (any GitProvider)? {
@@ -215,17 +240,18 @@ final class AppEnvironment {
     // MARK: Accounts
 
     @discardableResult
-    func addAccount(kind: ProviderKind, baseURL: URL, token: String) async throws -> Account {
+    func addAccount(kind: ProviderKind, baseURL: URL, credential: StoredToken, authMethod: AuthMethod = .personalAccessToken) async throws -> Account {
         guard let provider = providers[kind] else { throw AppError.unsupportedProvider }
-        let me = try await provider.verify(baseURL: baseURL, token: token)
+        let me = try await provider.verify(baseURL: baseURL, token: credential.accessToken)
         var account = Account(
             kind: kind,
             baseURL: baseURL,
             displayName: baseURL.host.map { host in host == "github.com" ? "GitHub" : host } ?? kind.rawValue,
-            me: me
+            me: me,
+            authMethod: authMethod
         )
         account.displayName += " (\(me.login))"
-        try tokenStore.set(StoredToken(accessToken: token, obtainedAt: Date()), for: account.id)
+        try tokenStore.set(await stamped(credential, provider: provider, baseURL: baseURL), for: account.id)
         var updated = config
         updated.accounts.append(account)
         if updated.presets.isEmpty {
@@ -260,13 +286,25 @@ final class AppEnvironment {
         try? persist(updated)
     }
 
-    func replaceToken(for account: Account, token: String) async throws {
+    /// Replaces the credential of an existing account, keeping its id so presets and widgets stay attached.
+    func replaceCredential(for account: Account, credential: StoredToken, authMethod: AuthMethod? = nil) async throws {
         guard let provider = providers[account.kind] else { throw AppError.unsupportedProvider }
-        let me = try await provider.verify(baseURL: account.baseURL, token: token)
+        let me = try await provider.verify(baseURL: account.baseURL, token: credential.accessToken)
         var updatedAccount = account
         updatedAccount.me = me
-        try tokenStore.set(StoredToken(accessToken: token, obtainedAt: Date()), for: account.id)
+        if let authMethod { updatedAccount.authMethod = authMethod }
+        try tokenStore.set(await stamped(credential, provider: provider, baseURL: account.baseURL), for: account.id)
         updateAccount(updatedAccount)
+        Task { await refresh() }
+    }
+
+    /// Adds the token's expiry date when the provider knows one, so Settings can warn before it stops working.
+    /// OAuth credentials already carry their own expiry from the token response.
+    private func stamped(_ credential: StoredToken, provider: any GitProvider, baseURL: URL) async -> StoredToken {
+        guard credential.expiresAt == nil else { return credential }
+        var stamped = credential
+        stamped.expiresAt = await provider.tokenExpiry(baseURL: baseURL, token: credential.accessToken)
+        return stamped
     }
 
     // MARK: Presets
