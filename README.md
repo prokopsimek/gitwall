@@ -80,12 +80,126 @@ And also:
 
 ### Supported hosts
 
-| Host | Sign in | Token alternative |
+| Host | Sign in | Or paste a token |
 |---|---|---|
-| github.com | OAuth device flow, built in | Classic token with `repo` and `read:org`, or fine-grained with read access to Pull requests, Issues, Metadata |
-| GitHub Enterprise Server | Your own OAuth App's client ID (Settings › Accounts › Advanced) | Same scopes as github.com |
-| gitlab.com | OAuth with PKCE, built in | Personal access token with `read_api` |
-| Self-managed GitLab 16+ | Your own application's client ID, redirect `gitwall://oauth/gitlab` | Personal access token with `read_api` |
+| github.com | OAuth device flow, built in | [Fine-grained or classic](#personal-access-tokens) |
+| GitHub Enterprise Server | Your own OAuth App's client ID (Settings › Accounts › Advanced) | [Classic](#github-classic-token), or fine-grained where your server offers them |
+| gitlab.com | OAuth with PKCE, built in | [Fine-grained or legacy](#personal-access-tokens) |
+| Self-managed GitLab 16+ | Your own application's client ID, redirect `gitwall://oauth/gitlab` | [Legacy](#gitlab-legacy-token), or [fine-grained](#gitlab-fine-grained-token) on GitLab 19.2+ |
+
+### Personal access tokens
+
+Signing in is the quickest way. A token is the way to go when your organization blocks OAuth apps, when your own
+server has no application for Gitwall, or when you want a credential that can only read. Paste it in
+Settings › Accounts › + › *Use a personal access token instead*. Gitwall keeps it in the macOS Keychain and warns
+you a week before it expires.
+
+| | Fine-grained token | Classic (GitHub) or legacy (GitLab) token |
+|---|---|---|
+| **GitHub** | Read-only. One token covers one owner: your account or one organization. | Scopes `repo` and `read:org`. One token covers all your organizations, but `repo` also allows writing. |
+| **GitLab** | Read-only, GitLab 19.2 or newer, but without each reviewer's review state. Needed where a group or the instance enforces fine-grained tokens. | Scope `read_api`, GitLab 16 or newer. |
+
+#### GitHub fine-grained token
+
+<details>
+<summary>Recommended for github.com. Read-only, one owner per token.</summary>
+
+1. Open the [prefilled token form](https://github.com/settings/personal-access-tokens/new?name=Gitwall&description=Read-only%20access%20for%20the%20Gitwall%20widgets&expires_in=365&pull_requests=read&issues=read&statuses=read&contents=read).
+   It fills in the name, a one-year expiration and the permissions below. Without the link: Settings ›
+   Developer settings › Personal access tokens › Fine-grained tokens › Generate new token.
+2. **Resource owner:** your account, or the organization whose repositories you want to follow.
+3. **Expiration:** at most 365 days. Organizations can set a shorter limit.
+4. **Repository access:** *All repositories*, or *Only select repositories* (up to 50).
+5. **Permissions › Repositories**, each set to *Read-only*:
+
+   | Permission | Gitwall uses it for |
+   |---|---|
+   | Pull requests | pull requests, reviews and review requests |
+   | Issues | issues, labels, assignees and milestones |
+   | Commit statuses | the CI state of pull requests |
+   | Contents | the CI state as well: without it GitHub hides the commit that carries the state |
+   | Metadata | required by GitHub, added automatically |
+
+   Account permissions are not needed. Contents also lets the token read your code. If you do not need the CI
+   state, leave out Contents and Commit statuses; everything else keeps working.
+6. Select **Generate token** and paste it into Gitwall.
+
+Good to know:
+
+- **One owner per token.** To follow your own repositories and two organizations, create three tokens and add
+  three GitHub accounts in Gitwall. Each account gets its own presets. With a token owned by your account, the
+  organization list in Gitwall stays empty; tick repositories instead.
+- **Organization approval.** By default an organization owner has to approve a fine-grained token. Until then it
+  reads only public repositories. Single sign-on (SAML) is handled while you create the token.
+- **CI state without a Checks permission.** Fine-grained tokens cannot get *Checks*, but GitHub still reports
+  the combined state of GitHub Actions and other checks when the token has Contents and Commit statuses.
+</details>
+
+#### GitHub classic token
+
+<details>
+<summary>One token for every organization. Also the choice for GitHub Enterprise Server.</summary>
+
+1. Open the [prefilled token form](https://github.com/settings/tokens/new?scopes=repo,read:org&description=Gitwall).
+   Without the link: Settings › Developer settings › Personal access tokens › Tokens (classic) › Generate new
+   token (classic). On GitHub Enterprise Server, open the same page on your server.
+2. **Scopes:** `repo` for private repositories, `read:org` for your organizations.
+3. Pick an expiration, select **Generate token** and paste it into Gitwall.
+4. For an organization with single sign-on (SAML): next to the token select **Configure SSO** › **Authorize**.
+</details>
+
+#### GitLab fine-grained token
+
+<details>
+<summary>GitLab 19.2 or newer, on gitlab.com and self-managed. Read-only.</summary>
+
+1. Select your avatar › **Edit profile** › **Access** › **Personal access tokens** › **Generate token** ›
+   **Fine-grained token**. Or open `/-/user_settings/personal_access_tokens/granular/new` on your server, for
+   example [on gitlab.com](https://gitlab.com/-/user_settings/personal_access_tokens/granular/new).
+2. Enter a name such as `Gitwall` and an **expiration date**. Fine-grained tokens always expire, by default
+   within 365 days.
+3. **Group and project access:** *All groups and projects that I'm a member of*, or only the ones you want to
+   follow.
+4. **Add resource permissions:** select each resource below and set its permission to **Read**.
+
+   | Tab | Resource | Gitwall uses it for |
+   |---|---|---|
+   | Group and project | Projects › Project | the projects you follow |
+   | Group and project | Groups › Group | the groups you follow |
+   | Group and project | Repository › Merge Request | merge requests, approvals and reviewers |
+   | Group and project | Project Planning › Work Item | issues and milestones |
+   | Group and project | Project Planning › Label | labels |
+   | Group and project | CI/CD › Pipeline | the pipeline state of merge requests |
+   | User | System Access › User | your account, and authors, assignees and reviewers |
+   | User | Projects › Project | the project list when you pick repositories |
+   | User | Groups › Group | the group list when you pick repositories |
+   | User | System Access › Personal Access Token | the expiry warning |
+
+5. Select **Generate token** and paste it into Gitwall.
+
+Good to know:
+
+- **Review state.** GitLab does not give fine-grained tokens the review state of each reviewer. Gitwall then
+  counts every reviewer who has not approved as still reviewing, so *Waiting for my review* can keep a merge
+  request you already commented on, and *changes requested* does not show. A legacy token keeps the full state.
+- **Missing permission.** GitLab answers with "Access denied: This operation requires a fine-grained personal
+  access token with the following … permissions", naming the one to add.
+</details>
+
+#### GitLab legacy token
+
+<details>
+<summary>GitLab 16 or newer. Broad read access with a single scope.</summary>
+
+1. Open the [prefilled token form on gitlab.com](https://gitlab.com/-/user_settings/personal_access_tokens?name=Gitwall&scopes=read_api),
+   or the same path on your server. Without the link: avatar › **Edit profile** › **Access** › **Personal access
+   tokens** › **Generate token** › **Legacy token**.
+2. **Scope:** `read_api`.
+3. Set an expiration date, select **Generate token** and paste it into Gitwall.
+
+A group on gitlab.com can refuse legacy tokens after a date its owner sets, and an administrator can stop new
+legacy tokens on a self-managed instance. Use a fine-grained token there.
+</details>
 
 ## Development
 
@@ -162,10 +276,15 @@ Logic is developed test-first with Swift Testing, against fixtures captured from
 live server or a human are skipped unless you opt in:
 
 ```sh
+GITWALL_GITHUB_TOKEN=github_pat_… GITWALL_GITHUB_REPO=owner/private-repo \
+  swift test --package-path Packages/GitwallGitHub --filter Integration
 GITWALL_GITLAB_TOKEN=glpat-… GITWALL_GITLAB_URL=https://gitlab.example.com \
   swift test --package-path Packages/GitwallGitLab --filter Integration
 GITWALL_OAUTH_INTERACTIVE=1 swift test --package-path Packages/GitwallAuth --filter Interactive
 ```
+
+Run the provider suites with both a classic and a fine-grained token when you touch the queries: fine-grained
+tokens only reach what their permissions list, so a new field can work with one and fail with the other.
 
 ## Contributing
 

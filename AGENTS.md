@@ -35,7 +35,8 @@ with lasting consequences are recorded in `docs/adr/`.
 ## Commands
 
 ```sh
-make generate        # xcodegen
+make generate        # xcodegen, only when project.yml changed; after adding or removing a file run
+                     # `xcodegen generate --spec project.yml` or the new file is not compiled
 make build           # Debug build into build/DerivedData
 make run             # build + launch
 make install         # Release build into ~/Applications (daily driver)

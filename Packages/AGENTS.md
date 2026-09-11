@@ -21,5 +21,8 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   `OAuthTransport`. Never mock our own types.
 - Provider responses are mapped from real fixtures under `Tests/.../Fixtures`, captured from live APIs.
 - Integration tests that need a real server or a human are gated behind an environment variable and skipped
-  by default (`GITWALL_GITLAB_TOKEN`, `GITWALL_OAUTH_INTERACTIVE`).
+  by default (`GITWALL_GITHUB_TOKEN` + optional `GITWALL_GITHUB_REPO`, `GITWALL_GITLAB_TOKEN` + `GITWALL_GITLAB_URL`,
+  `GITWALL_OAUTH_INTERACTIVE`).
+- A query change must keep working with fine-grained tokens. When you add a REST endpoint or a GraphQL type,
+  check it against the provider's fine-grained permission list and update the token guide in the README.
 - Nothing here may import AppKit or SwiftUI except GitwallUI.

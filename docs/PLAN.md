@@ -177,7 +177,7 @@ Strategie dotazů:
 ## Auth
 
 - `TokenStore` nad Security frameworkem, položky per `Account.id`, `kSecAttrAccessibleAfterFirstUnlock`, jen v app targetu (widget tokeny nepotřebuje).
-- PAT: vložení + `verify()` → uloží `me`. Nápověda scope: GitHub `repo` (nebo fine-grained: Pull requests/Issues/Metadata read), GitLab `read_api`.
+- PAT: vložení + `verify()` → uloží `me`. Nápověda scope: GitHub classic `repo` + `read:org`, fine-grained Pull requests/Issues/Commit statuses/Contents read (Contents kvůli stavu CI, jeden vlastník na token); GitLab legacy `read_api`, fine-grained (19.2+) podle tabulky v README „Personal access tokens“.
 - GitHub.com device flow: veřejný client ID naší OAuth App, polling s respektem k `interval` / `slow_down`. GHES: uživatel zadá vlastní client ID.
 - GitLab.com Authorization Code + PKCE přes `ASWebAuthenticationSession`, callback `gitwall://oauth/gitlab`, scopes `read_api read_user`. Self-host: PAT výchozí, volitelné vlastní client ID.
 

@@ -297,8 +297,8 @@ struct AddAccountSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(scopeHelp).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                if let url = tokenURL {
-                    Link(kind == .github ? "Create a token on GitHub…" : "Create a token on GitLab…", destination: url).font(.caption)
+                ForEach(tokenLinks, id: \.title) { link in
+                    Link(link.title, destination: link.url).font(.caption)
                 }
                 if canSignIn {
                     Button("Sign in with \(kind == .github ? "GitHub" : "GitLab") instead") { usingToken = false }
@@ -354,17 +354,13 @@ struct AddAccountSheet: View {
 
     private var scopeHelp: String {
         switch kind {
-        case .github: "Classic token: scopes repo and read:org. Fine-grained token: read access to Pull requests, Issues, Metadata (and Members for organizations)."
-        case .gitlab: "Personal access token with the read_api scope (classic token). Works with gitlab.com and self-managed GitLab 16 or newer."
+        case .github: "Fine-grained token (read-only): set Pull requests, Issues, Commit statuses and Contents to Read-only. It covers one owner, so add one account per organization. Classic token: scopes repo and read:org."
+        case .gitlab: "Legacy token with the read_api scope, for gitlab.com and GitLab 16 or newer. GitLab 19.2 or newer also offers fine-grained tokens; the guide lists their permissions and limits."
         }
     }
 
-    private var tokenURL: URL? {
-        guard let baseURL else { return nil }
-        switch kind {
-        case .github: return URL(string: "\(baseURL.absoluteString)/settings/tokens/new?scopes=repo,read:org&description=Gitwall")
-        case .gitlab: return URL(string: "\(baseURL.absoluteString)/-/user_settings/personal_access_tokens?name=Gitwall&scopes=read_api")
-        }
+    private var tokenLinks: [TokenSetupLinks.Link] {
+        TokenSetupLinks.links(kind: kind, baseURL: baseURL)
     }
 
     private func signIn() async {

@@ -99,4 +99,5 @@ enum Links {
     static let privacy = "https://prokopsimek.github.io/gitwall/privacy/"
     static let source = "https://github.com/prokopsimek/gitwall"
     static let issues = "https://github.com/prokopsimek/gitwall/issues"
+    static let tokenGuide = "https://github.com/prokopsimek/gitwall#personal-access-tokens"
 }

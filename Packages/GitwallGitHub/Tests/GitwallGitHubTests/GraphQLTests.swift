@@ -221,7 +221,26 @@ struct GitHubIntegrationTests {
         let provider = GitHubProvider()
         let orgs = try await provider.discoverContainers(baseURL: github, token: token)
         let repos = try await provider.discoverRepositories(baseURL: github, token: token, query: nil)
-        #expect(orgs.count >= 0)
+        print("integration: \(repos.count) repositories, organizations: \(orgs.map(\.id).joined(separator: ", "))")
         #expect(!repos.isEmpty)
+    }
+
+    /// Checks a repository the token can only reach with its own permissions, such as a private repository and a
+    /// fine-grained token. Pick one with open pull requests or issues:
+    ///
+    ///     GITWALL_GITHUB_TOKEN=github_pat_… GITWALL_GITHUB_REPO=owner/private-repo \
+    ///         swift test --package-path Packages/GitwallGitHub --filter Integration
+    @Test(
+        "fetches pull requests and issues of GITWALL_GITHUB_REPO",
+        .enabled(if: ProcessInfo.processInfo.environment["GITWALL_GITHUB_REPO"] != nil)
+    )
+    func fetchConfiguredRepository() async throws {
+        let repo = ProcessInfo.processInfo.environment["GITWALL_GITHUB_REPO"] ?? ""
+        let account = Account(kind: .github, baseURL: github, displayName: "GitHub", sources: [.repository(fullName: repo)])
+        let items = try await GitHubProvider().fetchItems(account: account, token: token, kinds: [.pullRequest, .issue])
+        let pulls = items.filter { $0.kind == .pullRequest }
+        let withCI = pulls.filter { $0.ciState != CIState.none }
+        print("integration: \(repo): \(pulls.count) pull requests (\(withCI.count) with CI state), \(items.count - pulls.count) issues")
+        #expect(!items.isEmpty, "The token cannot read \(repo), or it has no open pull requests or issues")
     }
 }
