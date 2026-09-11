@@ -56,11 +56,14 @@ public enum FilterEngine {
                 return false
             }
         }
-        if !filter.includeDrafts, item.isDraft { return false }
+        if !filter.includeDrafts, item.isDraft, !isDraftAwaitingMyReview(item, filter: filter, me: me) { return false }
 
         let labels = Set(item.labels.map { $0.name.lowercased() })
         if !filter.labelsAny.isEmpty, filter.labelsAny.allSatisfy({ !labels.contains($0.lowercased()) }) { return false }
         if filter.labelsNone.contains(where: { labels.contains($0.lowercased()) }) { return false }
+
+        if !filter.authorsAny.isEmpty, !filter.authorsAny.contains(where: { sameLogin($0, item.author.login) }) { return false }
+        if filter.authorsNone.contains(where: { sameLogin($0, item.author.login) }) { return false }
 
         if item.kind == .pullRequest {
             if !filter.reviewStates.isEmpty, !filter.reviewStates.contains(item.reviewState ?? .none) { return false }
@@ -85,6 +88,23 @@ public enum FilterEngine {
         }
 
         return true
+    }
+
+    /// A draft nobody asked me to review stays hidden; one that names me as a reviewer does not, because cloud
+    /// agents request the review while the pull request is still a draft and cannot mark it ready themselves.
+    private static func isDraftAwaitingMyReview(_ item: WorkItem, filter: ItemFilter, me: UserRef?) -> Bool {
+        guard filter.includeDraftsRequestingMyReview, filter.relations.contains(.reviewRequestedFromMe), let me else { return false }
+        return item.requestedReviewers.contains { sameLogin($0.login, me.login) }
+    }
+
+    /// Logins differ between providers and APIs: GitHub GraphQL returns `renovate`, REST returns `renovate[bot]`.
+    private static func sameLogin(_ lhs: String, _ rhs: String) -> Bool {
+        func normalized(_ login: String) -> String {
+            var value = login.trimmingCharacters(in: .whitespaces).lowercased()
+            if value.hasSuffix("[bot]") { value.removeLast(5) }
+            return value
+        }
+        return normalized(lhs) == normalized(rhs)
     }
 
     private static func relation(relationKind: Relation, item: WorkItem, me: UserRef) -> Bool {

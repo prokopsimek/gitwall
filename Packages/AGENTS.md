@@ -26,3 +26,9 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 - A query change must keep working with fine-grained tokens. When you add a REST endpoint or a GraphQL type,
   check it against the provider's fine-grained permission list and update the token guide in the README.
 - Nothing here may import AppKit or SwiftUI except GitwallUI.
+- `ItemFilter` decodes every key with `decodeIfPresent`: a `config.json` written by an older build must keep
+  loading, so a new field needs a default, never a migration.
+- Filter categories combine with AND, values inside one category with OR. Two deliberate exceptions live in
+  `FilterEngine`: a draft that names me as a reviewer passes a review preset even when drafts are off (cloud
+  agents cannot mark their pull requests ready), and author logins are compared without a trailing `[bot]`,
+  because GitHub GraphQL returns `renovate` where REST returns `renovate[bot]`.

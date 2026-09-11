@@ -156,6 +156,41 @@ struct FilterEngineTests {
         #expect(run(Preset(name: "Oldest", sort: .oldestCreated), items) == [2, 3, 1])
     }
 
+    @Test("a draft that asks for my review still counts as waiting for me")
+    func draftsRequestingMyReview() {
+        // Cloud agents (Copilot, the Claude and Codex GitHub apps) open a draft and request a review;
+        // they cannot mark it ready, so hiding every draft hides the whole queue.
+        let asksMe = item(1, isDraft: true, requestedReviewers: ["me"])
+        let someoneElse = item(2, isDraft: true, requestedReviewers: ["other"])
+        let review = ItemFilter(relations: [.reviewRequestedFromMe], includeDrafts: false)
+        #expect(run(Preset(name: "Waiting", filter: review), [asksMe, someoneElse]) == [1])
+
+        var optedOut = review
+        optedOut.includeDraftsRequestingMyReview = false
+        #expect(run(Preset(name: "Strict", filter: optedOut), [asksMe, someoneElse]).isEmpty)
+    }
+
+    @Test("presets that are not about my review keep hiding drafts")
+    func draftsStayHiddenElsewhere() {
+        let assigned = item(1, isDraft: true, assignees: ["me"], requestedReviewers: ["me"])
+        let mine = ItemFilter(relations: [.assignedToMe], includeDrafts: false)
+        #expect(run(Preset(name: "Assigned", filter: mine), [assigned]).isEmpty)
+        #expect(run(Preset(name: "Everything", filter: ItemFilter(includeDrafts: false)), [assigned]).isEmpty)
+    }
+
+    @Test("authors: any-of includes, none-of excludes, bot suffix and case ignored")
+    func authors() {
+        let items = [
+            item(1, author: "copilot-swe-agent"),
+            item(2, author: "renovate[bot]"),
+            item(3, author: "jana.v"),
+        ]
+        #expect(run(Preset(name: "Agents", filter: ItemFilter(authorsAny: ["Copilot-SWE-Agent"])), items) == [1])
+        #expect(run(Preset(name: "Bots", filter: ItemFilter(authorsAny: ["renovate"])), items) == [2])
+        #expect(run(Preset(name: "No bots", filter: ItemFilter(authorsNone: ["renovate[bot]"])), items) == [1, 3])
+        #expect(run(Preset(name: "Both", filter: ItemFilter(authorsAny: ["copilot-swe-agent", "jana.v"], authorsNone: ["jana.v"])), items) == [1])
+    }
+
     @Test("counts per preset for the menu bar badge")
     func counts() {
         let items = [item(1, author: "me"), item(2)]
