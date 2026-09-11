@@ -28,6 +28,10 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 - Nothing here may import AppKit or SwiftUI except GitwallUI.
 - `ItemFilter` decodes every key with `decodeIfPresent`: a `config.json` written by an older build must keep
   loading, so a new field needs a default, never a migration.
+- A GitHub review request addressed to a team resolves to the token owner when they are in that team. The
+  membership query (`GraphQLQueries.viewerTeams`, classic tokens need `read:org`) runs at most once per
+  `fetchItems`, and only for a batch that actually contains a team request; a refusal is logged and leaves the
+  queue as it was.
 - Filter categories combine with AND, values inside one category with OR. Two deliberate exceptions live in
   `FilterEngine`: a draft that names me as a reviewer passes a review preset even when drafts are off (cloud
   agents cannot mark their pull requests ready), and author logins are compared without a trailing `[bot]`,
