@@ -14,7 +14,7 @@ struct InteractiveOAuthTests {
         FileHandle.standardError.write(Data(">>> \(message)\n".utf8))
     }
 
-    @Test("GitHub device flow returns a usable token after the user approves", .timeLimit(.minutes(5)))
+    @Test("GitHub device flow returns a usable token after the user approves", .timeLimit(.minutes(10)))
     func deviceFlow() async throws {
         let flow = GitHubDeviceFlow(client: OAuthClients.github)
         let code = try await flow.requestCode()

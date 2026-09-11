@@ -68,7 +68,15 @@ Support URL: <https://github.com/prokopsimek/gitwall/issues>
 Marketing URL: <https://prokopsimek.github.io/gitwall/>
 Copyright: `2026 Prokop Simek`
 
-What's New (first release): leave empty; App Store Connect hides it for 1.0.
+What's New (0.2.0):
+
+```
+Sign in with GitHub or GitLab in one click. No more copying tokens: Gitwall keeps you signed in and refreshes the connection in the background.
+
+New: a short walkthrough on first launch takes you from an account to a widget on your desktop.
+
+Also in this version: Gitwall tells you before a personal access token expires, and an account that needs attention offers to sign in again without losing what it already showed you.
+```
 
 ## Screenshots
 
