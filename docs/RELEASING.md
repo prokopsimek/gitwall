@@ -110,52 +110,56 @@ Mac Installer Distribution certificate, and upload the build without an Apple ID
 
 ## 5. Developer ID build, notarization, GitHub Release
 
-Export the same archive signed with Developer ID:
+One-time: the Developer ID Application certificate. The App Store Connect API refuses to create it
+("This operation can only be performed by the Account Holder"), so it is made once in the developer portal
+from a certificate signing request:
 
 ```sh
-xcodebuild -exportArchive \
-  -archivePath build/Gitwall.xcarchive \
-  -exportOptionsPlist Config/ExportOptions-developer-id.plist \
-  -exportPath build/export/developer-id \
-  -allowProvisioningUpdates
+openssl req -new -newkey rsa:2048 -nodes \
+  -keyout ~/.appstoreconnect/private_keys/developer-id.key \
+  -out ~/Desktop/Gitwall-DeveloperID.certSigningRequest \
+  -subj "/CN=Prokop Simek/C=CZ"
 ```
 
-Notarize, staple and zip:
+Upload the request at <https://developer.apple.com/account/resources/certificates/add> (type
+"Developer ID Application", profile type G2 Sub-CA), download the `.cer`, then import both halves so
+`codesign` can use them:
 
 ```sh
-VERSION=$(grep MARKETING_VERSION project.yml | awk '{print $2}')
+security import ~/Downloads/developerID_application.cer -k ~/Library/Keychains/login.keychain-db
+security import ~/.appstoreconnect/private_keys/developer-id.key -k ~/Library/Keychains/login.keychain-db \
+  -T /usr/bin/codesign -T /usr/bin/productsign
+security find-identity -v -p codesigning | grep "Developer ID"
+```
+
+Then every release is one command, which archives, exports with Developer ID, notarizes with the same API
+key as the upload, staples, zips and publishes the GitHub Release:
+
+```sh
+export ASC_KEY_ID=... ASC_ISSUER_ID=... ASC_KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_<id>.p8
+make release
+```
+
+What `make release` does, in case a step has to be repeated by hand:
+
+```sh
+xcodebuild -exportArchive -archivePath build/Gitwall.xcarchive \
+  -exportOptionsPlist Config/ExportOptions-developer-id.plist \
+  -exportPath build/export/developer-id -allowProvisioningUpdates \
+  -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 cd build/export/developer-id
 ditto -c -k --keepParent Gitwall.app Gitwall-$VERSION.zip
-xcrun notarytool submit Gitwall-$VERSION.zip --keychain-profile "gitwall-notary" --wait
+xcrun notarytool submit Gitwall-$VERSION.zip --key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait
 xcrun stapler staple Gitwall.app
-# Stapling modifies the bundle, so build the final zip only now.
-rm Gitwall-$VERSION.zip
-ditto -c -k --keepParent Gitwall.app Gitwall-$VERSION.zip
-xcrun stapler validate Gitwall.app
-spctl -a -vv -t exec Gitwall.app          # expect: accepted, source=Notarized Developer ID
+rm Gitwall-$VERSION.zip && ditto -c -k --keepParent Gitwall.app Gitwall-$VERSION.zip   # staple changed the bundle
 shasum -a 256 Gitwall-$VERSION.zip > Gitwall-$VERSION.zip.sha256
-cd -
+spctl -a -vv -t exec Gitwall.app        # expect: accepted, source=Notarized Developer ID
 ```
 
-If `notarytool` reports `Invalid`, read the log:
+If notarization comes back `Invalid`, read the log: `xcrun notarytool log <submission-id> --key ... --key-id ... --issuer ...`.
 
-```sh
-xcrun notarytool log <submission-id> --keychain-profile "gitwall-notary"
-```
-
-Tag and publish the release:
-
-```sh
-git tag -a v$VERSION -m "Gitwall $VERSION"
-git push origin v$VERSION
-gh release create v$VERSION \
-  build/export/developer-id/Gitwall-$VERSION.zip \
-  build/export/developer-id/Gitwall-$VERSION.zip.sha256 \
-  --title "Gitwall $VERSION" --generate-notes
-```
-
-The direct-download build has no auto-update (see `docs/PLAN.md`); say so in the release
-notes and point to the App Store for automatic updates.
+The direct-download build has no auto-update (see `docs/PLAN.md`); say so in the release notes and point to
+the App Store for automatic updates.
 
 ## 6. Submit to the App Store
 

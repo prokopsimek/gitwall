@@ -13,7 +13,8 @@ draft and merge-conflict state. Click an item to open it in your browser.
   review state, CI state, drafts, age, milestone, text.
 - Notifications per preset (new item, review requested, approved, changes requested,
   CI failed, merged, closed).
-- Sign in once. Tokens live in the macOS Keychain and are refreshed silently.
+- Sign in once with GitHub or GitLab, or use a personal access token. Credentials live in the macOS
+  Keychain and OAuth tokens are refreshed silently, so you are never asked to sign in again.
 - No backend. The app talks to GitHub / GitLab APIs directly from your Mac.
 
 Requires macOS 14 Sonoma or later.
@@ -21,9 +22,10 @@ Requires macOS 14 Sonoma or later.
 ## Status
 
 Beta. GitHub (github.com and GitHub Enterprise Server) and GitLab (gitlab.com and self-managed,
-GitLab 16 or newer) with personal access tokens work end to end: accounts, repository, organization
-and group discovery, presets with filters, menu bar popover, configurable desktop widgets in four
-sizes, notifications. OAuth sign-in and the App Store release are the next milestones (see `docs/PLAN.md`).
+GitLab 16 or newer) work end to end: sign in with GitHub or GitLab or paste a personal access token,
+repository, organization and group discovery, presets with filters, menu bar popover, configurable desktop
+widgets in four sizes, notifications, first-run walkthrough. Version 0.1.0 is with App Review; the roadmap is
+in `docs/PLAN.md`.
 
 ## Widgets
 

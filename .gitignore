@@ -34,3 +34,6 @@ Scripts/out/
 
 # Python bytecode from Scripts/asc.py
 __pycache__/
+*.key
+*.csr
+*.cer

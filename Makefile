@@ -8,11 +8,12 @@ DESTINATION  := platform=macOS
 PACKAGES     := $(wildcard Packages/*)
 APP          := $(DERIVED)/Build/Products/$(CONFIG)/Gitwall.app
 ARCHIVE      := build/Gitwall.xcarchive
+VERSION      := $(shell awk '/MARKETING_VERSION:/ {print $$2; exit}' project.yml)
 RELEASE_APP  := build/DerivedData-release/Build/Products/Release/Gitwall.app
 INSTALL_APP  := $(HOME)/Applications/Gitwall.app
 LSREGISTER   := /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
-.PHONY: help generate build run install register test test-packages test-app clean archive open
+.PHONY: help generate build run install register test test-packages test-app clean archive release open
 
 help:
 	@echo "make generate       - generate Gitwall.xcodeproj from project.yml (XcodeGen)"
@@ -23,6 +24,7 @@ help:
 	@echo "make test           - swift test for all packages + xcodebuild test"
 	@echo "make test-packages  - swift test for all packages"
 	@echo "make archive        - Release archive for App Store / notarization"
+	@echo "make release        - notarized Developer ID build + zip for GitHub Releases"
 	@echo "make clean          - remove generated project and build products"
 
 $(PROJECT): project.yml
@@ -81,6 +83,27 @@ archive: generate
 		-archivePath $(ARCHIVE) -allowProvisioningUpdates archive
 	@$(LSREGISTER) -u "$(ARCHIVE)/Products/Applications/Gitwall.app" >/dev/null 2>&1 || true
 	@$(MAKE) --no-print-directory register
+
+# Developer ID build for direct download: archive, notarize, staple, zip, publish. Needs the App Store Connect
+# API key in the environment (ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH) and a Developer ID certificate in the
+# login keychain; see docs/RELEASING.md.
+release: archive
+	@test -n "$(ASC_KEY_ID)" || { echo "set ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH"; exit 1; }
+	rm -rf build/export/developer-id
+	xcodebuild -exportArchive -archivePath $(ARCHIVE) \
+		-exportOptionsPlist Config/ExportOptions-developer-id.plist \
+		-exportPath build/export/developer-id -allowProvisioningUpdates \
+		-authenticationKeyPath "$(ASC_KEY_PATH)" -authenticationKeyID "$(ASC_KEY_ID)" -authenticationKeyIssuerID "$(ASC_ISSUER_ID)"
+	cd build/export/developer-id && \
+		ditto -c -k --keepParent Gitwall.app Gitwall-$(VERSION).zip && \
+		xcrun notarytool submit Gitwall-$(VERSION).zip --key "$(ASC_KEY_PATH)" --key-id "$(ASC_KEY_ID)" --issuer "$(ASC_ISSUER_ID)" --wait && \
+		xcrun stapler staple Gitwall.app && \
+		rm Gitwall-$(VERSION).zip && \
+		ditto -c -k --keepParent Gitwall.app Gitwall-$(VERSION).zip && \
+		shasum -a 256 Gitwall-$(VERSION).zip > Gitwall-$(VERSION).zip.sha256 && \
+		spctl -a -vv -t exec Gitwall.app
+	@echo "Ready: build/export/developer-id/Gitwall-$(VERSION).zip"
+	@echo "Publish with: gh release create v$(VERSION) build/export/developer-id/Gitwall-$(VERSION).zip build/export/developer-id/Gitwall-$(VERSION).zip.sha256 --title \"Gitwall $(VERSION)\" --generate-notes"
 
 open: generate
 	open $(PROJECT)

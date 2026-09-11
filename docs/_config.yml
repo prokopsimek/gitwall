@@ -11,3 +11,4 @@ exclude:
   - PLAN.md
   - RELEASING.md
   - appstore-listing.md
+  - adr

@@ -21,9 +21,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         app.run()
     }
 
-    let environment = AppEnvironment(demo: AppDelegate.isDemoLaunch)
+    let environment = AppEnvironment(demo: AppDelegate.isDemoLaunch, sandbox: AppDelegate.sandboxDirectory)
     private var statusItem: StatusItemController?
     private var mainWindow: MainWindowController?
+    private var onboardingWindow: OnboardingWindowController?
     private var settingsWindow: SettingsWindowController?
     private var mainMenu: MainMenuController?
     private var notificationDelegate: NotificationCenterDelegate?
@@ -50,9 +51,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyDebugArguments()
         if environment.isDemo {
             presentDemoWindows()
+        } else if environment.needsOnboarding, !environment.config.settings.onboardingCompleted {
+            showOnboarding()
         } else if environment.needsOnboarding {
             showMainWindow(presetID: nil)
         }
+    }
+
+    /// `--debug-fresh`: a throwaway container and an in-memory Keychain, so the walkthrough and the sign-in
+    /// flows can be exercised without touching the installed app's accounts. Debug builds only.
+    private static var sandboxDirectory: URL? {
+        #if DEBUG
+        guard CommandLine.arguments.contains("--debug-fresh") else { return nil }
+        return FileManager.default.temporaryDirectory.appendingPathComponent("gitwall-fresh-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        #else
+        return nil
+        #endif
     }
 
     /// `--debug-demo`: sample data instead of the user's; Debug builds only. Used for App Store screenshots.
@@ -126,6 +140,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindow?.show(presetID: presetID)
     }
 
+    func showOnboarding() {
+        if onboardingWindow == nil {
+            onboardingWindow = OnboardingWindowController(environment: environment) { [weak self] in
+                self?.onboardingWindow = nil
+                self?.showMainWindow(presetID: nil)
+            }
+        }
+        onboardingWindow?.show()
+    }
+
     func showSettings(_ tab: SettingsTab) {
         if settingsWindow == nil {
             settingsWindow = SettingsWindowController(environment: environment)
@@ -145,6 +169,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !environment.isDemo else { return }
         let args = CommandLine.arguments
         if args.contains("--debug-reset") {
+            // Destructive: wipes accounts, tokens and the snapshot. Only ever on a throwaway container.
+            guard AppDelegate.sandboxDirectory != nil else {
+                log.error("--debug-reset ignored: it would delete the real accounts. Add --debug-fresh.")
+                return
+            }
             environment.resetAllData()
             log.info("Debug reset performed")
         }

@@ -1,0 +1,25 @@
+# Packages
+
+All logic lives here, test-first with Swift Testing. `swift test --package-path Packages/<name>`, or
+`make test-packages` for all of them. Dependencies point one way only:
+
+```
+GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
+```
+
+| Package | Owns |
+|---|---|
+| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`. |
+| `GitwallUI` | Row views, status icons, time formatting shared by popover, window and widget. |
+| `GitwallAuth` | Keychain `TokenStore`, `StoredToken`, OAuth flows (`GitHubDeviceFlow`, `GitLabPKCEFlow`), `PKCE`, `TokenRefresher`, `RefreshingTokenReader`, token expiry parsing, `OAuthClients` (public client IDs). |
+| `GitwallGitHub` | `GitHubProvider`: GraphQL for lists, REST for identity and discovery, Link pagination. |
+| `GitwallGitLab` | `GitLabProvider`: one GraphQL request per project or group (complexity limit), REST discovery. Sends the token as a bearer credential, which covers both personal access tokens and OAuth. |
+
+## Rules
+
+- Mock only at the HTTP boundary: each provider package has an `HTTPTransport`, GitwallAuth an
+  `OAuthTransport`. Never mock our own types.
+- Provider responses are mapped from real fixtures under `Tests/.../Fixtures`, captured from live APIs.
+- Integration tests that need a real server or a human are gated behind an environment variable and skipped
+  by default (`GITWALL_GITLAB_TOKEN`, `GITWALL_OAUTH_INTERACTIVE`).
+- Nothing here may import AppKit or SwiftUI except GitwallUI.

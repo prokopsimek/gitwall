@@ -1,11 +1,16 @@
 # Gitwall – plán (schváleno 2026-09-10)
 
-## Stav k 2026-09-10 večer
+## Stav k 2026-09-11
 
-- Hotovo: M0, M1 (GitHub PAT end-to-end včetně GHES endpointů), z M3 filtry, notifikace a diff snapshotů, ikona, privacy manifesty, release dokumentace.
-- Odchylky: App Group používá Team-ID formát (viz `AppGroup.swift`); Keychain používá klasické macOS úložiště (data-protection varianta selhává bez provisioning profilu); Dock ikona je ve výchozím stavu zapnutá (rozhodnutí Prokopa 2026-09-10); spouštění při přihlášení se zapne po přidání prvního účtu.
-- Zbývá: M2 GitLab, M4 OAuth (device flow, PKCE, tichá obnova), M5 App Store (App Store Connect záznam, screenshoty, Developer ID certifikát pro notarizaci, GitHub Pages pro privacy policy), plný onboarding průvodce.
-- SSH klíče nelze použít místo tokenu: metadata PR/issues (review, CI, štítky) poskytuje jen HTTP API, které vyžaduje token nebo OAuth. SSH ověřuje pouze git protokol.
+- Hotovo: M0, M1 (GitHub PAT end-to-end včetně GHES), M2 (GitLab cloud i self-managed, ověřeno proti
+  git.applifting.cz 19.3), M3 (filtry, notifikace, onboarding), M4 (OAuth device flow pro GitHub, PKCE pro
+  GitLab, tichá obnova tokenů), z M5 App Store Connect záznam, metadata, sedm screenshotů, privacy policy na
+  GitHub Pages, verze 0.1.0 build 4 odeslaná do App Review 2026-09-10.
+- Odchylky od plánu: App Group používá Team-ID formát, Keychain klasické úložiště, Dock ikona zapnutá,
+  GitLab klient posílá token jako Bearer (funguje pro PAT i OAuth). Zdůvodnění v `docs/adr/`.
+- Zbývá: Developer ID certifikát a notarizovaný build v GitHub Releases (certifikát jde založit jen v portálu,
+  API ho odmítá), verze 0.2.0 s OAuth a onboardingem po schválení 0.1.0, odkaz na App Store v docs a README.
+- SSH klíče nelze použít místo tokenu: metadata PR/issues (review, CI, štítky) poskytuje jen HTTP API.
 
 ## Context
 

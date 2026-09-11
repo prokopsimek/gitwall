@@ -50,12 +50,15 @@ final class AppEnvironment {
     @ObservationIgnored private let avatars: AvatarDownloader?
     @ObservationIgnored private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard, tokenStore: (any TokenStore)? = nil, demo: Bool = false) {
+    /// `sandbox` points the config, snapshot and tokens at a throwaway directory so a test run cannot touch
+    /// the real installation's accounts (`--debug-fresh`).
+    init(defaults: UserDefaults = .standard, tokenStore: (any TokenStore)? = nil, demo: Bool = false, sandbox: URL? = nil) {
         self.defaults = defaults
-        self.tokenStore = tokenStore ?? KeychainTokenStore()
+        self.tokenStore = tokenStore ?? (sandbox == nil ? KeychainTokenStore() : InMemoryTokenStore())
         self.providers = [.github: GitHubProvider(), .gitlab: GitLabProvider()]
         isDemo = demo
-        container = demo ? nil : AppGroup.containerURL()
+        container = demo ? nil : (sandbox ?? AppGroup.containerURL())
+        if let sandbox { try? FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true) }
         if demo {
             configStore = nil
             snapshotStore = nil
