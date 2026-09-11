@@ -20,6 +20,9 @@
 - 2026-09-11: GitHub žádosti o review adresované týmu se do „Waiting for my review“ promítnou, když token umí
   přečíst členství v týmech (klasický token se `read:org`). Dotaz jde jen u dávky, kde tým o review opravdu žádá;
   když ho token nesmí položit, chová se appka jako dřív. **Neověřeno proti fine-grained tokenu.**
+- 2026-09-11: nová instalace si při prvním spuštění sama zapne „Launch at login“ (menu bar appka je k ničemu,
+  když neběží). Jen jednou – `AppSettings.launchAtLoginConfigured` – takže vypnutí v Obecných už nic nepřepíše;
+  existující instalace (má účet nebo dokončený onboarding) se nechává, jak si ji uživatel nastavil.
 - SSH klíče nelze použít místo tokenu: metadata PR/issues (review, CI, štítky) poskytuje jen HTTP API.
 
 ## Context

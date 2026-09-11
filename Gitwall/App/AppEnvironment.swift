@@ -39,6 +39,8 @@ final class AppEnvironment {
     let snapshotStore: SnapshotStore?
     /// `--debug-demo`: fictional accounts and items from `DemoData`, kept in memory only (screenshots, UI work).
     let isDemo: Bool
+    /// `--debug-fresh` and the app test host: a throwaway installation, which must not touch login items either.
+    private let isSandbox: Bool
     let tokenStore: any TokenStore
     let providers: [ProviderKind: any GitProvider]
     let notifications = NotificationDispatcher()
@@ -59,6 +61,7 @@ final class AppEnvironment {
         self.tokenStore = tokenStore ?? (sandbox == nil ? KeychainTokenStore() : InMemoryTokenStore())
         self.providers = [.github: GitHubProvider(), .gitlab: GitLabProvider()]
         isDemo = demo
+        isSandbox = sandbox != nil
         container = demo ? nil : (sandbox ?? AppGroup.containerURL())
         if let sandbox { try? FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true) }
         if demo {
@@ -98,6 +101,7 @@ final class AppEnvironment {
             lastError = "Configuration could not be read: \(error.localizedDescription)"
         }
         seedDefaultPresetsIfNeeded()
+        registerAtLoginOnFirstLaunch()
         snapshot = try? snapshotStore?.load()
         previousSnapshot = try? snapshotStore?.loadPrevious()
         reloadTokenExpiries()
@@ -141,6 +145,25 @@ final class AppEnvironment {
         } catch {
             log.error("Could not save the default presets: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Product decision: a menu bar agent is only useful when it is running, so a fresh installation starts with
+    /// Launch at login on. `AppConfig.shouldRegisterAtLogin` keeps it to the first launch; a failed registration
+    /// leaves the flag unset so the next launch tries again. Users switch it off in General.
+    private func registerAtLoginOnFirstLaunch() {
+        guard !isSandbox, config.shouldRegisterAtLogin else { return }
+        if SMAppService.mainApp.status == .notRegistered {
+            do {
+                try SMAppService.mainApp.register()
+                log.info("Launch at login switched on for the fresh installation")
+            } catch {
+                log.error("Could not switch Launch at login on: \(error.localizedDescription, privacy: .public)")
+                return
+            }
+        }
+        var updated = config
+        updated.settings.launchAtLoginConfigured = true
+        try? persist(updated, refresh: false)
     }
 
     private func scheduleRefreshLoop() {
@@ -287,7 +310,6 @@ final class AppEnvironment {
         try tokenStore.set(await stamped(credential, provider: provider, baseURL: baseURL), for: account.id)
         // The account arrives with its own three presets (assigned pull requests, assigned issues, reviews waiting).
         let updated = config.adding(account, pullRequestTerm: provider.capabilities.pullRequestTerm)
-        let isFirstAccount = config.accounts.isEmpty
         try persist(updated)
         reloadTokenExpiries()
         if selectedPresetID == nil { selectedPresetID = updated.presets.first?.id }
@@ -295,10 +317,6 @@ final class AppEnvironment {
         let stored = updated.account(id: account.id) ?? account
         // The permission prompt blocks until the user answers; never await it on the account flow.
         Task { await notifications.requestAuthorizationIfNeeded() }
-        if isFirstAccount, SMAppService.mainApp.status == .notRegistered {
-            // Product decision: a menu bar agent is only useful when it is running. Users can switch it off in General.
-            try? SMAppService.mainApp.register()
-        }
         return stored
     }
 

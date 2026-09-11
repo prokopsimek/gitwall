@@ -68,6 +68,15 @@ struct ConfigStoreTests {
         #expect(filter.includeDraftsRequestingMyReview)
     }
 
+    @Test("settings written before the launch-at-login flag still load, with the flag unset")
+    func legacySettingsDecode() throws {
+        let legacy = #"{"refreshIntervalMinutes":2,"onboardingCompleted":true}"#
+        let settings = try SnapshotCoding.decode(AppSettings.self, from: Data(legacy.utf8))
+        #expect(settings.refreshIntervalMinutes == 2)
+        #expect(settings.onboardingCompleted)
+        #expect(!settings.launchAtLoginConfigured)
+    }
+
     @Test("a config.json written before per-account presets still loads, with the marker unset")
     func legacyAccountDecodes() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gitwall-legacy-\(UUID().uuidString)")
