@@ -10,8 +10,12 @@
   GitLab klient posílá token jako Bearer (funguje pro PAT i OAuth). Zdůvodnění v `docs/adr/`.
 - 2026-09-11: Developer ID certifikát založený v portálu (API ho odmítá), notarizovaný build 0.2.0 (7) na
   GitHub Releases, build 7 nahraný do App Store Connect.
-- Zbývá: po schválení 0.1.0 založit v App Store Connect verzi 0.2.0 s buildem 7 a odeslat ji, do docs a README
-  doplnit odkaz na App Store.
+- 2026-09-11: 0.3.0 (8) – každý účet dostane tři výchozí presety (přiřazené PR/MR, přiřazené issues, čeká na
+  můj review), stávající účty jednou automaticky; ze společných zůstal jen „All open“. Oprava GitLab review stavů
+  a mazání presetů při odebrání účtu. README se screenshoty.
+- Zbývá: po schválení 0.1.0 založit v App Store Connect rovnou verzi 0.3.0 s buildem 8 (0.2.0 se v obchodě
+  přeskočí) a odeslat ji, do docs a README doplnit odkaz na App Store.
+- Známé omezení: GitHub žádosti o review adresované týmu se do „Waiting for my review“ nepromítnou.
 - SSH klíče nelze použít místo tokenu: metadata PR/issues (review, CI, štítky) poskytuje jen HTTP API.
 
 ## Context

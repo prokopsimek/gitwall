@@ -41,7 +41,7 @@ WORKS WITH YOUR HOSTS
 • Several accounts at once, in one list
 
 PRESETS
-Save named views such as “My pull requests”, “Waiting for my review” or “All open”. Combine repositories, organizations or groups from any account, choose pull requests, issues or both, and filter by author, review request, assignee, labels, review state, CI state, drafts, age, milestone or text.
+Every account starts with presets for pull requests and issues assigned to you and reviews waiting for you. Save more named views on top. Combine repositories, organizations or groups from any account, choose pull requests, issues or both, and filter by author, review request, assignee, labels, review state, CI state, drafts, age, milestone or text.
 
 WIDGETS
 Add desktop widgets in four sizes: Counter, List, Board and Wide Board. Every widget shows the preset you pick for it, and you can add as many as you like.
@@ -68,14 +68,16 @@ Support URL: <https://github.com/prokopsimek/gitwall/issues>
 Marketing URL: <https://prokopsimek.github.io/gitwall/>
 Copyright: `2026 Prokop Simek`
 
-What's New (0.2.0):
+What's New (0.3.0, the first update after 0.1.0 in the store, so it covers 0.2.0 too):
 
 ```
+Every account now comes with its own presets: pull requests assigned to you, issues assigned to you, and reviews waiting for you. Change their filters or delete them like any other preset. Accounts you already have get them once.
+
 Sign in with GitHub or GitLab in one click. No more copying tokens: Gitwall keeps you signed in and refreshes the connection in the background.
 
-New: a short walkthrough on first launch takes you from an account to a widget on your desktop.
+A short walkthrough on first launch takes you from an account to a widget on your desktop.
 
-Also in this version: Gitwall tells you before a personal access token expires, and an account that needs attention offers to sign in again without losing what it already showed you.
+Also: a heads-up before a personal access token expires, and GitLab reviews you already did no longer show up as waiting for you.
 ```
 
 ## Screenshots
