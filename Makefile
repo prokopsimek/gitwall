@@ -53,9 +53,13 @@ register:
 # the widget extension and the URL scheme away from the app in use. Drop them and point Launch Services back at
 # the installed Release build when there is one (make install), otherwise at the Debug build (make run).
 restore-registration:
-	@$(LSREGISTER) -u "$(ARCHIVE)/Products/Applications/Gitwall.app" >/dev/null 2>&1 || true
-	@for app in build/export/*/Gitwall.app; do [ -d "$$app" ] && $(LSREGISTER) -u "$$app" >/dev/null 2>&1; done; true
-	@if [ -d "$(INSTALL_APP)" ]; then $(LSREGISTER) -f "$(INSTALL_APP)" >/dev/null 2>&1; else $(LSREGISTER) -f "$(APP)" >/dev/null 2>&1; fi; true
+	@# Every copy under build/: archive, exports and the intermediate Release products of make install.
+	@find build -name Gitwall.app -type d -prune 2>/dev/null | while read -r app; do $(LSREGISTER) -u "$$app" >/dev/null 2>&1; done; true
+	@if [ -d "$(INSTALL_APP)" ]; then \
+		$(LSREGISTER) -f "$(INSTALL_APP)" >/dev/null 2>&1; pluginkit -a "$(INSTALL_APP)/Contents/PlugIns/GitwallWidget.appex" >/dev/null 2>&1; \
+	else \
+		$(LSREGISTER) -f "$(APP)" >/dev/null 2>&1; pluginkit -a "$(APP)/Contents/PlugIns/GitwallWidget.appex" >/dev/null 2>&1; \
+	fi; true
 	@pkill -f GitwallWidget.appex >/dev/null 2>&1 || true
 	@killall chronod >/dev/null 2>&1 || true
 
@@ -65,10 +69,11 @@ install: generate
 		-allowProvisioningUpdates build
 	@pkill -x Gitwall >/dev/null 2>&1 || true
 	@pkill -f GitwallWidget.appex >/dev/null 2>&1 || true
-	@$(LSREGISTER) -u "$(APP)" >/dev/null 2>&1 || true
 	rm -rf "$(INSTALL_APP)"
 	ditto "$(RELEASE_APP)" "$(INSTALL_APP)"
-	@killall chronod >/dev/null 2>&1 || true
+	@$(MAKE) --no-print-directory restore-registration
+	@# Registering the app does not always re-announce its extension; do it explicitly so the gallery sees it.
+	@pluginkit -a "$(INSTALL_APP)/Contents/PlugIns/GitwallWidget.appex" >/dev/null 2>&1 || true
 	open "$(INSTALL_APP)"
 
 run: build
