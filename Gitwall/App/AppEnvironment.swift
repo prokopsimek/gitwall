@@ -31,6 +31,8 @@ final class AppEnvironment {
     var selectedPresetID: UUID?
     /// Item ids that appeared in the last sync, for the "new" dot in the popover.
     private(set) var newItemIDs: Set<String> = []
+    /// Credential expiry per account; `nil` value means the credential has no expiry. See `reloadTokenExpiries`.
+    private(set) var tokenExpiries: [UUID: Date?] = [:]
 
     let container: URL?
     let configStore: ConfigStore?
@@ -97,6 +99,7 @@ final class AppEnvironment {
         }
         snapshot = try? snapshotStore?.load()
         previousSnapshot = try? snapshotStore?.loadPrevious()
+        reloadTokenExpiries()
         if selectedPresetID == nil { selectedPresetID = config.presets.first?.id }
         if let configStore, let snapshotStore {
             // The reader refreshes OAuth tokens behind the sync engine's back, so a signed-in account never
@@ -174,6 +177,7 @@ final class AppEnvironment {
             newItemIDs = Set(changes.filter { $0.event == .newItem }.map(\.item.id))
             log.info("Sync finished with \(result.snapshot.items.count) items, \(changes.count) changes")
 
+            reloadTokenExpiries()
             await avatars?.download(for: result.snapshot.items)
             WidgetCenter.shared.reloadAllTimelines()
 
@@ -225,9 +229,19 @@ final class AppEnvironment {
         }
     }
 
-    /// Expiry of the stored credential, when it has one.
+    /// Expiry of the stored credential, when it has one. Read from a cache: `accountsNeedingAttention` is
+    /// evaluated on every SwiftUI render and the Keychain is too slow to touch that often.
     func expiry(for account: Account) -> Date? {
-        (try? tokenStore.token(for: account.id))?.expiresAt
+        tokenExpiries[account.id] ?? nil
+    }
+
+    /// Rereads every credential's expiry. Called at start and whenever a credential changes.
+    func reloadTokenExpiries() {
+        var expiries: [UUID: Date?] = [:]
+        for account in config.accounts {
+            expiries[account.id] = (try? tokenStore.token(for: account.id))?.expiresAt
+        }
+        tokenExpiries = expiries
     }
 
     /// OAuth accounts can be repaired by signing in again; token accounts need a new token pasted in.
@@ -262,6 +276,7 @@ final class AppEnvironment {
         }
         let isFirstAccount = config.accounts.isEmpty
         try persist(updated)
+        reloadTokenExpiries()
         if selectedPresetID == nil { selectedPresetID = updated.presets.first?.id }
         // The permission prompt blocks until the user answers; never await it on the account flow.
         Task { await notifications.requestAuthorizationIfNeeded() }
@@ -287,6 +302,7 @@ final class AppEnvironment {
         }
         try? tokenStore.removeToken(for: account.id)
         try? persist(updated)
+        reloadTokenExpiries()
     }
 
     /// Replaces the credential of an existing account, keeping its id so presets and widgets stay attached.
@@ -298,6 +314,7 @@ final class AppEnvironment {
         if let authMethod { updatedAccount.authMethod = authMethod }
         try tokenStore.set(await stamped(credential, provider: provider, baseURL: account.baseURL), for: account.id)
         updateAccount(updatedAccount)
+        reloadTokenExpiries()
         Task { await refresh() }
     }
 

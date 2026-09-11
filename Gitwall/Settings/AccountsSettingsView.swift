@@ -8,6 +8,7 @@ struct AccountsSettingsView: View {
     @State private var showingAdd = false
     @State private var reauthAccount: Account?
     @State private var signInError: String?
+    @State private var coordinator = OAuthCoordinator()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -60,6 +61,12 @@ struct AccountsSettingsView: View {
         .sheet(item: $reauthAccount) { account in
             ReplaceTokenSheet(environment: environment, account: account)
         }
+        // Signing in again to GitHub shows a code, exactly like adding an account does.
+        .sheet(isPresented: Binding(get: { coordinator.deviceCode != nil }, set: { if !$0 { coordinator.cancel() } })) {
+            if let code = coordinator.deviceCode {
+                DeviceCodeView(code: code) { coordinator.cancel() }
+            }
+        }
     }
 
     /// OAuth accounts are repaired by signing in again; token accounts need a new token pasted in.
@@ -71,7 +78,6 @@ struct AccountsSettingsView: View {
         signInError = nil
         Task {
             do {
-                let coordinator = OAuthCoordinator()
                 let clientID: String? = if case .oauth(let id) = account.authMethod { id } else { nil }
                 let result: OAuthCoordinator.Result = switch account.kind {
                 case .github: try await coordinator.signInWithGitHub(baseURL: account.baseURL, clientID: clientID)
@@ -201,15 +207,14 @@ struct AddAccountSheet: View {
     @State private var coordinator = OAuthCoordinator()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if let code = coordinator.deviceCode {
-                deviceCodeStep(code)
-            } else {
-                form
-            }
+        // DeviceCodeView brings its own padding and width; the form gets them here.
+        if let code = coordinator.deviceCode {
+            deviceCodeStep(code)
+        } else {
+            form
+                .padding(20)
+                .frame(width: 460)
         }
-        .padding(20)
-        .frame(width: 460)
     }
 
     // MARK: - Steps
@@ -317,40 +322,9 @@ struct AddAccountSheet: View {
     }
 
     private func deviceCodeStep(_ code: DeviceCode) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Confirm on GitHub").font(.title2.weight(.semibold))
-            Text("Enter this code in the browser window that just opened.")
-                .foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                Text(code.userCode)
-                    .font(.system(size: 34, weight: .semibold, design: .monospaced))
-                    .textSelection(.enabled)
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(code.userCode, forType: .string)
-                } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 8)
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("Waiting for approval…").foregroundStyle(.secondary)
-            }
-            Link("Open the page again", destination: code.verificationURI).font(.callout)
-            if let error {
-                Text(error).font(.callout).foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            HStack {
-                Spacer()
-                Button("Cancel") {
-                    coordinator.cancel()
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-            }
+        DeviceCodeView(code: code, error: error) {
+            coordinator.cancel()
+            dismiss()
         }
     }
 
@@ -462,5 +436,48 @@ struct ReplaceTokenSheet: View {
         }
         .padding(20)
         .frame(width: 420)
+    }
+}
+
+/// The GitHub device flow asks the user to type a short code in the browser; this is where they read it.
+struct DeviceCodeView: View {
+    let code: DeviceCode
+    var error: String?
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Confirm on GitHub").font(.title2.weight(.semibold))
+            Text("Enter this code in the browser window that just opened.")
+                .foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Text(code.userCode)
+                    .font(.system(size: 34, weight: .semibold, design: .monospaced))
+                    .textSelection(.enabled)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(code.userCode, forType: .string)
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 8)
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Waiting for approval\u{2026}").foregroundStyle(.secondary)
+            }
+            Link("Open the page again", destination: code.verificationURI).font(.callout)
+            if let error {
+                Text(error).font(.callout).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", action: cancel).keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
     }
 }
