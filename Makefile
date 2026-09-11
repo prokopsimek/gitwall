@@ -14,7 +14,7 @@ RELEASE_APP  := build/DerivedData-release/Build/Products/Release/Gitwall.app
 INSTALL_APP  := $(HOME)/Applications/Gitwall.app
 LSREGISTER   := /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
-.PHONY: help generate build run install register restore-registration test test-packages test-app clean archive release open
+.PHONY: help generate build run install register restore-registration test test-packages test-app clean archive release screenshots open
 
 help:
 	@echo "make generate       - generate Gitwall.xcodeproj from project.yml (XcodeGen)"
@@ -26,6 +26,7 @@ help:
 	@echo "make test-packages  - swift test for all packages"
 	@echo "make archive        - Release archive for App Store / notarization"
 	@echo "make release        - notarized Developer ID build + zip for GitHub Releases"
+	@echo "make screenshots    - App Store and README screenshots from the demo data"
 	@echo "make clean          - remove generated project and build products"
 
 $(PROJECT): project.yml
@@ -120,6 +121,10 @@ release: archive
 	@$(MAKE) --no-print-directory restore-registration
 	@echo "Ready: build/export/developer-id/Gitwall-$(VERSION).zip"
 	@echo "Publish with: gh release create v$(VERSION) build/export/developer-id/Gitwall-$(VERSION).zip build/export/developer-id/Gitwall-$(VERSION).zip.sha256 --title \"Gitwall $(VERSION)\" --generate-notes"
+
+# App Store screenshots and the README/website copies, all from the demo data. See Scripts/make-screenshots.sh.
+screenshots:
+	Scripts/make-screenshots.sh
 
 open: generate
 	open $(PROJECT)

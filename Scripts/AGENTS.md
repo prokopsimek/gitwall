@@ -5,7 +5,8 @@ Tooling for releases and assets. Nothing here ships inside the app.
 | Script | Purpose |
 |---|---|
 | `asc.py` | App Store Connect API client with no third-party dependencies: ES256 JWT signed through `openssl`, `get/post/patch/delete`, and chunked screenshot upload. |
-| `screenshots.swift` | `capture <pid> <dir>` saves every window of a running process (also on other Spaces); `compose <spec.json|window.png> <out.png>` puts them on the 2880×1800 brand background without alpha. |
+| `screenshots.swift` | `waitfor <pid> <titles…>` blocks until the demo's windows exist; `capture <pid> <dir>` saves every window of a running process (also on other Spaces); `compose <spec.json|window.png> <out.png>` puts them on the 2880×1800 brand background without alpha. |
+| `make-screenshots.sh` | The whole screenshot pipeline behind `make screenshots`. |
 | `screenshot-specs/*.json` | The published App Store screenshot layouts: headline, subtitle and hand-placed layers with optional crops. |
 | `make-icon.swift`, `icon-variants.swift` | App icon rendering (concept F: brick wall, teal pull-request glyph). |
 
@@ -17,5 +18,7 @@ Tooling for releases and assets. Nothing here ships inside the app.
 
 ## Screenshots
 
-Run the Debug build with `--debug-demo --debug-demo-widgets`, capture, then compose the layouts. The full
-recipe, including which preset each capture needs, is in `docs/RELEASING.md`.
+`make screenshots` (runs `make-screenshots.sh`) does everything from the demo data: Debug build, four demo runs
+(one per preset the layouts need), `waitfor` + `capture`, `compose` of every layout in `screenshot-specs/`
+into `out/wall/` (App Store, 2880×1800 PNG), and 1600 px JPEG copies into `docs/screenshots/` for the README and
+the website. It ends with `make restore-registration`, so the Debug build does not steal the widget gallery.

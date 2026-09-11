@@ -10,10 +10,15 @@ Pull requests and issues on your desktop.
 
 Gitwall is a free, open-source macOS menu bar app with desktop widgets. It gathers open pull requests (merge requests) and issues from the GitHub and GitLab repositories you choose and lists them by latest activity, with review, CI, draft and conflict status visible at a glance. Click an item to open it in your browser.
 
+**[Download Gitwall](https://github.com/prokopsimek/gitwall/releases/latest)** for macOS 14 or later.
+
+![Gitwall main window with desktop widgets](screenshots/01-hero.jpg)
+
 ## Features
 
 - GitHub and GitLab, cloud and self-hosted, in one list
-- Named views such as "My PRs", "Waiting for my review" or "All open", with filters for type, relation to you, drafts, labels, review and CI state, age, milestone and text
+- Every account starts with three presets: pull requests assigned to you, issues assigned to you and reviews waiting for you
+- Presets you define from any mix of accounts and repositories, with filters for type, relation to you, drafts, labels, review and CI state, age, milestone and text
 - Desktop widgets in four sizes, each showing the view you pick
 - Menu bar popover with an optional item count next to the icon
 - Local notifications for new items, review requests, approvals, requested changes, CI failures, merges and closes
@@ -21,6 +26,12 @@ Gitwall is a free, open-source macOS menu bar app with desktop widgets. It gathe
 - Refresh interval from 1 to 30 minutes, manual refresh from the menu bar and the widget
 - Sign in with GitHub or GitLab in one click, or paste a personal access token; you stay signed in
 - No account with the developer, no analytics, no third-party services. Tokens stay in your Keychain.
+
+![Filters in the preset editor](screenshots/04-filters.jpg)
+
+![The four widget sizes](screenshots/02-widgets.jpg)
+
+![Menu bar popover](screenshots/07-menubar.jpg)
 
 ## Requirements
 

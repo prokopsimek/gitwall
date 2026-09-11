@@ -1,6 +1,8 @@
 #!/usr/bin/swift
 // App Store screenshots for Gitwall.
 //
+//   swift Scripts/screenshots.swift waitfor <pid> <title> [title ...]
+//       Blocks until those titled windows of <pid> exist, so a capture never runs before the app is ready.
 //   swift Scripts/screenshots.swift capture <pid> <outdir>
 //       Saves every visible window of process <pid> as a PNG (no shadow) into <outdir>
 //       and prints "<file>\t<title>\t<width>x<height>" per window.
@@ -205,8 +207,22 @@ func compose(spec: URL, output: URL) {
     render(layers: layers, title: json["title"] as? String, subtitle: json["subtitle"] as? String, output: output)
 }
 
+/// Waits until every titled window exists for `pid` (the demo opens its windows at slightly different times).
+func waitFor(pid: pid_t, titles: [String], timeout: TimeInterval = 30) {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        let present = Set(visibleWindows(of: pid).map(\.title))
+        if titles.allSatisfy(present.contains) { return }
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+    fail("timed out waiting for windows \(titles) of pid \(pid)")
+}
+
 let arguments = CommandLine.arguments
 switch arguments.dropFirst().first {
+case "waitfor":
+    guard arguments.count >= 4, let pid = Int32(arguments[2]) else { fail("usage: waitfor <pid> <title> [title ...]") }
+    waitFor(pid: pid, titles: Array(arguments.dropFirst(3)))
 case "capture":
     guard arguments.count == 4, let pid = Int32(arguments[2]) else { fail("usage: capture <pid> <outdir>") }
     capture(pid: pid, outDir: URL(fileURLWithPath: arguments[3]))
