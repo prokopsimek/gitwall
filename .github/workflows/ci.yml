@@ -19,7 +19,9 @@ jobs:
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
       - name: swift test
         run: |
-          for pkg in Packages/*; do
+          # Packages/ also holds documentation; only descend into real packages.
+          for manifest in Packages/*/Package.swift; do
+            pkg="$(dirname "$manifest")"
             echo "==> $pkg"
             swift test --package-path "$pkg"
           done
