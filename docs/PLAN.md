@@ -8,8 +8,10 @@
   GitHub Pages, verze 0.1.0 build 4 odeslaná do App Review 2026-09-10.
 - Odchylky od plánu: App Group používá Team-ID formát, Keychain klasické úložiště, Dock ikona zapnutá,
   GitLab klient posílá token jako Bearer (funguje pro PAT i OAuth). Zdůvodnění v `docs/adr/`.
-- Zbývá: Developer ID certifikát a notarizovaný build v GitHub Releases (certifikát jde založit jen v portálu,
-  API ho odmítá), verze 0.2.0 s OAuth a onboardingem po schválení 0.1.0, odkaz na App Store v docs a README.
+- 2026-09-11: Developer ID certifikát založený v portálu (API ho odmítá), notarizovaný build 0.2.0 (7) na
+  GitHub Releases, build 7 nahraný do App Store Connect.
+- Zbývá: po schválení 0.1.0 založit v App Store Connect verzi 0.2.0 s buildem 7 a odeslat ji, do docs a README
+  doplnit odkaz na App Store.
 - SSH klíče nelze použít místo tokenu: metadata PR/issues (review, CI, štítky) poskytuje jen HTTP API.
 
 ## Context

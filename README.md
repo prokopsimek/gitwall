@@ -24,8 +24,13 @@ Requires macOS 14 Sonoma or later.
 Beta. GitHub (github.com and GitHub Enterprise Server) and GitLab (gitlab.com and self-managed,
 GitLab 16 or newer) work end to end: sign in with GitHub or GitLab or paste a personal access token,
 repository, organization and group discovery, presets with filters, menu bar popover, configurable desktop
-widgets in four sizes, notifications, first-run walkthrough. Version 0.1.0 is with App Review; the roadmap is
-in `docs/PLAN.md`.
+widgets in four sizes, notifications, first-run walkthrough. Version 0.2.0 is on GitHub Releases; the App Store
+version is in review. The roadmap is in `docs/PLAN.md`.
+
+## Install
+
+Download the notarized build from [GitHub Releases](https://github.com/prokopsimek/gitwall/releases/latest),
+unzip it and move Gitwall.app to Applications. The Mac App Store version is in review.
 
 ## Widgets
 
