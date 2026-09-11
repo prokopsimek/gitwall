@@ -17,6 +17,9 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 ## Rules
 
 - No branching logic here that a package could own. `AppEnvironment` orchestrates; it does not compute.
+- Accounts enter and leave through `AppConfig.adding(_:pullRequestTerm:)` and `AppConfig.removing(accountID:)`
+  (GitwallCore), which own the per-account default presets and their cleanup. Do not append to
+  `config.accounts` directly.
 - `AppEnvironment.addAccount` and `replaceCredential` take a `StoredToken`, so refresh tokens and expiry
   dates survive. The sync engine reads through `RefreshingTokenReader`, which refreshes OAuth tokens
   silently; the user signs in once.
@@ -30,7 +33,7 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 
 | Argument | Effect |
 |---|---|
-| `--debug-fresh` | Throwaway container and in-memory Keychain. Use this for anything destructive. |
+| `--debug-fresh` | Throwaway container and in-memory Keychain. Use this for anything destructive. The app test host gets the same automatically, so `make test-app` never touches your real configuration. |
 | `--debug-reset` | Wipes accounts, tokens and snapshot. Refuses to run without `--debug-fresh`. |
 | `--debug-github-token <pat> [--debug-repos a/b,c/d]` | Creates a GitHub account without clicking. |
 | `--debug-demo [--debug-demo-preset <n>] [--debug-demo-widgets]` | Fictional data from `GitwallCore.DemoData` for App Store screenshots; widgets appear as borderless windows. |
