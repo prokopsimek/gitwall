@@ -28,6 +28,10 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 - Nothing here may import AppKit or SwiftUI except GitwallUI.
 - `ItemFilter` decodes every key with `decodeIfPresent`: a `config.json` written by an older build must keep
   loading, so a new field needs a default, never a migration.
+- Archived repositories are dropped by the provider, never by `FilterEngine` (see `docs/adr/0007`). GitHub asks
+  for `isArchived` in the repository queries and the search query carries `archived:false`; GitLab selects
+  `archived` on the project root and must never pass `includeArchived` to a group connection, because GitLab
+  already leaves archived projects out by default.
 - A GitHub review request addressed to a team resolves to the token owner when they are in that team. The
   membership query (`GraphQLQueries.viewerTeams`, classic tokens need `read:org`) runs at most once per
   `fetchItems`, and only for a batch that actually contains a team request; a refusal is logged and leaves the

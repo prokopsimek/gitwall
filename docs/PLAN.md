@@ -15,6 +15,8 @@
   a mazání presetů při odebrání účtu. README se screenshoty.
 - Zbývá: po schválení 0.1.0 založit v App Store Connect rovnou verzi 0.3.0 s buildem 8 (0.2.0 se v obchodě
   přeskočí) a odeslat ji, do docs a README doplnit odkaz na App Store.
+- 2026-09-11: archivovaná repa se nezobrazují nikde a nenabízejí se ani ve výběru repozitářů; zahazuje je
+  provider, ne filtr (`docs/adr/0007`). Bez přepínače.
 - 2026-09-11: GitHub žádosti o review adresované týmu se do „Waiting for my review“ promítnou, když token umí
   přečíst členství v týmech (klasický token se `read:org`). Dotaz jde jen u dávky, kde tým o review opravdu žádá;
   když ho token nesmí položit, chová se appka jako dřív. **Neověřeno proti fine-grained tokenu.**

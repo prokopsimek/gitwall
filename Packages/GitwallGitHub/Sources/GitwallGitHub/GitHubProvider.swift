@@ -181,6 +181,10 @@ public struct GitHubProvider: GitProvider {
                 gitHubLog.error("Repository \(fullName, privacy: .public) not found or not accessible; skipping")
                 continue
             }
+            if node.isArchived == true {
+                gitHubLog.info("Repository \(fullName, privacy: .public) is archived; skipping its items")
+                continue
+            }
             items += try await collect(node: node, kinds: kinds, repo: repo, account: account, token: token, endpoints: endpoints, teams: teams)
         }
         return items

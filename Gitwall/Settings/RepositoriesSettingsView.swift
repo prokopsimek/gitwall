@@ -155,9 +155,8 @@ struct RepositoriesSettingsView: View {
     }
 
     private var filteredRepositories: [RepoRef] {
-        let needle = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !needle.isEmpty else { return repositories }
-        return repositories.filter { $0.fullName.lowercased().contains(needle) }
+        let watched = account.map(RepositoryPicker.watchedRepositories) ?? []
+        return RepositoryPicker.visible(repositories, watched: watched, query: search)
     }
 
     private var isValidManualEntry: Bool {

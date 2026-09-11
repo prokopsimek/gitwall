@@ -43,6 +43,9 @@ them or build your own from any mix of accounts, repositories, pull requests and
 review state, checks, merge conflicts, labels, author logins, age, milestone and text. Each preset also decides
 which events notify you.
 
+Archived repositories never show up: nothing in them can be merged or closed, so Gitwall leaves them out of every
+list and does not offer them when you pick repositories.
+
 Pull requests that a cloud agent opened for you stay in "Waiting for my review" even though they are drafts:
 Copilot and the Claude and Codex GitHub apps request the review before a person marks the pull request ready.
 Filter the agents themselves with author logins such as `copilot-swe-agent` or `cursor`.
