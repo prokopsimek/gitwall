@@ -5,7 +5,8 @@ SCHEME       := Gitwall
 CONFIG       ?= Debug
 DERIVED      := build/DerivedData
 DESTINATION  := platform=macOS
-PACKAGES     := $(wildcard Packages/*)
+# Directories that actually hold a package; Packages/ also contains documentation.
+PACKAGES     := $(patsubst %/Package.swift,%,$(wildcard Packages/*/Package.swift))
 APP          := $(DERIVED)/Build/Products/$(CONFIG)/Gitwall.app
 ARCHIVE      := build/Gitwall.xcarchive
 VERSION      := $(shell awk '/MARKETING_VERSION:/ {print $$2; exit}' project.yml)
