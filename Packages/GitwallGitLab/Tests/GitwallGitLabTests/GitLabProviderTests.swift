@@ -48,18 +48,37 @@ struct GitLabCapabilitiesTests {
 
 @Suite("REST: verify and discovery")
 struct GitLabRESTTests {
-    @Test("verify sends PRIVATE-TOKEN and maps /user")
+    @Test("verify sends the token as a bearer credential and maps /user")
     func verify() async throws {
         let transport = StubTransport([.json(try Fixtures.data("rest_user.json"))])
         let me = try await GitLabProvider(transport: transport).verify(baseURL: selfHosted, token: "glpat-x")
 
         let request = try #require(await transport.requests.first)
         #expect(request.url?.absoluteString == "https://git.applifting.cz/api/v4/user")
-        #expect(request.value(forHTTPHeaderField: "PRIVATE-TOKEN") == "glpat-x")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer glpat-x")
         #expect(request.value(forHTTPHeaderField: "User-Agent") == "Gitwall")
         #expect(me.login == "prokopsimek")
         #expect(me.displayName == "Prokop Simek")
         #expect(me.avatarURL?.absoluteString == "https://git.applifting.cz/uploads/-/system/user/avatar/12/avatar.png")
+    }
+
+    @Test("tokenExpiry reads the personal access token self endpoint")
+    func tokenExpiry() async throws {
+        let transport = StubTransport([.json(#"{"id":1,"name":"Gitwall token","scopes":["read_api"],"expires_at":"2027-09-10","active":true}"#)])
+        let date = await GitLabProvider(transport: transport).tokenExpiry(baseURL: selfHosted, token: "glpat-x")
+
+        #expect(await transport.requests.first?.url?.absoluteString == "https://git.applifting.cz/api/v4/personal_access_tokens/self")
+        #expect(date == (try Date("2027-09-10T00:00:00Z", strategy: .iso8601)))
+    }
+
+    @Test("tokenExpiry stays quiet for OAuth tokens and non-expiring ones")
+    func tokenExpiryAbsent() async throws {
+        // OAuth access tokens cannot read the PAT endpoint; GitLab answers 401 and that is not an error here.
+        let oauth = StubTransport([.json(#"{"message":"401 Unauthorized"}"#, status: 401)])
+        #expect(await GitLabProvider(transport: oauth).tokenExpiry(baseURL: selfHosted, token: "oauth") == nil)
+
+        let never = StubTransport([.json(#"{"id":1,"expires_at":null,"active":true}"#)])
+        #expect(await GitLabProvider(transport: never).tokenExpiry(baseURL: selfHosted, token: "glpat-x") == nil)
     }
 
     @Test("discoverRepositories lists member projects, follows pagination and filters locally")
@@ -200,7 +219,7 @@ struct GitLabGraphQLTests {
 
         let request = try #require(await transport.requests.first)
         #expect(request.url?.absoluteString == "https://gitlab.com/api/graphql")
-        #expect(request.value(forHTTPHeaderField: "PRIVATE-TOKEN") == "t")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer t")
         #expect(try await transport.graphQLVariable("path", at: 0) == "gitlab-org/gitlab-runner")
         let query = try await transport.graphQLQuery(at: 0)
         #expect(query.contains("project(fullPath: $path)"))

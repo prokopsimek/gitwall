@@ -51,6 +51,26 @@ struct VerifyTests {
     }
 }
 
+@Suite("tokenExpiry")
+struct TokenExpiryTests {
+    @Test("reads the expiry GitHub sends for expiring tokens")
+    func expiring() async throws {
+        let transport = StubTransport([.json(#"{"login":"me","name":null,"avatar_url":null}"#,
+                                             headers: ["GitHub-Authentication-Token-Expiration": "2026-10-01 12:30:00 UTC"])])
+        let date = await GitHubProvider(transport: transport).tokenExpiry(baseURL: github, token: "ghp")
+        #expect(date == (try Date("2026-10-01T12:30:00Z", strategy: .iso8601)))
+    }
+
+    @Test("a token without an expiry header has none, and a rejected token does not raise")
+    func noExpiry() async throws {
+        let classic = StubTransport([.json(#"{"login":"me","name":null,"avatar_url":null}"#)])
+        #expect(await GitHubProvider(transport: classic).tokenExpiry(baseURL: github, token: "ghp") == nil)
+
+        let rejected = StubTransport([.json(#"{"message":"Bad credentials"}"#, status: 401)])
+        #expect(await GitHubProvider(transport: rejected).tokenExpiry(baseURL: github, token: "bad") == nil)
+    }
+}
+
 @Suite("discoverRepositories")
 struct DiscoverRepositoriesTests {
     private func repoJSON(_ fullName: String, pushedAt: String, isPrivate: Bool = false, archived: Bool = false, description: String? = nil) -> String {

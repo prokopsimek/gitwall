@@ -39,6 +39,20 @@ public struct GitLabProvider: GitProvider {
         return UserRef(login: user.username, displayName: user.name, avatarURL: endpoints.resolve(avatar: user.avatar_url))
     }
 
+    /// Personal access tokens can read their own metadata; OAuth access tokens get 401 here, which means "unknown".
+    public func tokenExpiry(baseURL: URL, token: String) async -> Date? {
+        let endpoints = GitLabEndpoints(baseURL: baseURL)
+        let url = endpoints.rest.appendingPathComponent("personal_access_tokens/self")
+        guard let (info, _) = try? await client.get(RESTTokenInfo.self, url: url, token: token), let expiresAt = info.expires_at else {
+            return nil
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: expiresAt)
+    }
+
     public func discoverRepositories(baseURL: URL, token: String, query: String?) async throws -> [RepoRef] {
         let endpoints = GitLabEndpoints(baseURL: baseURL)
         var components = URLComponents(url: endpoints.rest.appendingPathComponent("projects"), resolvingAgainstBaseURL: false)!
@@ -199,6 +213,11 @@ private struct RESTProject: Decodable {
     let visibility: String?
     let archived: Bool?
     let last_activity_at: Date?
+}
+
+private struct RESTTokenInfo: Decodable {
+    /// `YYYY-MM-DD`, or null for a token that never expires.
+    let expires_at: String?
 }
 
 private struct RESTGroup: Decodable {

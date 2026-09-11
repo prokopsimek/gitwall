@@ -97,4 +97,12 @@ public protocol GitProvider: Sendable {
 
     /// All open items of the requested kinds for the account's sources.
     func fetchItems(account: Account, token: String, kinds: Set<ItemKind>) async throws -> [WorkItem]
+
+    /// When the credential stops working, when the provider can tell. Never throws: an unknown expiry is `nil`,
+    /// so settings can warn about an expiring personal access token without turning it into a sync failure.
+    func tokenExpiry(baseURL: URL, token: String) async -> Date?
+}
+
+extension GitProvider {
+    public func tokenExpiry(baseURL: URL, token: String) async -> Date? { nil }
 }

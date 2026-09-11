@@ -102,16 +102,30 @@ public actor SyncEngine {
             return failure(.error, "No provider registered for \(account.kind.rawValue).")
         }
 
-        do {
-            let items = try await provider.fetchItems(account: account, token: token, kinds: kinds)
-            return AccountOutcome(
+        func succeed(_ items: [WorkItem]) -> AccountOutcome {
+            AccountOutcome(
                 accountID: account.id,
                 items: items,
                 status: FetchStatus(state: .ok, lastSuccessAt: timestamp, message: nil)
             )
+        }
+
+        do {
+            return succeed(try await provider.fetchItems(account: account, token: token, kinds: kinds))
+        } catch ProviderError.unauthorized {
+            // The token may just have expired. Give the reader one chance to refresh it silently.
+            do {
+                guard let refreshed = try await tokens.tokenAfterUnauthorized(for: account.id) else {
+                    return failure(.needsReauth, ProviderError.unauthorized.localizedDescription)
+                }
+                return succeed(try await provider.fetchItems(account: account, token: refreshed, kinds: kinds))
+            } catch ProviderError.unauthorized {
+                return failure(.needsReauth, ProviderError.unauthorized.localizedDescription)
+            } catch {
+                return failure(.error, error.localizedDescription)
+            }
         } catch let error as ProviderError {
             switch error {
-            case .unauthorized: return failure(.needsReauth, error.localizedDescription)
             case .rateLimited: return failure(.rateLimited, error.localizedDescription)
             default: return failure(.error, error.localizedDescription)
             }

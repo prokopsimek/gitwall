@@ -16,8 +16,9 @@ struct GitLabClient: Sendable {
         request.httpMethod = method
         request.httpBody = body
         request.timeoutInterval = 30
-        // Personal access tokens work for REST and GraphQL alike with this header.
-        request.setValue(token, forHTTPHeaderField: "PRIVATE-TOKEN")
+        // Bearer covers both credential kinds: GitLab accepts a personal access token here just like an OAuth
+        // access token, for REST and GraphQL alike, so the client never has to know which one it holds.
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         if body != nil {

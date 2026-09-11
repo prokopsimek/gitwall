@@ -9,6 +9,8 @@ struct SyncEngineTests {
         // @unchecked: mutated only before the engine runs; tests are single-threaded per instance.
         let kind: ProviderKind
         var results: [UUID: Result<[WorkItem], ProviderError>] = [:]
+        /// Overrides `results` when the call arrives with this token, so a retry after a refresh can succeed.
+        var resultsAfterToken: [String: [WorkItem]] = [:]
         var requestedKinds: [UUID: Set<ItemKind>] = [:]
 
         init(kind: ProviderKind) { self.kind = kind }
@@ -23,6 +25,7 @@ struct SyncEngineTests {
         func discoverContainers(baseURL: URL, token: String) async throws -> [ContainerRef] { [] }
         func fetchItems(account: Account, token: String, kinds: Set<ItemKind>) async throws -> [WorkItem] {
             requestedKinds[account.id] = kinds
+            if let items = resultsAfterToken[token] { return items }
             guard let result = results[account.id] else { return [] }
             return try result.get()
         }
@@ -31,6 +34,24 @@ struct SyncEngineTests {
     struct StaticTokens: TokenReading {
         var tokens: [UUID: String]
         func token(for accountID: UUID) async throws -> String? { tokens[accountID] }
+    }
+
+    /// Hands out a second token once, the way a refreshing reader does after the provider rejected the first.
+    final class RefreshingTokens: TokenReading, @unchecked Sendable {
+        let first: [UUID: String]
+        let refreshed: [UUID: String]
+        var refreshCalls = 0
+
+        init(first: [UUID: String], refreshed: [UUID: String]) {
+            self.first = first
+            self.refreshed = refreshed
+        }
+
+        func token(for accountID: UUID) async throws -> String? { first[accountID] }
+        func tokenAfterUnauthorized(for accountID: UUID) async throws -> String? {
+            refreshCalls += 1
+            return refreshed[accountID]
+        }
     }
 
     struct Env {
@@ -159,4 +180,37 @@ struct SyncEngineTests {
 
         #expect(env.githubProvider.requestedKinds[env.github.id] == [.pullRequest, .issue])
     }
+    @Test("a rejected token is refreshed once and the fetch is retried with it")
+    func retriesAfterRefresh() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let item = env.item(1, account: env.github)
+        env.githubProvider.results[env.github.id] = .failure(.unauthorized)
+        env.githubProvider.resultsAfterToken["gh-new"] = [item]
+        let tokens = RefreshingTokens(first: [env.github.id: "gh-old", env.gitlab.id: "gl"], refreshed: [env.github.id: "gh-new"])
+        let engine = SyncEngine(providers: [.github: env.githubProvider, .gitlab: env.gitlabProvider],
+                                tokens: tokens, configStore: env.configStore, snapshotStore: env.snapshotStore, now: { env.now })
+
+        let result = try await engine.sync()
+
+        #expect(tokens.refreshCalls == 1)
+        #expect(result.snapshot.accountStatus[env.github.id]?.state == .ok)
+        #expect(result.snapshot.items.contains { $0.id == item.id })
+    }
+
+    @Test("when no refreshed token is available the account needs a new sign-in")
+    func needsReauthWithoutRefresh() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .failure(.unauthorized)
+        let tokens = RefreshingTokens(first: [env.github.id: "gh-old", env.gitlab.id: "gl"], refreshed: [:])
+        let engine = SyncEngine(providers: [.github: env.githubProvider, .gitlab: env.gitlabProvider],
+                                tokens: tokens, configStore: env.configStore, snapshotStore: env.snapshotStore, now: { env.now })
+
+        let result = try await engine.sync()
+
+        #expect(tokens.refreshCalls == 1)
+        #expect(result.snapshot.accountStatus[env.github.id]?.state == .needsReauth)
+    }
+
 }

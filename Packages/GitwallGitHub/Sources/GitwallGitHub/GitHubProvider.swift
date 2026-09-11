@@ -29,6 +29,15 @@ public struct GitHubProvider: GitProvider {
         return UserRef(login: user.login, displayName: user.name, avatarURL: user.avatar_url)
     }
 
+    /// Fine-grained and expiring classic tokens carry `GitHub-Authentication-Token-Expiration` on every response.
+    public func tokenExpiry(baseURL: URL, token: String) async -> Date? {
+        let endpoints = GitHubEndpoints(baseURL: baseURL)
+        guard let (_, response) = try? await client.get(RESTUser.self, url: endpoints.rest.appendingPathComponent("user"), token: token) else {
+            return nil
+        }
+        return TokenExpiryHeader.date(from: response)
+    }
+
     public func discoverRepositories(baseURL: URL, token: String, query: String?) async throws -> [RepoRef] {
         let endpoints = GitHubEndpoints(baseURL: baseURL)
         var components = URLComponents(url: endpoints.rest.appendingPathComponent("user/repos"), resolvingAgainstBaseURL: false)!
