@@ -245,6 +245,29 @@ struct GitLabGraphQLTests {
         #expect(try await transport.graphQLVariable("path", at: 0) == "gitlab-org/ci-cd")
     }
 
+    @Test("an archived project contributes nothing; the group query keeps GitLab's own default")
+    func archivedProject() async throws {
+        let archived = #"{"data":{"project":{"fullPath":"a/b","archived":true,"mergeRequests":{"pageInfo":{"hasNextPage":true,"endCursor":"c1"},"nodes":[{"iid":"5","title":"Old","webUrl":"https://gitlab.com/a/b/-/merge_requests/5","createdAt":"2026-09-01T00:00:00Z","updatedAt":"2026-09-02T00:00:00Z","project":{"fullPath":"a/b"}}]},"issues":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}"#
+        let transport = StubTransport([.json(archived)])
+        let items = try await GitLabProvider(transport: transport).fetchItems(
+            account: account([.repository(fullName: "a/b")], baseURL: cloud), token: "t", kinds: [.pullRequest, .issue]
+        )
+
+        #expect(items.isEmpty)
+        // The project claims another page of merge requests; nothing may ask for it.
+        #expect(await transport.requests.count == 1)
+        #expect(try await transport.graphQLQuery(at: 0).contains("archived"))
+
+        // Groups have no `archived` field, and their connections already leave archived projects out.
+        let groupTransport = StubTransport([.json(#"{"data":{"group":{"fullPath":"a","mergeRequests":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]},"issues":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}"#)])
+        _ = try await GitLabProvider(transport: groupTransport).fetchItems(
+            account: account([.group(fullPath: "a", includeSubgroups: true)], baseURL: cloud), token: "t", kinds: [.pullRequest, .issue]
+        )
+        let groupQuery = try await groupTransport.graphQLQuery(at: 0)
+        #expect(!groupQuery.contains("archived"))
+        #expect(!groupQuery.contains("includeArchived"))
+    }
+
     @Test("only requested connections are queried and one request is sent per source")
     func kindsAndRequests() async throws {
         let transport = StubTransport([.json(emptyProject), .json(emptyProject), .json(emptyProject)])

@@ -64,6 +64,29 @@ struct GraphQLFetchTests {
         #expect(items[0].requestedReviewers.isEmpty)
     }
 
+    @Test("an archived repository contributes nothing and is not paginated")
+    func archivedRepositoriesAreSkipped() async throws {
+        // Nothing in an archived repository can be merged or closed, so it has no place in the queue.
+        let page = """
+        {"data":{"r0":{"nameWithOwner":"acme/live","isArchived":false,"pullRequests":{"pageInfo":{"hasNextPage":false,"endCursor":null},\
+        "nodes":[{"number":1,"title":"Live","url":"https://github.com/acme/live/pull/1","createdAt":"2026-09-01T00:00:00Z",\
+        "updatedAt":"2026-09-02T00:00:00Z","author":{"login":"jana"},"repository":{"nameWithOwner":"acme/live"}}]}},\
+        "r1":{"nameWithOwner":"acme/old","isArchived":true,"pullRequests":{"pageInfo":{"hasNextPage":true,"endCursor":"c1"},\
+        "nodes":[{"number":2,"title":"Old","url":"https://github.com/acme/old/pull/2","createdAt":"2026-09-01T00:00:00Z",\
+        "updatedAt":"2026-09-02T00:00:00Z","author":{"login":"jana"},"repository":{"nameWithOwner":"acme/old"}}]}}}}
+        """
+        let transport = StubTransport([.json(page)])
+        let items = try await GitHubProvider(transport: transport).fetchItems(
+            account: account([.repository(fullName: "acme/live"), .repository(fullName: "acme/old")]),
+            token: "t", kinds: [.pullRequest]
+        )
+
+        #expect(items.map(\.number) == [1])
+        // The archived repository claims another page; asking for it would be the only extra request.
+        #expect(await transport.requests.count == 1)
+        #expect(try await transport.graphQLQuery(at: 0).contains("{ nameWithOwner isArchived "))
+    }
+
     @Test("only requested connections are queried")
     func kindsSelectConnections() async throws {
         let transport = StubTransport([.json(#"{"data":{"r0":{"nameWithOwner":"a/b","pullRequests":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}"#)])

@@ -57,11 +57,14 @@ enum GitLabQueries {
         if kinds.contains(.issue) { declared.append("$issueAfter: String") }
         let variables = declared.joined(separator: ", ")
         let root = isGroup ? "group(fullPath: $path)" : "project(fullPath: $path)"
+        // Only Project has `archived`; a group aggregates many projects, and its connections leave archived ones
+        // out on their own (`includeArchived` defaults to false), so never pass that argument here.
+        let archived = isGroup ? "" : "\n    archived"
         return """
         query(\(variables)) {
           queryComplexity { score limit }
           \(root) {
-            fullPath
+            fullPath\(archived)
             \(connections.joined(separator: "\n    "))
           }
         }
@@ -113,6 +116,8 @@ struct ContainerData: Decodable {
 
 struct ContainerNode: Decodable {
     let fullPath: String?
+    /// Projects only. Nothing in an archived project can be merged or closed, so its items are dropped.
+    let archived: Bool?
     let mergeRequests: Connection<MergeRequestNode>?
     let issues: Connection<IssueNode>?
 }

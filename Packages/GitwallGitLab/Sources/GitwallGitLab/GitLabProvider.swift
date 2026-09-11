@@ -154,6 +154,10 @@ public struct GitLabProvider: GitProvider {
                 gitLabLog.error("GitLab could not resolve \(path, privacy: .public); skipping")
                 return []
             }
+            if node.archived == true {
+                gitLabLog.info("Project \(path, privacy: .public) is archived; skipping its items")
+                return []
+            }
             if wanted.contains(.pullRequest) {
                 let connection = node.mergeRequests
                 items += connection?.items.map { GitLabMapping.workItem($0, accountID: account.id, endpoints: endpoints) } ?? []

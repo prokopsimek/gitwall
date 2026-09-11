@@ -65,7 +65,7 @@ enum GraphQLQueries {
     static func repositoryBatch(_ repositories: [(owner: String, name: String)], kinds: Set<ItemKind>) -> String {
         var query = "query {\n  \(rateLimitField)\n"
         for (index, repo) in repositories.enumerated() {
-            query += "  r\(index): repository(owner: \"\(repo.owner)\", name: \"\(repo.name)\") { nameWithOwner \(connections(for: kinds)) }\n"
+            query += "  r\(index): repository(owner: \"\(repo.owner)\", name: \"\(repo.name)\") { nameWithOwner isArchived \(connections(for: kinds)) }\n"
         }
         query += "}\n" + fragments(for: kinds)
         return query
@@ -73,7 +73,7 @@ enum GraphQLQueries {
 
     /// Follow-up page for a single repository and kind.
     static func repositoryPage(owner: String, name: String, kind: ItemKind, after cursor: String) -> String {
-        "query {\n  \(rateLimitField)\n  r0: repository(owner: \"\(owner)\", name: \"\(name)\") { nameWithOwner \(connections(for: [kind], after: cursor)) }\n}\n" + fragments(for: [kind])
+        "query {\n  \(rateLimitField)\n  r0: repository(owner: \"\(owner)\", name: \"\(name)\") { nameWithOwner isArchived \(connections(for: [kind], after: cursor)) }\n}\n" + fragments(for: [kind])
     }
 
     /// Teams the token owner belongs to, so review requests addressed to a team can be resolved.
@@ -184,6 +184,8 @@ struct SearchData: Decodable, RateLimitCarrying {
 
 struct RepositoryNode: Decodable {
     let nameWithOwner: String
+    /// Nothing in an archived repository can be merged or closed; its items are dropped before mapping.
+    let isArchived: Bool?
     let pullRequests: Connection<ItemNode>?
     let issues: Connection<ItemNode>?
 }
