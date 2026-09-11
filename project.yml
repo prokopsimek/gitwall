@@ -55,7 +55,10 @@ targets:
     type: application
     platform: macOS
     sources:
+      # AGENTS.md is a note for developers; without the exclude XcodeGen ships it as a bundle resource.
       - path: Gitwall
+        excludes:
+          - "AGENTS.md"
       # Widget views double as demo renderers for App Store screenshots (`--debug-demo-render`).
       - path: GitwallWidget/WidgetViews.swift
         excludes:
@@ -110,6 +113,7 @@ targets:
       - path: GitwallWidget
         excludes:
           - "Info.plist"
+          - "AGENTS.md"
     dependencies:
       - package: GitwallCore
       - package: GitwallUI
