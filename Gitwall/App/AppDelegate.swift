@@ -49,6 +49,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = StatusItemController(environment: environment)
         environment.start()
         applyDebugArguments()
+        #if DEBUG
+        // `--debug-onboarding-step <welcome|account|repositories|presets|notifications|startup|widget>` opens the
+        // walkthrough at one step, so each screen can be checked without clicking through the whole thing.
+        if let index = CommandLine.arguments.firstIndex(of: "--debug-onboarding-step"),
+           CommandLine.arguments.indices.contains(index + 1),
+           let step = OnboardingStep(rawValue: CommandLine.arguments[index + 1]) {
+            showOnboarding(step: step)
+            return
+        }
+        #endif
         if environment.isDemo {
             presentDemoWindows()
         } else if environment.needsOnboarding, !environment.config.settings.onboardingCompleted {
@@ -140,9 +150,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindow?.show(presetID: presetID)
     }
 
-    func showOnboarding() {
+    func showOnboarding(step: OnboardingStep = .welcome) {
         if onboardingWindow == nil {
-            onboardingWindow = OnboardingWindowController(environment: environment) { [weak self] in
+            onboardingWindow = OnboardingWindowController(environment: environment, initialStep: step) { [weak self] in
                 self?.onboardingWindow = nil
                 self?.showMainWindow(presetID: nil)
             }

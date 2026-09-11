@@ -7,7 +7,14 @@ struct OnboardingView: View {
     @Bindable var environment: AppEnvironment
     let finish: () -> Void
 
-    @State private var step: OnboardingStep = .welcome
+    @State private var step: OnboardingStep
+
+    init(environment: AppEnvironment, initialStep: OnboardingStep = .welcome, finish: @escaping () -> Void) {
+        self.environment = environment
+        self.finish = finish
+        _step = State(initialValue: initialStep)
+    }
+
     @State private var showingAddAccount = false
     @State private var repositoriesState = SettingsState()
 

@@ -34,3 +34,4 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | `--debug-reset` | Wipes accounts, tokens and snapshot. Refuses to run without `--debug-fresh`. |
 | `--debug-github-token <pat> [--debug-repos a/b,c/d]` | Creates a GitHub account without clicking. |
 | `--debug-demo [--debug-demo-preset <n>] [--debug-demo-widgets]` | Fictional data from `GitwallCore.DemoData` for App Store screenshots; widgets appear as borderless windows. |
+| `--debug-onboarding-step <step>` | Opens the walkthrough at one step (`welcome`, `account`, `repositories`, `presets`, `notifications`, `startup`, `widget`), so a screen can be checked without clicking through. Pairs well with `--debug-demo`. |

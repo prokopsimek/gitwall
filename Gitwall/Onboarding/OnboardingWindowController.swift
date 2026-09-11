@@ -9,7 +9,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private let environment: AppEnvironment
     private let onFinish: () -> Void
 
-    init(environment: AppEnvironment, onFinish: @escaping () -> Void) {
+    init(environment: AppEnvironment, initialStep: OnboardingStep = .welcome, onFinish: @escaping () -> Void) {
         self.environment = environment
         self.onFinish = onFinish
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 620),
@@ -19,7 +19,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         window.center()
         super.init(window: window)
         window.contentViewController = NSHostingController(
-            rootView: OnboardingView(environment: environment, finish: { [weak self] in self?.finish() })
+            rootView: OnboardingView(environment: environment, initialStep: initialStep, finish: { [weak self] in self?.finish() })
         )
         window.delegate = self
     }
