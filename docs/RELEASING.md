@@ -193,6 +193,21 @@ the App Store for automatic updates.
 - Description, keywords (pull request, merge request, GitHub, GitLab, code review, widget,
   menu bar), promotional text.
 
+## Verifying the sign-in flows
+
+The GitHub device flow can be exercised against the real github.com, including the polling loop, from the
+package tests. It needs a human to approve the code, so it is skipped unless the environment variable is set,
+and it needs a terminal: `swift test` buffers the test's output when stdout is a file, so run it interactively
+or wrap it in `script -q`.
+
+```sh
+GITWALL_OAUTH_INTERACTIVE=1 swift test --package-path Packages/GitwallAuth --filter Interactive
+# >>> Open https://github.com/login/device and enter: XXXX-XXXX
+```
+
+The GitLab PKCE flow needs a browser window, so it is verified through the app: Settings › Accounts ›
+Add Account › Sign in with GitLab.
+
 ## Screenshots
 
 Debug builds accept `--debug-demo`: the app starts with fictional accounts, presets and items
