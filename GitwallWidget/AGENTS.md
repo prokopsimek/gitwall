@@ -15,8 +15,9 @@ App Group and applies the preset chosen for that widget instance. It never touch
   disappears fails with error 1100 and chronod then backs off for a day. A static widget also cannot become a
   configurable one in place (error 1103). One kind per size keeps the gallery names meaningful.
 - Only one copy of the app may be registered with Launch Services. `make run` and `make install` unregister
-  the other copy; archives under `build/` are unregistered too. A stale copy makes the widget silently vanish
-  from the gallery.
+  the other copy; `make archive` and `make release` drop their archive and export copies and point Launch
+  Services back at the installed app (`make restore-registration`). A stale copy makes the widget silently
+  vanish from the gallery.
 - After a widget change the gallery may show stale or no Gitwall entries until the user opens
   "Edit Widgets…", which triggers a fresh descriptor fetch. `make register` restarts chronod.
 - The extension carries its own `AppIcon` asset; without it the gallery row has no icon.

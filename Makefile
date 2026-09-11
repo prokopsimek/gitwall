@@ -14,7 +14,7 @@ RELEASE_APP  := build/DerivedData-release/Build/Products/Release/Gitwall.app
 INSTALL_APP  := $(HOME)/Applications/Gitwall.app
 LSREGISTER   := /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
-.PHONY: help generate build run install register test test-packages test-app clean archive release open
+.PHONY: help generate build run install register restore-registration test test-packages test-app clean archive release open
 
 help:
 	@echo "make generate       - generate Gitwall.xcodeproj from project.yml (XcodeGen)"
@@ -46,6 +46,16 @@ register:
 	@$(LSREGISTER) -u "$(INSTALL_APP)" >/dev/null 2>&1 || true
 	@$(LSREGISTER) -u "$(ARCHIVE)/Products/Applications/Gitwall.app" >/dev/null 2>&1 || true
 	@$(LSREGISTER) -f "$(APP)" >/dev/null 2>&1 || true
+	@pkill -f GitwallWidget.appex >/dev/null 2>&1 || true
+	@killall chronod >/dev/null 2>&1 || true
+
+# Archives and exports are extra copies of the app that Launch Services happily picks up, which silently moves
+# the widget extension and the URL scheme away from the app in use. Drop them and point Launch Services back at
+# the installed Release build when there is one (make install), otherwise at the Debug build (make run).
+restore-registration:
+	@$(LSREGISTER) -u "$(ARCHIVE)/Products/Applications/Gitwall.app" >/dev/null 2>&1 || true
+	@for app in build/export/*/Gitwall.app; do [ -d "$$app" ] && $(LSREGISTER) -u "$$app" >/dev/null 2>&1; done; true
+	@if [ -d "$(INSTALL_APP)" ]; then $(LSREGISTER) -f "$(INSTALL_APP)" >/dev/null 2>&1; else $(LSREGISTER) -f "$(APP)" >/dev/null 2>&1; fi; true
 	@pkill -f GitwallWidget.appex >/dev/null 2>&1 || true
 	@killall chronod >/dev/null 2>&1 || true
 
@@ -82,8 +92,7 @@ archive: generate
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Release \
 		-destination 'generic/$(DESTINATION)' -derivedDataPath build/DerivedData-archive \
 		-archivePath $(ARCHIVE) -allowProvisioningUpdates archive
-	@$(LSREGISTER) -u "$(ARCHIVE)/Products/Applications/Gitwall.app" >/dev/null 2>&1 || true
-	@$(MAKE) --no-print-directory register
+	@$(MAKE) --no-print-directory restore-registration
 
 # Developer ID build for direct download: archive, notarize, staple, zip, publish. Needs the App Store Connect
 # API key in the environment (ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH) and a Developer ID certificate in the
@@ -103,6 +112,7 @@ release: archive
 		ditto -c -k --keepParent Gitwall.app Gitwall-$(VERSION).zip && \
 		shasum -a 256 Gitwall-$(VERSION).zip > Gitwall-$(VERSION).zip.sha256 && \
 		spctl -a -vv -t exec Gitwall.app
+	@$(MAKE) --no-print-directory restore-registration
 	@echo "Ready: build/export/developer-id/Gitwall-$(VERSION).zip"
 	@echo "Publish with: gh release create v$(VERSION) build/export/developer-id/Gitwall-$(VERSION).zip build/export/developer-id/Gitwall-$(VERSION).zip.sha256 --title \"Gitwall $(VERSION)\" --generate-notes"
 
