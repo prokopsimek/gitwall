@@ -27,6 +27,7 @@ struct AccountsSettingsView: View {
                             state.tab = .repositories
                         },
                         onReauth: { reauth(account) },
+                        onAddPresets: { environment.addDefaultPresets(for: account) },
                         onRemove: { environment.removeAccount(account) }
                     )
                 }
@@ -114,6 +115,7 @@ private struct AccountRow: View {
     let usesOAuth: Bool
     let onRepositories: () -> Void
     let onReauth: () -> Void
+    let onAddPresets: () -> Void
     let onRemove: () -> Void
 
     var body: some View {
@@ -153,6 +155,8 @@ private struct AccountRow: View {
             Button("Repositories…", action: onRepositories)
             Menu {
                 Button(usesOAuth ? "Sign in again…" : "Replace Token…", action: onReauth)
+                Button("Add Default Presets", action: onAddPresets)
+                    .help("Assigned pull requests, assigned issues and reviews waiting for you, for this account. Presets you already have are not duplicated.")
                 Divider()
                 Button("Remove Account", role: .destructive, action: onRemove)
             } label: {

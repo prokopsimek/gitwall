@@ -194,7 +194,7 @@ struct OnboardingView: View {
     private var presets: some View {
         VStack(alignment: .leading, spacing: 18) {
             header("Your views",
-                   "Gitwall starts with three presets. Each widget shows one of them, and you can add your own in Settings › Presets.")
+                   "Each account gets three presets: pull requests and issues assigned to you, and reviews waiting for you. All open shows everything in one place. Each widget shows one preset; change the filters or add your own in Settings › Presets.")
             ForEach(environment.config.presets) { preset in
                 HStack(spacing: 10) {
                     Image(systemName: preset.icon).foregroundStyle(.tint).frame(width: 22)

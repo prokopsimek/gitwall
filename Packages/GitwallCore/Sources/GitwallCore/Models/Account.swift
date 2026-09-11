@@ -42,6 +42,9 @@ public struct Account: Codable, Hashable, Identifiable, Sendable {
     /// Provider-native query appended to the provider's own search (advanced users).
     public var nativeQuery: String?
     public var sources: [RepoSource]
+    /// Whether this account's default presets were created. `nil` for accounts saved before per-account presets
+    /// existed (the key is missing from their `config.json`); the app creates theirs once at launch.
+    public var defaultPresetsCreated: Bool?
 
     public init(
         id: UUID = UUID(),
@@ -51,7 +54,8 @@ public struct Account: Codable, Hashable, Identifiable, Sendable {
         me: UserRef? = nil,
         authMethod: AuthMethod = .personalAccessToken,
         nativeQuery: String? = nil,
-        sources: [RepoSource] = []
+        sources: [RepoSource] = [],
+        defaultPresetsCreated: Bool? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -61,6 +65,21 @@ public struct Account: Codable, Hashable, Identifiable, Sendable {
         self.authMethod = authMethod
         self.nativeQuery = nativeQuery
         self.sources = sources
+        self.defaultPresetsCreated = defaultPresetsCreated
+    }
+
+    /// A short name for preset titles: `GitHub` or `GitLab` for the cloud hosts, the host name otherwise.
+    /// When several accounts share a host, the login tells them apart.
+    public func shortLabel(among accounts: [Account]) -> String {
+        let host = baseURL.host?.lowercased() ?? baseURL.absoluteString
+        let base: String = switch host {
+        case "github.com": "GitHub"
+        case "gitlab.com": "GitLab"
+        default: host
+        }
+        let sharesHost = accounts.contains { $0.id != id && $0.baseURL.host?.lowercased() == host }
+        guard sharesHost, let login = me?.login else { return base }
+        return "\(base) (\(login))"
     }
 
     public var isCloudInstance: Bool {

@@ -199,6 +199,16 @@ enum GitLabMapping {
         return reviewerCount > 0 ? .pending : .none
     }
 
+    /// Review states in which the reviewer still owes a review. `UNAPPROVED` means an approval was revoked, and a
+    /// re-requested review goes back to `UNREVIEWED`, so both put the merge request back on the reviewer's list.
+    static let awaitingReviewStates: Set<String> = ["UNREVIEWED", "REVIEW_STARTED", "UNAPPROVED"]
+
+    /// Whether a reviewer with this interaction still has to review.
+    static func isAwaitingReview(reviewState: String?, approved: Bool?) -> Bool {
+        guard approved != true, let reviewState else { return false }
+        return awaitingReviewStates.contains(reviewState)
+    }
+
     static func ciState(_ status: String?) -> CIState {
         switch status {
         case "SUCCESS": .success
@@ -242,8 +252,10 @@ enum GitLabMapping {
         let requested = reviewers.filter { reviewer in
             guard let login = reviewer.username else { return false }
             if let interaction = reviewer.mergeRequestInteraction {
-                return interaction.approved != true && interaction.reviewState != "APPROVED"
+                // Someone who already reviewed (commented or requested changes) is not waiting on themselves.
+                return isAwaitingReview(reviewState: interaction.reviewState, approved: interaction.approved)
             }
+            // Instances without mergeRequestInteraction only tell us who approved.
             return !approvedBy.contains(login)
         }
         return WorkItem(

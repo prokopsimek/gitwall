@@ -48,11 +48,26 @@ struct ConfigStoreTests {
         #expect(config.settings.refreshIntervalMinutes == 5)
     }
 
-    @Test("default presets notify about every event and include a menu bar count")
+    @Test("default presets notify about every event, and a new installation ends up with one menu bar count")
     func defaultPresets() {
-        let presets = Preset.defaults()
-        #expect(presets.count == 3)
-        #expect(presets.allSatisfy { $0.notifications == Set(NotificationEvent.allCases) })
-        #expect(presets.contains { $0.showCountInMenuBar })
+        #expect(Preset.defaults().allSatisfy { $0.notifications == Set(NotificationEvent.allCases) })
+        // The count belongs to the first account's review preset, see AccountPresetsTests.
+        let account = Account(kind: .github, baseURL: URL(string: "https://github.com")!, displayName: "GitHub")
+        let config = AppConfig().adding(account, pullRequestTerm: "Pull request")
+        #expect(config.presets.filter(\.showCountInMenuBar).count == 1)
+    }
+
+    @Test("a config.json written before per-account presets still loads, with the marker unset")
+    func legacyAccountDecodes() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gitwall-legacy-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let legacy = #"{"schemaVersion":1,"accounts":[{"id":"6B1D0A2E-0100-4C61-9F4B-1D2A3B4C5D01","kind":"github","baseURL":"https://github.com","displayName":"GitHub (prokop)","authMethod":{"personalAccessToken":{}},"sources":[]}],"presets":[],"settings":{"refreshIntervalMinutes":5,"onboardingCompleted":true}}"#
+        try Data(legacy.utf8).write(to: dir.appendingPathComponent("config.json"))
+
+        let config = try ConfigStore(directoryURL: dir).load()
+        #expect(config.accounts.count == 1)
+        #expect(config.accounts[0].defaultPresetsCreated == nil)
+        #expect(config.seedingDefaultPresets { _ in "Pull request" }.presets.count == 3)
     }
 }

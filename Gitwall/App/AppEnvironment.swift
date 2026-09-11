@@ -97,6 +97,7 @@ final class AppEnvironment {
             log.error("Config unreadable, starting empty: \(error.localizedDescription, privacy: .public)")
             lastError = "Configuration could not be read: \(error.localizedDescription)"
         }
+        seedDefaultPresetsIfNeeded()
         snapshot = try? snapshotStore?.load()
         previousSnapshot = try? snapshotStore?.loadPrevious()
         reloadTokenExpiries()
@@ -126,6 +127,21 @@ final class AppEnvironment {
     }
 
     var needsOnboarding: Bool { config.accounts.isEmpty }
+
+    /// Accounts added before per-account presets existed get theirs once. Presets deleted afterwards stay deleted.
+    private func seedDefaultPresetsIfNeeded() {
+        let seeded = config.seedingDefaultPresets { [providers] kind in
+            providers[kind]?.capabilities.pullRequestTerm ?? "Pull request"
+        }
+        guard seeded != config else { return }
+        let count = config.accounts.filter { $0.defaultPresetsCreated != true }.count
+        do {
+            try persist(seeded, refresh: false)
+            log.info("Created default presets for \(count) existing accounts")
+        } catch {
+            log.error("Could not save the default presets: \(error.localizedDescription, privacy: .public)")
+        }
+    }
 
     private func scheduleRefreshLoop() {
         refreshLoop?.cancel()
@@ -269,22 +285,21 @@ final class AppEnvironment {
         )
         account.displayName += " (\(me.login))"
         try tokenStore.set(await stamped(credential, provider: provider, baseURL: baseURL), for: account.id)
-        var updated = config
-        updated.accounts.append(account)
-        if updated.presets.isEmpty {
-            updated.presets = Preset.defaults()
-        }
+        // The account arrives with its own three presets (assigned pull requests, assigned issues, reviews waiting).
+        let updated = config.adding(account, pullRequestTerm: provider.capabilities.pullRequestTerm)
         let isFirstAccount = config.accounts.isEmpty
         try persist(updated)
         reloadTokenExpiries()
         if selectedPresetID == nil { selectedPresetID = updated.presets.first?.id }
+        // Hand back the stored account, which carries the preset marker.
+        let stored = updated.account(id: account.id) ?? account
         // The permission prompt blocks until the user answers; never await it on the account flow.
         Task { await notifications.requestAuthorizationIfNeeded() }
         if isFirstAccount, SMAppService.mainApp.status == .notRegistered {
             // Product decision: a menu bar agent is only useful when it is running. Users can switch it off in General.
             try? SMAppService.mainApp.register()
         }
-        return account
+        return stored
     }
 
     func updateAccount(_ account: Account) {
@@ -295,14 +310,21 @@ final class AppEnvironment {
     }
 
     func removeAccount(_ account: Account) {
-        var updated = config
-        updated.accounts.removeAll { $0.id == account.id }
-        for index in updated.presets.indices {
-            updated.presets[index].scopes.removeAll { $0.accountID == account.id }
+        let updated = config.removing(accountID: account.id)
+        if let selectedPresetID, updated.preset(id: selectedPresetID) == nil {
+            self.selectedPresetID = updated.presets.first?.id
         }
         try? tokenStore.removeToken(for: account.id)
         try? persist(updated)
         reloadTokenExpiries()
+    }
+
+    /// "Add Default Presets" from the account menu: restores whichever of the three are missing.
+    func addDefaultPresets(for account: Account) {
+        guard let provider = providers[account.kind] else { return }
+        let updated = config.addingDefaultPresets(for: account.id, pullRequestTerm: provider.capabilities.pullRequestTerm)
+        guard updated != config else { return }
+        try? persist(updated, refresh: false)
     }
 
     /// Replaces the credential of an existing account, keeping its id so presets and widgets stay attached.

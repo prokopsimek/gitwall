@@ -200,6 +200,7 @@ struct GitLabGraphQLTests {
         #expect(mr.assignees.map(\.login) == ["takax"])
         #expect(mr.requestedReviewers.map(\.login).contains("ajwalker"))
         #expect(!mr.requestedReviewers.map(\.login).contains("rsarangadharan"))   // already approved
+        #expect(!mr.requestedReviewers.map(\.login).contains("GitLabDuo"))        // already reviewed
         #expect(mr.reviewState == .approved)
         #expect(mr.reviewers.map(\.login) == ["rsarangadharan"])
         #expect(mr.ciState == .success)
@@ -323,6 +324,14 @@ struct GitLabGraphQLTests {
 
 @Suite("GraphQL mapping")
 struct GitLabMappingTests {
+    @Test("a reviewer waits for review only until they have reviewed", arguments: [
+        ("UNREVIEWED", true), ("REVIEW_STARTED", true), ("UNAPPROVED", true),
+        ("REVIEWED", false), ("REQUESTED_CHANGES", false), ("APPROVED", false),
+    ])
+    func pendingReviewStates(state: String, pending: Bool) {
+        #expect(GitLabMapping.isAwaitingReview(reviewState: state, approved: state == "APPROVED") == pending)
+    }
+
     @Test("review state: approved wins, requested changes next, reviewers pending, otherwise none")
     func reviewState() {
         #expect(GitLabMapping.reviewState(approved: true, reviewerStates: ["REQUESTED_CHANGES"], reviewerCount: 1) == .approved)

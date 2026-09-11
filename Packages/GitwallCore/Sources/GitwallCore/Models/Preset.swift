@@ -110,22 +110,10 @@ public struct Preset: Codable, Hashable, Identifiable, Sendable {
         self.showCountInMenuBar = showCountInMenuBar
     }
 
-    /// Presets created for a fresh installation. Notifications default to all events, per product decision.
+    /// Presets shared by all accounts, created with the first account. Per-account presets come from
+    /// ``accountDefaults(for:label:pullRequestTerm:showCountInMenuBar:)``. Notifications default to all events.
     public static func defaults() -> [Preset] {
         [
-            Preset(
-                name: "My pull requests",
-                icon: "person.crop.circle",
-                kinds: [.pullRequest],
-                filter: ItemFilter(relations: [.authoredByMe])
-            ),
-            Preset(
-                name: "Waiting for my review",
-                icon: "eye",
-                kinds: [.pullRequest],
-                filter: ItemFilter(relations: [.reviewRequestedFromMe], includeDrafts: false),
-                showCountInMenuBar: true
-            ),
             Preset(
                 name: "All open",
                 icon: "tray.full",
@@ -133,4 +121,46 @@ public struct Preset: Codable, Hashable, Identifiable, Sendable {
             ),
         ]
     }
+
+    /// The three presets every account starts with: pull requests assigned to me, issues assigned to me, and pull
+    /// requests waiting for my review. Scoped to `account`; ordinary presets that the user can edit or delete.
+    /// - Parameters:
+    ///   - label: Short account name for the titles, see ``Account/shortLabel(among:)``.
+    ///   - pullRequestTerm: The provider's word, "Pull request" or "Merge request".
+    public static func accountDefaults(for account: Account, label: String, pullRequestTerm: String, showCountInMenuBar: Bool) -> [Preset] {
+        let scope = [PresetScope(accountID: account.id)]
+        let plural = pullRequestTerm.lowercased() + "s"
+        return [
+            Preset(
+                name: "\(label) · Assigned \(plural)",
+                icon: "arrow.triangle.pull",
+                scopes: scope,
+                kinds: [.pullRequest],
+                filter: ItemFilter(relations: [.assignedToMe])
+            ),
+            Preset(
+                name: "\(label) · Assigned issues",
+                icon: "smallcircle.filled.circle",
+                scopes: scope,
+                kinds: [.issue],
+                filter: ItemFilter(relations: [.assignedToMe])
+            ),
+            Preset(
+                name: "\(label) · Waiting for my review",
+                icon: "eye",
+                scopes: scope,
+                kinds: [.pullRequest],
+                // A draft is not asking for a review yet.
+                filter: ItemFilter(relations: [.reviewRequestedFromMe], includeDrafts: false),
+                showCountInMenuBar: showCountInMenuBar
+            ),
+        ]
+    }
+
+    /// Same selection regardless of name, icon, sort and notification choices. Used to avoid adding a default
+    /// preset the user already has under another name.
+    public func isEquivalent(to other: Preset) -> Bool {
+        kinds == other.kinds && filter == other.filter && Set(scopes) == Set(other.scopes)
+    }
+
 }
