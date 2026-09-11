@@ -72,7 +72,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// flows can be exercised without touching the installed app's accounts. Debug builds only.
     private static var sandboxDirectory: URL? {
         #if DEBUG
-        guard CommandLine.arguments.contains("--debug-fresh") else { return nil }
+        // The app test target launches the whole app as its host. Without this it would sync, migrate and write
+        // into the real App Group of whoever runs the tests.
+        let underTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        guard CommandLine.arguments.contains("--debug-fresh") || underTests else { return nil }
         return FileManager.default.temporaryDirectory.appendingPathComponent("gitwall-fresh-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
         #else
         return nil
