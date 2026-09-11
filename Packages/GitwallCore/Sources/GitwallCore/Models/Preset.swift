@@ -38,8 +38,15 @@ public struct PresetScope: Codable, Hashable, Sendable {
 public struct ItemFilter: Codable, Hashable, Sendable {
     public var relations: Set<Relation>
     public var includeDrafts: Bool
+    /// Cloud agents open a draft and request a review on it, and cannot mark it ready themselves, so a draft
+    /// that explicitly asks for my review counts as waiting for me even when `includeDrafts` is off.
+    /// Only applies to presets that filter on ``Relation/reviewRequestedFromMe``.
+    public var includeDraftsRequestingMyReview: Bool
     public var labelsAny: [String]
     public var labelsNone: [String]
+    /// Author logins, matched case-insensitively and ignoring a trailing `[bot]`.
+    public var authorsAny: [String]
+    public var authorsNone: [String]
     public var reviewStates: Set<ReviewState>
     public var ciStates: Set<CIState>
     public var mergeStates: Set<MergeState>
@@ -50,8 +57,11 @@ public struct ItemFilter: Codable, Hashable, Sendable {
     public init(
         relations: Set<Relation> = [],
         includeDrafts: Bool = true,
+        includeDraftsRequestingMyReview: Bool = true,
         labelsAny: [String] = [],
         labelsNone: [String] = [],
+        authorsAny: [String] = [],
+        authorsNone: [String] = [],
         reviewStates: Set<ReviewState> = [],
         ciStates: Set<CIState> = [],
         mergeStates: Set<MergeState> = [],
@@ -61,14 +71,44 @@ public struct ItemFilter: Codable, Hashable, Sendable {
     ) {
         self.relations = relations
         self.includeDrafts = includeDrafts
+        self.includeDraftsRequestingMyReview = includeDraftsRequestingMyReview
         self.labelsAny = labelsAny
         self.labelsNone = labelsNone
+        self.authorsAny = authorsAny
+        self.authorsNone = authorsNone
         self.reviewStates = reviewStates
         self.ciStates = ciStates
         self.mergeStates = mergeStates
         self.updatedWithinDays = updatedWithinDays
         self.milestone = milestone
         self.text = text
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case relations, includeDrafts, includeDraftsRequestingMyReview, labelsAny, labelsNone
+        case authorsAny, authorsNone, reviewStates, ciStates, mergeStates, updatedWithinDays, milestone, text
+    }
+
+    /// Every key is optional so a `config.json` written by an older build keeps loading; missing keys fall back
+    /// to the defaults above.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            relations: try container.decodeIfPresent(Set<Relation>.self, forKey: .relations) ?? [],
+            includeDrafts: try container.decodeIfPresent(Bool.self, forKey: .includeDrafts) ?? true,
+            includeDraftsRequestingMyReview:
+                try container.decodeIfPresent(Bool.self, forKey: .includeDraftsRequestingMyReview) ?? true,
+            labelsAny: try container.decodeIfPresent([String].self, forKey: .labelsAny) ?? [],
+            labelsNone: try container.decodeIfPresent([String].self, forKey: .labelsNone) ?? [],
+            authorsAny: try container.decodeIfPresent([String].self, forKey: .authorsAny) ?? [],
+            authorsNone: try container.decodeIfPresent([String].self, forKey: .authorsNone) ?? [],
+            reviewStates: try container.decodeIfPresent(Set<ReviewState>.self, forKey: .reviewStates) ?? [],
+            ciStates: try container.decodeIfPresent(Set<CIState>.self, forKey: .ciStates) ?? [],
+            mergeStates: try container.decodeIfPresent(Set<MergeState>.self, forKey: .mergeStates) ?? [],
+            updatedWithinDays: try container.decodeIfPresent(Int.self, forKey: .updatedWithinDays),
+            milestone: try container.decodeIfPresent(String.self, forKey: .milestone),
+            text: try container.decodeIfPresent(String.self, forKey: .text)
+        )
     }
 
     public static let any = ItemFilter()

@@ -40,8 +40,12 @@ them or build your own from any mix of accounts, repositories, pull requests and
 ![Preset editor with account scopes](docs/screenshots/05-presets.jpg)
 
 **Filters that work the same on both platforms.** Relation to you (author, assignee, requested reviewer), drafts,
-review state, checks, merge conflicts, labels, age, milestone and text. Each preset also decides which events
-notify you.
+review state, checks, merge conflicts, labels, author logins, age, milestone and text. Each preset also decides
+which events notify you.
+
+Pull requests that a cloud agent opened for you stay in "Waiting for my review" even though they are drafts:
+Copilot and the Claude and Codex GitHub apps request the review before a person marks the pull request ready.
+Filter the agents themselves with author logins such as `copilot-swe-agent` or `cursor`.
 
 ![Filters in the preset editor](docs/screenshots/04-filters.jpg)
 

@@ -57,6 +57,17 @@ struct ConfigStoreTests {
         #expect(config.presets.filter(\.showCountInMenuBar).count == 1)
     }
 
+    @Test("a filter written before the author fields still loads, with the new fields at their defaults")
+    func legacyFilterDecodes() throws {
+        let legacy = #"{"relations":["reviewRequestedFromMe"],"includeDrafts":false,"labelsAny":[],"labelsNone":[],"reviewStates":[],"ciStates":[],"mergeStates":[]}"#
+        let filter = try SnapshotCoding.decode(ItemFilter.self, from: Data(legacy.utf8))
+        #expect(filter.relations == [.reviewRequestedFromMe])
+        #expect(filter.includeDrafts == false)
+        #expect(filter.authorsAny.isEmpty)
+        #expect(filter.authorsNone.isEmpty)
+        #expect(filter.includeDraftsRequestingMyReview)
+    }
+
     @Test("a config.json written before per-account presets still loads, with the marker unset")
     func legacyAccountDecodes() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gitwall-legacy-\(UUID().uuidString)")

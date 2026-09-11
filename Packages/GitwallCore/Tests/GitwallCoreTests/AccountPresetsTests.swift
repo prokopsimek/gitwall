@@ -170,7 +170,7 @@ struct AccountPresetsTests {
 
     // MARK: - The presets actually select the right items
 
-    @Test("each account's presets see only that account, and the review preset skips drafts")
+    @Test("each account's presets see only that account, and the review preset keeps drafts that ask for my review")
     func filtering() {
         let a = github()
         let b = gitlab()
@@ -189,6 +189,7 @@ struct AccountPresetsTests {
             item(5, b, .pullRequest, assigned: true),
             item(6, b, .issue, assigned: true),
             item(7, a, .pullRequest),
+            item(8, a, .pullRequest, draft: true),
         ]
         func numbers(_ name: String) -> [Int] {
             let preset = config.presets.first { $0.name == name }!
@@ -197,9 +198,11 @@ struct AccountPresetsTests {
 
         #expect(numbers("GitHub · Assigned pull requests") == [1])
         #expect(numbers("GitHub · Assigned issues") == [2])
-        #expect(numbers("GitHub · Waiting for my review") == [3])
+        // 4 is a draft that names me as a reviewer, the way cloud agents file their pull requests; 8 is an
+        // ordinary draft nobody asked me to look at.
+        #expect(numbers("GitHub · Waiting for my review") == [3, 4])
         #expect(numbers("git.applifting.cz · Assigned merge requests") == [5])
         #expect(numbers("git.applifting.cz · Assigned issues") == [6])
-        #expect(numbers("All open") == [1, 2, 3, 4, 5, 6, 7])
+        #expect(numbers("All open") == [1, 2, 3, 4, 5, 6, 7, 8])
     }
 }

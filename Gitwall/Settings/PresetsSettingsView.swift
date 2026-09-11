@@ -99,12 +99,16 @@ private struct PresetEditor: View {
     @State var preset: Preset
     @State private var labelsAny: String
     @State private var labelsNone: String
+    @State private var authorsAny: String
+    @State private var authorsNone: String
 
     init(environment: AppEnvironment, preset: Preset) {
         self.environment = environment
         _preset = State(initialValue: preset)
         _labelsAny = State(initialValue: preset.filter.labelsAny.joined(separator: ", "))
         _labelsNone = State(initialValue: preset.filter.labelsNone.joined(separator: ", "))
+        _authorsAny = State(initialValue: preset.filter.authorsAny.joined(separator: ", "))
+        _authorsNone = State(initialValue: preset.filter.authorsNone.joined(separator: ", "))
     }
 
     var body: some View {
@@ -166,6 +170,11 @@ private struct PresetEditor: View {
 
             Section("Pull request state") {
                 Toggle("Include drafts", isOn: $preset.filter.includeDrafts)
+                if !preset.filter.includeDrafts, preset.filter.relations.contains(.reviewRequestedFromMe) {
+                    Toggle("Drafts that ask for my review", isOn: $preset.filter.includeDraftsRequestingMyReview)
+                    Text("Cloud agents request a review while the pull request is still a draft and cannot mark it ready themselves.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 MultiToggleRow(title: "Review", options: [
                     (ReviewState.approved, "Approved"), (.changesRequested, "Changes requested"), (.pending, "Pending"), (ReviewState.none, "No review"),
                 ], selection: $preset.filter.reviewStates)
@@ -182,6 +191,12 @@ private struct PresetEditor: View {
                     .onChange(of: labelsAny) { _, value in preset.filter.labelsAny = split(value) }
                 TextField("None of these labels (comma separated)", text: $labelsNone)
                     .onChange(of: labelsNone) { _, value in preset.filter.labelsNone = split(value) }
+                TextField("Any of these authors (comma separated)", text: $authorsAny)
+                    .onChange(of: authorsAny) { _, value in preset.filter.authorsAny = split(value) }
+                TextField("None of these authors (comma separated)", text: $authorsNone)
+                    .onChange(of: authorsNone) { _, value in preset.filter.authorsNone = split(value) }
+                Text("Author logins, for example copilot-swe-agent or renovate. A trailing [bot] is ignored.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Picker("Updated within", selection: Binding(
                     get: { preset.filter.updatedWithinDays ?? 0 },
                     set: { preset.filter.updatedWithinDays = $0 == 0 ? nil : $0 }
