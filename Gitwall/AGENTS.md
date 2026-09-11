@@ -25,6 +25,9 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   silently; the user signs in once.
 - `OAuthCoordinator` owns only the window-bound parts (device code display, `ASWebAuthenticationSession`).
   The protocol work is in GitwallAuth.
+- `AppEnvironment.start` registers the app as a login item when `AppConfig.shouldRegisterAtLogin` says so, and
+  records it in the settings. A sandboxed run (`--debug-fresh`, the test host) never touches login items,
+  because `SMAppService.mainApp` would register the developer's own build.
 - Activation policy: the app is `regular` in Info.plist and drops to `accessory` when the user hides the
   Dock icon. Going the other way at runtime leaves a generic Dock icon, hence the order in
   `applicationWillFinishLaunching`.

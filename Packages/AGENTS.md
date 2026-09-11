@@ -26,8 +26,11 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 - A query change must keep working with fine-grained tokens. When you add a REST endpoint or a GraphQL type,
   check it against the provider's fine-grained permission list and update the token guide in the README.
 - Nothing here may import AppKit or SwiftUI except GitwallUI.
-- `ItemFilter` decodes every key with `decodeIfPresent`: a `config.json` written by an older build must keep
-  loading, so a new field needs a default, never a migration.
+- `ItemFilter` and `AppSettings` decode every key with `decodeIfPresent`: a `config.json` written by an older
+  build must keep loading, so a new field needs a default, never a migration.
+- Whether a fresh installation switches Launch at login on for itself is `AppConfig.shouldRegisterAtLogin`; the
+  app only carries it out. It fires once, and never on an installation that predates
+  `AppSettings.launchAtLoginConfigured`, because what such an installation has now is the user's choice.
 - Archived repositories are dropped by the provider, never by `FilterEngine` (see `docs/adr/0007`). GitHub asks
   for `isArchived` in the repository queries and the search query carries `archived:false`; GitLab selects
   `archived` on the project root and must never pass `includeArchived` to a group connection, because GitLab
