@@ -39,7 +39,9 @@ make generate        # xcodegen, only when project.yml changed; after adding or 
                      # `xcodegen generate --spec project.yml` or the new file is not compiled
 make build           # Debug build into build/DerivedData
 make run             # build + launch
-make install         # Release build into ~/Applications (daily driver)
+make install         # Release build into ~/Applications (daily driver); override with
+                     # `make install INSTALL_APP=/Applications/Gitwall.app` to keep the app there instead.
+                     # Only one copy of Gitwall.app may stay installed — see GitwallWidget/AGENTS.md
 make test-packages   # swift test for every package
 make test            # packages + xcodebuild test
 make archive         # Release archive for the App Store / notarization

@@ -9,6 +9,7 @@ Tooling for releases and assets. Nothing here ships inside the app.
 | `make-screenshots.sh` | The whole screenshot pipeline behind `make screenshots`. |
 | `screenshot-specs/*.json` | The published App Store screenshot layouts: headline, subtitle and hand-placed layers with optional crops. |
 | `make-icon.swift`, `icon-variants.swift` | App icon rendering (concept F: brick wall, teal pull-request glyph). |
+| `register-app.sh` | Leaves exactly one copy of `Gitwall.app` registered with Launch Services and announces its widget extension. Behind `make register` and `make restore-registration`; it prints every copy it drops. |
 
 ## Credentials
 
