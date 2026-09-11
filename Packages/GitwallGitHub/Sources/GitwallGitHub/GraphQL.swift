@@ -76,6 +76,18 @@ enum GraphQLQueries {
         "query {\n  \(rateLimitField)\n  r0: repository(owner: \"\(owner)\", name: \"\(name)\") { nameWithOwner \(connections(for: [kind], after: cursor)) }\n}\n" + fragments(for: [kind])
     }
 
+    /// Teams the token owner belongs to, so review requests addressed to a team can be resolved.
+    /// Classic tokens need `read:org`; without it GitHub answers with an error and Gitwall carries on without teams.
+    static let viewerTeams = """
+    query {
+      viewer {
+        organizations(first: 100) {
+          nodes { login teams(first: 100, role: MEMBER) { nodes { slug } } }
+        }
+      }
+    }
+    """
+
     static let search = """
     query($q: String!, $after: String) {
       \(rateLimitField)
@@ -138,6 +150,25 @@ struct RepositoryBatchData: Decodable, RateLimitCarrying {
         }
         self.repositories = repositories
         rateLimitInfo = rateLimit
+    }
+}
+
+struct ViewerTeamsData: Decodable {
+    struct Viewer: Decodable {
+        struct Organization: Decodable {
+            struct Team: Decodable { let slug: String }
+            let login: String
+            let teams: Connection<Team>?
+        }
+        let organizations: Connection<Organization>?
+    }
+    let viewer: Viewer?
+
+    /// `owner/slug`, lowercased, ready to compare with a review request on a repository of that owner.
+    var slugs: Set<String> {
+        Set((viewer?.organizations?.items ?? []).flatMap { organization in
+            (organization.teams?.items ?? []).map { "\(organization.login.lowercased())/\($0.slug.lowercased())" }
+        })
     }
 }
 
@@ -230,7 +261,17 @@ struct ItemNode: Decodable {
 // MARK: - Mapping
 
 enum GraphQLMapping {
-    static func workItem(_ node: ItemNode, kind: ItemKind, accountID: UUID, fallbackRepository: String) -> WorkItem {
+    /// - Parameters:
+    ///   - viewer: the token owner, when known. A review request addressed to one of their teams resolves to them.
+    ///   - teamSlugs: `owner/slug`, lowercased, of the teams the viewer belongs to.
+    static func workItem(
+        _ node: ItemNode,
+        kind: ItemKind,
+        accountID: UUID,
+        fallbackRepository: String,
+        viewer: UserRef? = nil,
+        teamSlugs: Set<String> = []
+    ) -> WorkItem {
         let repo = node.repository?.nameWithOwner ?? fallbackRepository
         let author = userRef(login: node.author?.login, name: node.author?.name, avatar: node.author?.avatarUrl)
         let labels = node.labels?.items.map { Label(name: $0.name, colorHex: $0.color) } ?? []
@@ -245,10 +286,21 @@ enum GraphQLMapping {
             )
         }
 
-        let requested = node.reviewRequests?.items.compactMap { request -> UserRef? in
-            guard let reviewer = request.requestedReviewer, reviewer.__typename != "Team" else { return nil }
-            return userRef(login: reviewer.login, name: reviewer.name, avatar: reviewer.avatarUrl, optional: true)
-        } ?? []
+        let owner = repo.split(separator: "/").first.map(String.init)?.lowercased() ?? ""
+        var requested: [UserRef] = []
+        for request in node.reviewRequests?.items ?? [] {
+            guard let reviewer = request.requestedReviewer else { continue }
+            if reviewer.__typename == "Team" {
+                // GitHub asks the team, not the person. Resolve it only for teams the viewer is in, so the
+                // item lands in their review queue; everyone else's teams stay out of it.
+                guard let viewer, let slug = reviewer.slug, teamSlugs.contains("\(owner)/\(slug.lowercased())") else { continue }
+                requested.append(viewer)
+            } else if let user = userRef(login: reviewer.login, name: reviewer.name, avatar: reviewer.avatarUrl, optional: true) {
+                requested.append(user)
+            }
+        }
+        var seenReviewers: Set<String> = []
+        requested = requested.filter { seenReviewers.insert($0.login.lowercased()).inserted }
         let reviews = node.latestReviews?.items ?? []
         let reviewers = reviews.compactMap { userRef(login: $0.author?.login, name: nil, avatar: $0.author?.avatarUrl, optional: true) }
 

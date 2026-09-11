@@ -10,7 +10,7 @@ public struct GitHubProvider: GitProvider {
         pullRequestAbbreviation: "PR",
         supportsOrganizationSources: true,
         supportsGroupSources: false,
-        resolvesTeamReviewRequests: false
+        resolvesTeamReviewRequests: true
     )
 
     static let maxRepositoryPages = 5
@@ -80,6 +80,8 @@ public struct GitHubProvider: GitProvider {
         guard !kinds.isEmpty else { return [] }
         let endpoints = GitHubEndpoints(baseURL: account.baseURL)
         var items: [WorkItem] = []
+        // Resolved lazily: only a batch that actually contains a review request for a team pays for the query.
+        let teams = TeamSlugs()
 
         var repositories: [(owner: String, name: String)] = []
         var organizations: [String] = []
@@ -100,11 +102,11 @@ public struct GitHubProvider: GitProvider {
 
         for batch in stride(from: 0, to: repositories.count, by: GraphQLQueries.maxRepositoriesPerBatch) {
             let slice = Array(repositories[batch..<min(batch + GraphQLQueries.maxRepositoriesPerBatch, repositories.count)])
-            items += try await fetchRepositoryBatch(slice, kinds: kinds, account: account, token: token, endpoints: endpoints)
+            items += try await fetchRepositoryBatch(slice, kinds: kinds, account: account, token: token, endpoints: endpoints, teams: teams)
         }
         for organization in organizations {
             for kind in kinds.sorted(by: { $0.rawValue < $1.rawValue }) {
-                items += try await fetchSearch(organization: organization, kind: kind, account: account, token: token, endpoints: endpoints)
+                items += try await fetchSearch(organization: organization, kind: kind, account: account, token: token, endpoints: endpoints, teams: teams)
             }
         }
 
@@ -112,12 +114,57 @@ public struct GitHubProvider: GitProvider {
         return items.filter { seen.insert($0.id).inserted }
     }
 
+    /// One lookup per `fetchItems`, shared by every batch and page.
+    actor TeamSlugs {
+        private var slugs: Set<String>?
+
+        func resolve(_ load: () async -> Set<String>) async -> Set<String> {
+            if let slugs { return slugs }
+            let loaded = await load()
+            slugs = loaded
+            return loaded
+        }
+    }
+
+    /// Nothing to resolve unless the token owner is known and GitHub asked one of their teams for a review.
+    private func teamSlugs(
+        for nodes: [ItemNode],
+        account: Account,
+        token: String,
+        endpoints: GitHubEndpoints,
+        teams: TeamSlugs
+    ) async -> Set<String> {
+        guard account.me != nil else { return [] }
+        let asksATeam = nodes.contains { node in
+            node.reviewRequests?.items.contains { $0.requestedReviewer?.__typename == "Team" } ?? false
+        }
+        guard asksATeam else { return [] }
+        return await teams.resolve { await viewerTeamSlugs(endpoints: endpoints, token: token) }
+    }
+
+    /// Teams the token owner belongs to, as `owner/slug`. Empty when the token may not read them, which leaves
+    /// team review requests out of the queue exactly as before.
+    private func viewerTeamSlugs(endpoints: GitHubEndpoints, token: String) async -> Set<String> {
+        do {
+            let response = try await client.graphQL(ViewerTeamsData.self, endpoint: endpoints.graphQL, token: token,
+                                                    query: GraphQLQueries.viewerTeams)
+            if let first = response.errors?.first {
+                gitHubLog.info("Team review requests stay unresolved: \(first.message, privacy: .public)")
+            }
+            return response.data?.slugs ?? []
+        } catch {
+            gitHubLog.info("Could not read the viewer's teams: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+    }
+
     private func fetchRepositoryBatch(
         _ repositories: [(owner: String, name: String)],
         kinds: Set<ItemKind>,
         account: Account,
         token: String,
-        endpoints: GitHubEndpoints
+        endpoints: GitHubEndpoints,
+        teams: TeamSlugs
     ) async throws -> [WorkItem] {
         let query = GraphQLQueries.repositoryBatch(repositories, kinds: kinds)
         let response = try await client.graphQL(RepositoryBatchData.self, endpoint: endpoints.graphQL, token: token, query: query)
@@ -134,7 +181,7 @@ public struct GitHubProvider: GitProvider {
                 gitHubLog.error("Repository \(fullName, privacy: .public) not found or not accessible; skipping")
                 continue
             }
-            items += try await collect(node: node, kinds: kinds, repo: repo, account: account, token: token, endpoints: endpoints)
+            items += try await collect(node: node, kinds: kinds, repo: repo, account: account, token: token, endpoints: endpoints, teams: teams)
         }
         return items
     }
@@ -145,14 +192,17 @@ public struct GitHubProvider: GitProvider {
         repo: (owner: String, name: String),
         account: Account,
         token: String,
-        endpoints: GitHubEndpoints
+        endpoints: GitHubEndpoints,
+        teams: TeamSlugs
     ) async throws -> [WorkItem] {
         var items: [WorkItem] = []
         for kind in kinds {
             var connection = kind == .pullRequest ? node.pullRequests : node.issues
             var pages = 0
             while let current = connection {
-                items += current.items.map { GraphQLMapping.workItem($0, kind: kind, accountID: account.id, fallbackRepository: node.nameWithOwner) }
+                let slugs = await teamSlugs(for: current.items, account: account, token: token, endpoints: endpoints, teams: teams)
+                items += current.items.map { GraphQLMapping.workItem($0, kind: kind, accountID: account.id, fallbackRepository: node.nameWithOwner,
+                                                                     viewer: account.me, teamSlugs: slugs) }
                 guard let pageInfo = current.pageInfo, pageInfo.hasNextPage, let cursor = pageInfo.endCursor,
                       pages < GraphQLQueries.maxExtraPagesPerRepository else { break }
                 pages += 1
@@ -165,16 +215,18 @@ public struct GitHubProvider: GitProvider {
         return items
     }
 
-    private func fetchSearch(organization: String, kind: ItemKind, account: Account, token: String, endpoints: GitHubEndpoints) async throws -> [WorkItem] {
+    private func fetchSearch(organization: String, kind: ItemKind, account: Account, token: String, endpoints: GitHubEndpoints,
+                             teams: TeamSlugs) async throws -> [WorkItem] {
         let q = try GraphQLQueries.searchQuery(organization: organization, kind: kind, nativeQuery: account.nativeQuery)
         var items: [WorkItem] = []
         var after: String?
         for _ in 0..<GraphQLQueries.maxSearchPages {
             let response = try await client.graphQL(SearchData.self, endpoint: endpoints.graphQL, token: token, query: GraphQLQueries.search, variables: ["q": q, "after": after])
             guard let search = response.data?.search else { break }
-            items += search.items
-                .filter { ($0.__typename == "PullRequest") == (kind == .pullRequest) }
-                .map { GraphQLMapping.workItem($0, kind: kind, accountID: account.id, fallbackRepository: organization) }
+            let matching = search.items.filter { ($0.__typename == "PullRequest") == (kind == .pullRequest) }
+            let slugs = await teamSlugs(for: matching, account: account, token: token, endpoints: endpoints, teams: teams)
+            items += matching.map { GraphQLMapping.workItem($0, kind: kind, accountID: account.id, fallbackRepository: organization,
+                                                            viewer: account.me, teamSlugs: slugs) }
             guard let pageInfo = search.pageInfo, pageInfo.hasNextPage, let cursor = pageInfo.endCursor else { break }
             after = cursor
         }

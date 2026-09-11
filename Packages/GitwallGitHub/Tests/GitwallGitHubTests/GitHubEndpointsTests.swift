@@ -51,6 +51,6 @@ struct GitHubProviderCapabilitiesTests {
         #expect(provider.capabilities.pullRequestAbbreviation == "PR")
         #expect(provider.capabilities.supportsOrganizationSources)
         #expect(!provider.capabilities.supportsGroupSources)
-        #expect(!provider.capabilities.resolvesTeamReviewRequests)
+        #expect(provider.capabilities.resolvesTeamReviewRequests)
     }
 }

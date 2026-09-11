@@ -34,6 +34,36 @@ struct GraphQLFetchTests {
         #expect(query.contains("issues(states: OPEN, first: 50"))
     }
 
+    /// A pull request whose only reviewer is the `platform` team of `acme`.
+    private func teamRequestPage(repo: String = "acme/app") -> String {
+        #"{"data":{"r0":{"nameWithOwner":"\#(repo)","pullRequests":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[{"number":7,"title":"Rotate keys","url":"https://github.com/\#(repo)/pull/7","createdAt":"2026-09-01T00:00:00Z","updatedAt":"2026-09-02T00:00:00Z","author":{"login":"copilot-swe-agent"},"reviewRequests":{"nodes":[{"requestedReviewer":{"__typename":"Team","slug":"platform","name":"Platform"}}]},"repository":{"nameWithOwner":"\#(repo)"}}]}}}}"#
+    }
+
+    @Test("a review request for my team lands in my queue, and the teams are looked up once")
+    func teamReviewRequestsResolve() async throws {
+        let teams = #"{"data":{"viewer":{"organizations":{"nodes":[{"login":"Acme","teams":{"nodes":[{"slug":"platform"}]}}]}}}}"#
+        let transport = StubTransport([.json(teamRequestPage()), .json(teams)])
+        let items = try await GitHubProvider(transport: transport).fetchItems(
+            account: account([.repository(fullName: "acme/app")]), token: "t", kinds: [.pullRequest]
+        )
+
+        #expect(items.map(\.number) == [7])
+        #expect(items[0].requestedReviewers.map(\.login) == ["prokopsimek"])
+        #expect(await transport.requests.count == 2)
+    }
+
+    @Test("a token that may not read teams keeps the queue working")
+    func teamLookupRefused() async throws {
+        let forbidden = #"{"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by personal access token"}]}"#
+        let transport = StubTransport([.json(teamRequestPage()), .json(forbidden)])
+        let items = try await GitHubProvider(transport: transport).fetchItems(
+            account: account([.repository(fullName: "acme/app")]), token: "t", kinds: [.pullRequest]
+        )
+
+        #expect(items.map(\.number) == [7])
+        #expect(items[0].requestedReviewers.isEmpty)
+    }
+
     @Test("only requested connections are queried")
     func kindsSelectConnections() async throws {
         let transport = StubTransport([.json(#"{"data":{"r0":{"nameWithOwner":"a/b","pullRequests":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}"#)])
@@ -184,7 +214,23 @@ struct GraphQLMappingTests {
         #expect(GraphQLMapping.mergeState(nil) == .unknown)
     }
 
-    @Test("team review requests are ignored, user requests kept, ghost authors tolerated")
+    @Test("a review request for a team I am in counts as a request for me, once")
+    func teamReviewRequests() throws {
+        let json = #"{"number":9,"title":"T","url":"https://github.com/acme/app/pull/9","createdAt":"2026-09-01T00:00:00Z","updatedAt":"2026-09-02T00:00:00Z","author":null,"reviewRequests":{"nodes":[{"requestedReviewer":{"__typename":"Team","slug":"Core","name":"Core"}},{"requestedReviewer":{"__typename":"Team","slug":"design","name":"Design"}},{"requestedReviewer":{"__typename":"User","login":"me","name":"Me","avatarUrl":"https://a/me"}}]},"repository":{"nameWithOwner":"acme/app"}}"#
+        let node = try GitHubClient.decoder.decode(ItemNode.self, from: Data(json.utf8))
+        let me = UserRef(login: "me")
+
+        let mine = GraphQLMapping.workItem(node, kind: .pullRequest, accountID: UUID(), fallbackRepository: "x/y",
+                                           viewer: me, teamSlugs: ["acme/core"])
+        // The direct request and the team request are the same person, and the team of another org is not mine.
+        #expect(mine.requestedReviewers.map(\.login) == ["me"])
+
+        let other = GraphQLMapping.workItem(node, kind: .pullRequest, accountID: UUID(), fallbackRepository: "x/y",
+                                            viewer: UserRef(login: "someone"), teamSlugs: ["other/core"])
+        #expect(other.requestedReviewers.map(\.login) == ["me"])
+    }
+
+    @Test("team review requests are ignored without a viewer, user requests kept, ghost authors tolerated")
     func requestedReviewers() throws {
         let json = #"{"number":9,"title":"T","url":"https://github.com/a/b/pull/9","isDraft":true,"createdAt":"2026-09-01T00:00:00Z","updatedAt":"2026-09-02T00:00:00Z","author":null,"reviewRequests":{"nodes":[{"requestedReviewer":{"__typename":"Team","slug":"core","name":"Core"}},{"requestedReviewer":{"__typename":"User","login":"alice","name":"Alice","avatarUrl":"https://a/alice"}},{"requestedReviewer":null}]},"labels":{"nodes":[{"name":"bug","color":"D73A4A"}]},"repository":{"nameWithOwner":"a/b"}}"#
         let node = try GitHubClient.decoder.decode(ItemNode.self, from: Data(json.utf8))
