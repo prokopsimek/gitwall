@@ -52,6 +52,34 @@ Filter the agents themselves with author logins such as `copilot-swe-agent` or `
 
 ![Filters in the preset editor](docs/screenshots/04-filters.jpg)
 
+**A query field that speaks GitHub search syntax.** When the tick boxes run out, every preset has a *Query*
+field. Gitwall reads it with GitHub's own rules and checks it against the items it already has, so it works for
+GitLab too and the widget always agrees with the menu bar.
+
+```
+assignee:@me assignee:franta-dxh,lumir-sokol,tom-gilsky
+```
+
+That one means *assigned to me **and** to at least one of the three* — repeating a qualifier is AND, a comma
+inside one is OR, and a leading `-` excludes.
+
+| Qualifier | Matches |
+|---|---|
+| `assignee:` | anyone assigned |
+| `author:` | who opened it |
+| `label:` | a label |
+| `milestone:` | the milestone |
+| `reviewed-by:` | someone who reviewed it |
+| `review-requested:` | someone whose review was requested |
+| `involves:` | author, assignee or reviewer |
+| `repo:` / `org:` | `acme/app` / `acme` |
+| `is:` / `type:` | `pr`, `issue`, `draft`, `open` |
+| a bare word | the title, the repository or `#number` |
+
+`@me` is the account you signed in with. Put values with spaces in quotes: `milestone:"Q4 2026"`. There are no
+`AND`/`OR` keywords and no parentheses — GitHub does not document them either. A query Gitwall cannot read
+matches nothing and says why, so a typo can never quietly widen a preset.
+
 **Issues too, not just pull requests.**
 
 ![Open bugs preset in the main window and a widget](docs/screenshots/03-issues.jpg)

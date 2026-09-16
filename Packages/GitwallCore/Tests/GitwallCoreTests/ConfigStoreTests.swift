@@ -57,6 +57,13 @@ struct ConfigStoreTests {
         #expect(config.presets.filter(\.showCountInMenuBar).count == 1)
     }
 
+    @Test("a query survives a round trip through config.json")
+    func queryRoundTrips() throws {
+        let filter = ItemFilter(query: #"assignee:@me milestone:"Q4 2026""#)
+        let data = try SnapshotCoding.encode(filter)
+        #expect(try SnapshotCoding.decode(ItemFilter.self, from: data).query == filter.query)
+    }
+
     @Test("a filter written before the author fields still loads, with the new fields at their defaults")
     func legacyFilterDecodes() throws {
         let legacy = #"{"relations":["reviewRequestedFromMe"],"includeDrafts":false,"labelsAny":[],"labelsNone":[],"reviewStates":[],"ciStates":[],"mergeStates":[]}"#
@@ -66,6 +73,7 @@ struct ConfigStoreTests {
         #expect(filter.authorsAny.isEmpty)
         #expect(filter.authorsNone.isEmpty)
         #expect(filter.includeDraftsRequestingMyReview)
+        #expect(filter.query == nil)
     }
 
     @Test("settings written before the launch-at-login flag still load, with the flag unset")
