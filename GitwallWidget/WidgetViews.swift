@@ -23,6 +23,9 @@ struct PresetEntry: TimelineEntry {
     /// True when the user has not picked a preset for this widget instance yet.
     let isDefaultPreset: Bool
     let presetCount: Int
+    /// No account is connected yet, so these rows are `DemoData`. Declared with a default so the existing
+    /// constructions stay as they are.
+    var isSample: Bool = false
 
     var isStale: Bool {
         guard let fetchedAt else { return false }
@@ -65,7 +68,14 @@ struct GitwallWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             header
-            if entry.problem == nil, entry.isDefaultPreset, entry.presetCount > 1, family != .systemSmall {
+            if entry.isSample, family != .systemSmall {
+                Link(destination: DeepLink.settings(tab: "accounts").url) {
+                    Text("Sample data · connect an account")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if entry.problem == nil, !entry.isSample, entry.isDefaultPreset, entry.presetCount > 1, family != .systemSmall {
                 Text("Right-click → Edit Widget to pick a preset")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)

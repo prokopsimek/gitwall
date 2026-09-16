@@ -38,7 +38,14 @@ final class AppEnvironment {
     let configStore: ConfigStore?
     let snapshotStore: SnapshotStore?
     /// `--debug-demo`: fictional accounts and items from `DemoData`, kept in memory only (screenshots, UI work).
+    /// Screenshot-only affordances hang off this one (see `StatusItemController`), so it stays separate from the
+    /// user-facing ``isSampleData``.
     let isDemo: Bool
+    /// The user asked to look around with sample data instead of signing in. Same `DemoData`, but the app
+    /// otherwise behaves normally. See ``enterSampleData()``.
+    private(set) var isSampleData = false
+    /// Everything that must not reach the App Group, the Keychain or the network hangs off this.
+    var usesSampleContent: Bool { isDemo || isSampleData }
     /// `--debug-fresh` and the app test host: a throwaway installation, which must not touch login items either.
     private let isSandbox: Bool
     let tokenStore: any TokenStore
@@ -132,6 +139,41 @@ final class AppEnvironment {
 
     var needsOnboarding: Bool { config.accounts.isEmpty }
 
+    /// Apple's App Review could not get into Gitwall at all, because every screen is empty until someone pastes a
+    /// GitHub or GitLab token (guideline 2.1(a), rejected 2026-09-15). Their reply offers "a demonstration mode
+    /// that exhibits the app's full features and functionality" as the alternative to handing over a demo
+    /// account, which is what this is.
+    ///
+    /// Only offered while no account is configured, so sample data can never stand in front of someone's real
+    /// queue, and nothing here is written to the App Group or the Keychain.
+    var canShowSampleData: Bool { !isDemo && config.accounts.isEmpty }
+
+    func enterSampleData() {
+        guard !isSampleData, canShowSampleData else { return }
+        refreshLoop?.cancel()
+        refreshLoop = nil
+        isSampleData = true
+        config = DemoData.config
+        snapshot = DemoData.snapshot()
+        previousSnapshot = nil
+        selectedPresetID = config.presets.first?.id
+        WidgetCenter.shared.reloadAllTimelines()
+        log.info("Sample data on: in-memory only, no App Group or Keychain access")
+    }
+
+    func leaveSampleData() {
+        guard isSampleData else { return }
+        isSampleData = false
+        config = (try? configStore?.load()) ?? .empty
+        snapshot = try? snapshotStore?.load()
+        previousSnapshot = try? snapshotStore?.loadPrevious()
+        selectedPresetID = config.presets.first?.id
+        scheduleRefreshLoop()
+        WidgetCenter.shared.reloadAllTimelines()
+        log.info("Sample data off")
+        Task { await refresh() }
+    }
+
     /// Accounts added before per-account presets existed get theirs once. Presets deleted afterwards stay deleted.
     private func seedDefaultPresetsIfNeeded() {
         let seeded = config.seedingDefaultPresets { [providers] kind in
@@ -181,6 +223,8 @@ final class AppEnvironment {
     // MARK: Sync
 
     func refresh() async {
+        // Sample accounts have no tokens; fetching them would only write failures into the snapshot.
+        guard !isSampleData else { return }
         guard let syncEngine else { return }
         if isRefreshing {
             refreshPending = true
@@ -428,7 +472,7 @@ final class AppEnvironment {
     }
 
     private func persist(_ updated: AppConfig, refresh: Bool = true) throws {
-        if isDemo {
+        if usesSampleContent {
             config = updated
             return
         }
