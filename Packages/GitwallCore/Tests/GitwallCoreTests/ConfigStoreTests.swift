@@ -48,9 +48,9 @@ struct ConfigStoreTests {
         #expect(config.settings.refreshIntervalMinutes == 5)
     }
 
-    @Test("default presets notify about every event, and a new installation ends up with one menu bar count")
+    @Test("default presets notify about nothing, and a new installation ends up with one menu bar count")
     func defaultPresets() {
-        #expect(Preset.defaults().allSatisfy { $0.notifications == Set(NotificationEvent.allCases) })
+        #expect(Preset.defaults().allSatisfy { $0.notifications.isEmpty })
         // The count belongs to the first account's review preset, see AccountPresetsTests.
         let account = Account(kind: .github, baseURL: URL(string: "https://github.com")!, displayName: "GitHub")
         let config = AppConfig().adding(account, pullRequestTerm: "Pull request")

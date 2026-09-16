@@ -143,7 +143,7 @@ public struct Preset: Codable, Hashable, Identifiable, Sendable {
         kinds: Set<ItemKind> = [.pullRequest],
         filter: ItemFilter = .any,
         sort: SortOrder = .lastActivity,
-        notifications: Set<NotificationEvent> = Set(NotificationEvent.allCases),
+        notifications: Set<NotificationEvent> = [],
         showCountInMenuBar: Bool = false
     ) {
         self.id = id
@@ -158,7 +158,8 @@ public struct Preset: Codable, Hashable, Identifiable, Sendable {
     }
 
     /// Presets shared by all accounts, created with the first account. Per-account presets come from
-    /// ``accountDefaults(for:label:pullRequestTerm:showCountInMenuBar:)``. Notifications default to all events.
+    /// ``accountDefaults(for:label:pullRequestTerm:showCountInMenuBar:)``. Notifications default to none; the user
+    /// switches on what they want.
     public static func defaults() -> [Preset] {
         [
             Preset(
