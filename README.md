@@ -57,11 +57,13 @@ field. Gitwall reads it with GitHub's own rules and checks it against the items 
 GitLab too and the widget always agrees with the menu bar.
 
 ```
-assignee:@me assignee:franta-dxh,lumir-sokol,tom-gilsky
+assignee:@me AND (assignee:franta-dxh OR assignee:lumir-sokol OR assignee:tom-gilsky)
 ```
 
-That one means *assigned to me **and** to at least one of the three* — repeating a qualifier is AND, a comma
-inside one is OR, and a leading `-` excludes.
+That one means *assigned to me **and** to at least one of the three*. A space works as `AND` too, `AND` binds
+tighter than `OR`, and parentheses group up to five levels deep, as on GitHub. A comma inside a qualifier is a
+shorter OR, so `assignee:@me assignee:franta-dxh,lumir-sokol,tom-gilsky` says the same thing, and a leading `-`
+excludes a term.
 
 | Qualifier | Matches |
 |---|---|
@@ -76,9 +78,10 @@ inside one is OR, and a leading `-` excludes.
 | `is:` / `type:` | `pr`, `issue`, `draft`, `open` |
 | a bare word | the title, the repository or `#number` |
 
-`@me` is the account you signed in with. Put values with spaces in quotes: `milestone:"Q4 2026"`. There are no
-`AND`/`OR` keywords and no parentheses — GitHub does not document them either. A query Gitwall cannot read
-matches nothing and says why, so a typo can never quietly widen a preset.
+`@me` is the account you signed in with. Put values with spaces in quotes: `milestone:"Q4 2026"`. A word
+without a qualifier is text, so `@lumir-sokol` on its own searches titles; write `assignee:lumir-sokol`. There is
+no `NOT` and no minus in front of parentheses. A query Gitwall cannot read matches nothing and says why, so a
+typo can never quietly widen a preset.
 
 **Issues too, not just pull requests.**
 

@@ -334,7 +334,7 @@ private struct QueryField: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             } else {
-                Text("GitHub search syntax, checked against the items Gitwall already has. Repeating a qualifier means AND, a comma inside one means OR, a leading minus excludes. A query that cannot be read matches nothing.")
+                Text("GitHub search syntax, checked against the items Gitwall already has. A space or AND means AND, OR means OR, parentheses group, a comma inside a qualifier means OR, a leading minus excludes. A query that cannot be read matches nothing.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -359,7 +359,9 @@ private struct QueryField: View {
     }
 
     private static let examples: [(String, String)] = [
-        ("assignee:@me assignee:franta-dxh,lumir-sokol,tom-gilsky", "Assigned to me and to at least one of the three"),
+        ("assignee:@me AND (assignee:franta-dxh OR assignee:lumir-sokol)", "Assigned to me and to at least one of the two"),
+        ("assignee:@me assignee:franta-dxh,lumir-sokol,tom-gilsky", "The same idea with a comma, for three"),
+        ("label:bug OR (is:pr review-requested:@me)", "Every bug, plus pull requests waiting for my review"),
         ("is:issue -label:blocked label:bug,security", "Issues labelled bug or security, never blocked"),
         (#"milestone:"Q4 2026" -author:renovate"#, "In that milestone, not opened by renovate"),
     ]
