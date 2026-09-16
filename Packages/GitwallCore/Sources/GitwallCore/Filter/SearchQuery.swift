@@ -13,6 +13,8 @@ public enum SearchQueryError: Error, Equatable, Hashable, Sendable {
     case emptyGroup
     case tooDeep
     case negatedGroup
+    /// `@login` without a qualifier. GitHub answers it with a validation error, or with nothing inside `OR`.
+    case bareMention(String)
 
     /// English, user-facing; the preset editor prints this under the field.
     public var message: String {
@@ -37,6 +39,8 @@ public enum SearchQueryError: Error, Equatable, Hashable, Sendable {
             "Parentheses nest at most \(SearchQuery.maxDepth) levels deep, as on GitHub."
         case .negatedGroup:
             "A leading minus excludes one term. Put it on each term inside the parentheses instead."
+        case .bareMention(let mention):
+            "“\(mention)” needs a qualifier, for example assignee:\(mention.dropFirst()). Quote it to search the text."
         }
     }
 }
@@ -47,8 +51,9 @@ public enum SearchQueryError: Error, Equatable, Hashable, Sendable {
 /// `docs/adr/0009-preset-queries-accept-and-or-and-parentheses.md`.
 ///
 /// A space or `AND` combines terms with AND, `OR` with OR, and AND binds tighter; parentheses group, up to five
-/// levels deep. Comma separated values inside one term are OR, and a leading `-` negates that term. There is no
-/// `NOT` keyword and no minus in front of a group, because GitHub documents neither.
+/// levels deep. A leading `-` negates one term. There is no `NOT` keyword, and a minus in front of a group or a bare
+/// `@login` is an error, as it is on GitHub. Comma separated values inside one term are OR here; GitHub only honours
+/// that for `label:` and ignores it for `assignee:`, so the comma form does not paste into GitHub.
 public struct SearchQuery: Equatable, Sendable {
     /// Named after GitHub's own qualifiers; only the ones the snapshot can answer are here.
     enum Qualifier: String, CaseIterable, Sendable {
@@ -242,8 +247,12 @@ public struct SearchQuery: Equatable, Sendable {
                 position += 1
                 depth -= 1
                 return inner
-            case .word(let text, _):
+            case .word(let text, let quoted):
                 position += 1
+                let body = text.hasPrefix("-") ? String(text.dropFirst()) : text
+                if !quoted, body.count > 1, body.hasPrefix("@"), !body.contains(":") {
+                    return .failure(.bareMention(body))
+                }
                 return term(from: text).map { .term($0) }
             // Unreachable: `parseAnd` only calls this when `startsOperand` holds.
             case .close, nil:

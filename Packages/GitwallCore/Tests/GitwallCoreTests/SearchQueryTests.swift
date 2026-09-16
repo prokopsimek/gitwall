@@ -208,9 +208,17 @@ struct SearchQueryTests {
         #expect(error("label:a ()") == .emptyGroup)
     }
 
-    @Test("a bare @login is text, as on GitHub")
-    func bareMentionIsText() throws {
-        let query = try parse("@lumir-sokol")
+    @Test("a bare @login is rejected, because GitHub rejects it too")
+    func bareMention() {
+        #expect(error("@lumir-sokol") == .bareMention("@lumir-sokol"))
+        #expect(error("assignee:@me AND (assignee:franta-dxh OR @lumir-sokol)") == .bareMention("@lumir-sokol"))
+        #expect(error("-@lumir-sokol") == .bareMention("@lumir-sokol"))
+        #expect(SearchQueryError.bareMention("@lumir-sokol").message.contains("assignee:lumir-sokol"))
+    }
+
+    @Test("a quoted @login is text")
+    func quotedMention() throws {
+        let query = try parse(#""@lumir-sokol""#)
         #expect(query.matches(item(title: "Ping @lumir-sokol"), me: me))
         #expect(!query.matches(item(assignees: ["lumir-sokol"]), me: me))
     }

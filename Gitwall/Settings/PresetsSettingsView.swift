@@ -321,7 +321,7 @@ private struct QueryField: View {
             TextField(
                 "Query",
                 text: $text,
-                prompt: Text("assignee:@me assignee:franta-dxh,lumir-sokol"),
+                prompt: Text("assignee:@me AND (assignee:franta-dxh OR assignee:lumir-sokol)"),
                 axis: .vertical
             )
             .labelsHidden()
@@ -334,7 +334,7 @@ private struct QueryField: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             } else {
-                Text("GitHub search syntax, checked against the items Gitwall already has. A space or AND means AND, OR means OR, parentheses group, a comma inside a qualifier means OR, a leading minus excludes. A query that cannot be read matches nothing.")
+                Text("GitHub search syntax, checked against the items Gitwall already has. A space or AND means AND, OR means OR, parentheses group, a leading minus excludes. A comma inside a qualifier also means OR, but only in Gitwall. A query that cannot be read matches nothing.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -360,7 +360,7 @@ private struct QueryField: View {
 
     private static let examples: [(String, String)] = [
         ("assignee:@me AND (assignee:franta-dxh OR assignee:lumir-sokol)", "Assigned to me and to at least one of the two"),
-        ("assignee:@me assignee:franta-dxh,lumir-sokol,tom-gilsky", "The same idea with a comma, for three"),
+        ("assignee:@me assignee:franta-dxh,lumir-sokol", "The same with a comma; GitHub itself ignores the list"),
         ("label:bug OR (is:pr review-requested:@me)", "Every bug, plus pull requests waiting for my review"),
         ("is:issue -label:blocked label:bug,security", "Issues labelled bug or security, never blocked"),
         (#"milestone:"Q4 2026" -author:renovate"#, "In that milestone, not opened by renovate"),
