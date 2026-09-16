@@ -2,6 +2,9 @@
 
 Date: 2026-09-16
 
+Partly superseded by [ADR 0009](0009-preset-queries-accept-and-or-and-parentheses.md): `AND`, `OR` and
+parentheses are accepted after all.
+
 ## Context
 
 `ItemFilter` grew one field per idea: `labelsAny`, `labelsNone`, `authorsAny`, `authorsNone`, `milestone`,

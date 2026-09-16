@@ -107,6 +107,129 @@ struct SearchQueryTests {
         #expect(!query.matches(item(assignees: ["franta-dxh", "lumir-sokol"]), me: me))
     }
 
+    // MARK: - Boolean operators
+
+    @Test("the agent queue with AND, OR and parentheses")
+    func meAndAnyAgentWithOperators() throws {
+        let query = try parse("assignee:@me AND (assignee:franta-dxh OR assignee:lumir-sokol OR assignee:tom-gilsky)")
+        #expect(query.matches(item(assignees: ["prokopsimek", "lumir-sokol"]), me: me))
+        #expect(query.matches(item(assignees: ["tom-gilsky", "prokopsimek"]), me: me))
+        #expect(!query.matches(item(assignees: ["prokopsimek"]), me: me))
+        #expect(!query.matches(item(assignees: ["franta-dxh", "lumir-sokol"]), me: me))
+    }
+
+    @Test("OR matches either side")
+    func or() throws {
+        let query = try parse("label:bug OR author:alice")
+        #expect(query.matches(item(labels: ["bug"]), me: me))
+        #expect(query.matches(item(author: "alice"), me: me))
+        #expect(query.matches(item(author: "alice", labels: ["bug"]), me: me))
+        #expect(!query.matches(item(author: "bob", labels: ["chore"]), me: me))
+    }
+
+    @Test("an explicit AND means the same as a space")
+    func explicitAnd() throws {
+        let query = try parse("label:bug AND author:alice")
+        #expect(query == (try parse("label:bug author:alice")))
+        #expect(query.matches(item(author: "alice", labels: ["bug"]), me: me))
+        #expect(!query.matches(item(author: "alice"), me: me))
+    }
+
+    @Test("AND binds tighter than OR")
+    func precedence() throws {
+        let query = try parse("label:a OR label:b label:c")
+        #expect(query.matches(item(labels: ["a"]), me: me))
+        #expect(query.matches(item(labels: ["b", "c"]), me: me))
+        #expect(!query.matches(item(labels: ["b"]), me: me))
+        #expect(!query.matches(item(labels: ["c"]), me: me))
+    }
+
+    @Test("parentheses override precedence")
+    func parentheses() throws {
+        let query = try parse("(label:a OR label:b) label:c")
+        #expect(query.matches(item(labels: ["a", "c"]), me: me))
+        #expect(query.matches(item(labels: ["b", "c"]), me: me))
+        #expect(!query.matches(item(labels: ["a"]), me: me))
+    }
+
+    @Test("parentheses nest five levels deep, not six")
+    func nestingDepth() throws {
+        let five = try parse("(((((label:a)))))")
+        #expect(five.matches(item(labels: ["a"]), me: me))
+        #expect(error("((((((label:a))))))") == .tooDeep)
+    }
+
+    @Test("a minus inside a group negates its term")
+    func negationInsideGroup() throws {
+        let query = try parse("(-label:blocked OR author:alice)")
+        #expect(query.matches(item(labels: ["bug"]), me: me))
+        #expect(query.matches(item(author: "alice", labels: ["blocked"]), me: me))
+        #expect(!query.matches(item(author: "bob", labels: ["blocked"]), me: me))
+    }
+
+    @Test("a minus in front of a group is rejected")
+    func negatedGroup() {
+        #expect(error("-(label:a OR label:b)") == .negatedGroup)
+    }
+
+    @Test("lowercase and quoted operators are plain words")
+    func operatorsAsWords() throws {
+        let subject = item(title: "Rock or roll")
+        #expect(try parse("rock or roll").matches(subject, me: me))
+        #expect(try !parse("rock or jazz").matches(subject, me: me))
+        #expect(try parse(#""OR""#).matches(item(title: "OR gate"), me: me))
+        #expect(try !parse(#""OR""#).matches(item(title: "AND gate"), me: me))
+    }
+
+    @Test("a parenthesis inside quotes belongs to the value")
+    func quotedParenthesis() throws {
+        let query = try parse(#"milestone:"Q4 (late)""#)
+        #expect(query.matches(item(milestone: "Q4 (late)"), me: me))
+    }
+
+    @Test("unbalanced parentheses are rejected")
+    func unbalancedParentheses() {
+        #expect(error("(label:a") == .unclosedParenthesis)
+        #expect(error("label:a)") == .unexpectedClosingParenthesis)
+    }
+
+    @Test("an operator without a term on both sides is rejected")
+    func missingOperand() {
+        #expect(error("OR label:a") == .missingOperand("OR"))
+        #expect(error("label:a AND") == .missingOperand("AND"))
+        #expect(error("label:a OR OR label:b") == .missingOperand("OR"))
+        #expect(error("label:a OR AND label:b") == .missingOperand("OR"))
+        #expect(error("(OR label:a)") == .missingOperand("OR"))
+    }
+
+    @Test("empty parentheses are rejected")
+    func emptyGroup() {
+        #expect(error("()") == .emptyGroup)
+        #expect(error("label:a ()") == .emptyGroup)
+    }
+
+    @Test("a bare @login is rejected, because GitHub rejects it too")
+    func bareMention() {
+        #expect(error("@lumir-sokol") == .bareMention("@lumir-sokol"))
+        #expect(error("assignee:@me AND (assignee:franta-dxh OR @lumir-sokol)") == .bareMention("@lumir-sokol"))
+        #expect(error("-@lumir-sokol") == .bareMention("@lumir-sokol"))
+        #expect(SearchQueryError.bareMention("@lumir-sokol").message.contains("assignee:lumir-sokol"))
+    }
+
+    @Test("a quoted @login is text")
+    func quotedMention() throws {
+        let query = try parse(#""@lumir-sokol""#)
+        #expect(query.matches(item(title: "Ping @lumir-sokol"), me: me))
+        #expect(!query.matches(item(assignees: ["lumir-sokol"]), me: me))
+    }
+
+    @Test("a login value may carry a leading @")
+    func atLogin() throws {
+        let query = try parse("assignee:@franta-dxh")
+        #expect(query.matches(item(assignees: ["franta-dxh"]), me: me))
+        #expect(!query.matches(item(assignees: ["prokopsimek"]), me: me))
+    }
+
     @Test("a leading minus negates the whole term")
     func negation() throws {
         let query = try parse("-label:blocked")

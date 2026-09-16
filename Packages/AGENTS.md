@@ -44,8 +44,9 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   agents cannot mark their pull requests ready), and author logins are compared without a trailing `[bot]`,
   because GitHub GraphQL returns `renovate` where REST returns `renovate[bot]` (`LoginMatch`).
 - `ItemFilter.query` is GitHub search syntax read by `SearchQuery` and evaluated **locally**, over the snapshot,
-  for both providers; it is never sent to a server. Terms are AND, commas inside a term are OR, a leading `-`
-  excludes — and there are deliberately no `AND`/`OR`/`NOT` keywords and no parentheses, because GitHub does not
-  document them (see `docs/adr/0008`). Only qualifiers `WorkItem` can answer are accepted; anything else is a
-  parse error, and an unreadable query matches nothing so a typo cannot widen a preset. Adding a qualifier means
+  for both providers; it is never sent to a server. A space or `AND` is AND, `OR` is OR, AND binds tighter, and
+  parentheses nest at most five levels; a leading `-` excludes one term. `-(…)` and a bare `@login` are errors and
+  `NOT` is no operator — all checked against GitHub's own search (see `docs/adr/0009`). Commas inside a term are
+  OR, which GitHub only honours for `label:`. Only qualifiers `WorkItem` can answer are accepted; anything else is
+  a parse error, and an unreadable query matches nothing so a typo cannot widen a preset. Adding a qualifier means
   adding it to `SearchQuery.Qualifier`, to `SearchQueryTests` and to the table in the README.
