@@ -44,7 +44,7 @@ struct AccountPresetsTests {
         #expect(presets[1].kinds == [.issue] && presets[1].filter.relations == [.assignedToMe])
         #expect(presets[2].kinds == [.pullRequest] && presets[2].filter.relations == [.reviewRequestedFromMe])
         #expect(presets[2].filter.includeDrafts == false)
-        #expect(presets.allSatisfy { $0.notifications == Set(NotificationEvent.allCases) })
+        #expect(presets.allSatisfy { $0.notifications.isEmpty })
         #expect(presets.allSatisfy { !$0.showCountInMenuBar })
         #expect(Set(presets.map(\.id)).count == 3)
     }

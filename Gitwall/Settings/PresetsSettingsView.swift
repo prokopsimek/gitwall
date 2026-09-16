@@ -236,7 +236,7 @@ private struct PresetEditor: View {
                         }
                     ))
                 }
-                Text("Notifications fire for items that match this preset. All are on by default.")
+                Text("Notifications fire for items that match this preset. All are off by default.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

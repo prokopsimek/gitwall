@@ -240,7 +240,7 @@ struct OnboardingView: View {
     private var notifications: some View {
         VStack(alignment: .leading, spacing: 18) {
             header("Notifications",
-                   "Gitwall can tell you when something changes in your views. Everything is on to begin with; switch off what you do not need. Each preset keeps its own choice in Settings › Presets.")
+                   "Gitwall can tell you when something changes in your views. Everything is off to begin with; switch on what you want to hear about. Each preset keeps its own choice in Settings › Presets.")
             Button {
                 Task { await environment.notifications.requestAuthorizationIfNeeded() }
             } label: {

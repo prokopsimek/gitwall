@@ -52,7 +52,7 @@ Repozitář je prázdný (žádné commity). Rozhodnutí níže vzešla z rozhov
 | Tray | levý klik popover (přepínač pohledů + seznam), volitelný počet u ikony, pravý klik menu (Obnovit, Nastavení, Spouštět při přihlášení, O aplikaci, Ukončit) |
 | Widget | 4 velikosti; klik na řádek otevře PR přes `gitwall://item/…`; hlavička otevře popover; tlačítko obnovy |
 | Stav PR | řádek: název, repo, číslo, avatar, čas od aktivity, ikony draft / review / CI / konflikt; large + tray navíc štítky, komentáře, +/- řádků, revieweři |
-| Notifikace | v1; per pohled zapínatelné události z pevné sady, **výchozí všechny zapnuté**, nastavitelné v onboardingu |
+| Notifikace | v1; per pohled zapínatelné události z pevné sady, **výchozí všechny vypnuté** (změněno 2026-09-16, dřív zapnuté), nastavitelné v onboardingu |
 | Struktura | XcodeGen `project.yml` jako zdroj pravdy, xcodeproj v `.gitignore`; logika v lokálních SPM balíčcích |
 | Milestony | GitHub end-to-end → GitLab → notifikace + onboarding → OAuth → App Store; TestFlight průběžně |
 | Distribuce | App Store primárně; notarizovaný Developer ID build v GitHub Releases bez auto-update |
@@ -144,7 +144,7 @@ struct View: Codable, Identifiable {  // „pohled“ / preset
     var kinds: Set<ItemKind>           // PR, issue, obojí
     var filter: ItemFilter             // viz níže
     var sort: SortOrder                // .lastActivity (výchozí), .created, .oldestFirst
-    var notifications: NotificationSettings  // Set<NotificationEvent>, výchozí všechny
+    var notifications: NotificationSettings  // Set<NotificationEvent>, výchozí prázdná
     var showCountInMenuBar: Bool
 }
 struct ItemFilter: Codable {
@@ -201,7 +201,7 @@ Strategie dotazů:
 - **StatusItemController** (AppKit): `NSStatusItem` s ikonou + volitelným počtem z pohledu se `showCountInMenuBar`; levý klik `NSPopover` s `NSHostingController(PopoverView)`, pravý klik `NSMenu` (SwiftUI `MenuBarExtra` pravý klik neumí). Dock toggle přes `NSApp.setActivationPolicy`; známá chyba po přepnutí `.accessory → .regular` (hlavní menu neaktivní) se obchází `NSApp.activate` se zpožděním ~200 ms. Testovat pravý klik i na horním pixelu lišty (známý problém na macOS 26).
 - **PopoverView**: segment/picker pohledů, seznam `WorkItemRow` (z `GitwallUI`), stav synchronizace a stáří, tlačítka Obnovit / Nastavení. Klik otevře URL přes `NSWorkspace`, pravý klik kopíruje URL, nové položky (diff) mají tečku.
 - **SettingsWindow** (SwiftUI `Settings` scene): záložky Účty (přidat/ověřit/odebrat, nativní dotaz), Repozitáře (discovery s hledáním, org/skupina, ruční zápis), Pohledy (editor filtrů + notifikace), Obecné (interval, Dock ikona, spouštění při přihlášení).
-- **Onboarding** při prvním spuštění: vítejte → přidat účet → vybrat repa → vytvořit výchozí pohledy („Moje PR“, „Čeká na můj review“, „Vše otevřené“) → notifikace (vše zapnuté, lze upravit, žádost o oprávnění) → spouštění při přihlášení → „přidejte widget na plochu“ s návodem.
+- **Onboarding** při prvním spuštění: vítejte → přidat účet → vybrat repa → vytvořit výchozí pohledy („Moje PR“, „Čeká na můj review“, „Vše otevřené“) → notifikace (vše vypnuté, lze zapnout, žádost o oprávnění) → spouštění při přihlášení → „přidejte widget na plochu“ s návodem.
 - **Widget**: `AppIntentConfiguration` s `ViewEntity` (EntityQuery čte `config.json`). Small: název pohledu, počet, nejnovější položka. Medium: 3–4 řádky. Large: 8–10 řádků. ExtraLarge: dva sloupce. Řádek = `Link(gitwall://item/<id>)`, hlavička = `Link(gitwall://view/<id>)`, obnova = `Link(gitwall://refresh)` (WidgetKit spustí app, když neběží). Žádné `Button(intent:)` pro otevření app: Apple to výslovně nedoporučuje a `openAppWhenRun` je v macOS 26 SDK deprecated. `widgetURL(gitwall://view/<id>)` jako fallback pro klik mimo řádky. Avatary z `avatars/` v App Group, zmenšené na ≤ 96 px, max. ~12 na entry (paměťový limit widgetu ~30 MB). Prázdný stav: „Žádné položky“ nebo „Nastavte účet v Gitwall“.
 - **URL handler** v app: povinně v `NSApplicationDelegate.application(_:open:)` (ne `onOpenURL` na SwiftUI view, které u menu bar app nemusí existovat); schéma `gitwall` v `CFBundleURLTypes`. `item/<id>` → najde položku ve snapshotu, otevře `url` v prohlížeči; `view/<id>` → otevře popover na pohledu; `refresh` → spustí sync. Pozor na duplicitní debug bundly, které Launch Services registruje na stejné schéma.
 
@@ -231,7 +231,7 @@ Strategie dotazů:
 
 ### M3 – Filtry, notifikace, onboarding
 - Plné filtry (štítky, review/CI/merge stav, stáří, milestone, text) + nativní dotaz per účet.
-- `NotificationDispatcher`, nastavení per pohled, výchozí vše zapnuté.
+- `NotificationDispatcher`, nastavení per pohled, výchozí vše vypnuté.
 - Onboarding flow, prázdné stavy, stav rate limitu v tray.
 
 ### M4 – OAuth
