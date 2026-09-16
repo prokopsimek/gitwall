@@ -101,6 +101,7 @@ private struct PresetEditor: View {
     @State private var labelsNone: String
     @State private var authorsAny: String
     @State private var authorsNone: String
+    @State private var query: String
 
     init(environment: AppEnvironment, preset: Preset) {
         self.environment = environment
@@ -109,6 +110,7 @@ private struct PresetEditor: View {
         _labelsNone = State(initialValue: preset.filter.labelsNone.joined(separator: ", "))
         _authorsAny = State(initialValue: preset.filter.authorsAny.joined(separator: ", "))
         _authorsNone = State(initialValue: preset.filter.authorsNone.joined(separator: ", "))
+        _query = State(initialValue: preset.filter.query ?? "")
     }
 
     var body: some View {
@@ -187,15 +189,15 @@ private struct PresetEditor: View {
             }
 
             Section("More filters") {
-                TextField("Any of these labels (comma separated)", text: $labelsAny)
+                FilterField(title: "Any of these labels", prompt: "bug, security", text: $labelsAny)
                     .onChange(of: labelsAny) { _, value in preset.filter.labelsAny = split(value) }
-                TextField("None of these labels (comma separated)", text: $labelsNone)
+                FilterField(title: "None of these labels", prompt: "wontfix", text: $labelsNone)
                     .onChange(of: labelsNone) { _, value in preset.filter.labelsNone = split(value) }
-                TextField("Any of these authors (comma separated)", text: $authorsAny)
+                FilterField(title: "Any of these authors", prompt: "copilot-swe-agent, renovate", text: $authorsAny)
                     .onChange(of: authorsAny) { _, value in preset.filter.authorsAny = split(value) }
-                TextField("None of these authors (comma separated)", text: $authorsNone)
+                FilterField(title: "None of these authors", prompt: "dependabot", text: $authorsNone)
                     .onChange(of: authorsNone) { _, value in preset.filter.authorsNone = split(value) }
-                Text("Author logins, for example copilot-swe-agent or renovate. A trailing [bot] is ignored.")
+                Text("Comma separated. Author logins are matched without a trailing [bot].")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Updated within", selection: Binding(
                     get: { preset.filter.updatedWithinDays ?? 0 },
@@ -208,14 +210,21 @@ private struct PresetEditor: View {
                     Text("14 days").tag(14)
                     Text("30 days").tag(30)
                 }
-                TextField("Milestone", text: Binding(
+                FilterField(title: "Milestone", prompt: "Q4 2026", text: Binding(
                     get: { preset.filter.milestone ?? "" },
                     set: { preset.filter.milestone = $0.isEmpty ? nil : $0 }
                 ))
-                TextField("Title, repository or #number contains", text: Binding(
+                FilterField(title: "Title, repository or #number contains", prompt: "flaky", text: Binding(
                     get: { preset.filter.text ?? "" },
                     set: { preset.filter.text = $0.isEmpty ? nil : $0 }
                 ))
+            }
+
+            Section("Query") {
+                QueryField(text: $query)
+                    .onChange(of: query) { _, value in
+                        preset.filter.query = value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : value
+                    }
             }
 
             Section("Notifications") {
@@ -278,6 +287,82 @@ private struct PresetEditor: View {
         case .closed: "Closed or merged"
         }
     }
+}
+
+/// Label above the field rather than beside it: the settings window is narrow and a long leading label used to
+/// squeeze the editable part of a `TextField` in a grouped `Form` down to nothing.
+private struct FilterField: View {
+    let title: String
+    let prompt: String
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            TextField(title, text: $text, prompt: Text(prompt))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+}
+
+/// The free-form preset query, with the parser's own complaint shown under the field.
+private struct QueryField: View {
+    @Binding var text: String
+
+    private var error: SearchQueryError? {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        if case .failure(let error) = SearchQuery.parse(text) { return error }
+        return nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TextField(
+                "Query",
+                text: $text,
+                prompt: Text("assignee:@me assignee:franta-dxh,lumir-sokol"),
+                axis: .vertical
+            )
+            .labelsHidden()
+            .lineLimit(1...4)
+            .textFieldStyle(.roundedBorder)
+            .font(.system(.body, design: .monospaced))
+
+            if let error {
+                Label(error.message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else {
+                Text("GitHub search syntax, checked against the items Gitwall already has. Repeating a qualifier means AND, a comma inside one means OR, a leading minus excludes. A query that cannot be read matches nothing.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            DisclosureGroup("Qualifiers and examples") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(verbatim: SearchQuery.supportedQualifiers.map { "\($0):" }.joined(separator: "  "))
+                        .font(.system(.caption, design: .monospaced))
+                    Text("@me stands for the account you signed in with. is: and type: take pr, issue, draft or open. Values with spaces go in quotes. A bare word matches the title, the repository or #number.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Divider()
+                    ForEach(Self.examples, id: \.0) { example, explanation in
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(verbatim: example).font(.system(.caption, design: .monospaced))
+                            Text(explanation).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
+            .font(.caption)
+        }
+    }
+
+    private static let examples: [(String, String)] = [
+        ("assignee:@me assignee:franta-dxh,lumir-sokol,tom-gilsky", "Assigned to me and to at least one of the three"),
+        ("is:issue -label:blocked label:bug,security", "Issues labelled bug or security, never blocked"),
+        (#"milestone:"Q4 2026" -author:renovate"#, "In that milestone, not opened by renovate"),
+    ]
 }
 
 private struct ScopeRow: View {

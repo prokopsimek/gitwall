@@ -20,9 +20,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let hosting = NSHostingController(rootView: SettingsView(environment: environment, state: state))
         let window = NSWindow(contentViewController: hosting)
         window.title = "Gitwall Settings"
-        window.styleMask = [.titled, .closable, .miniaturizable]
+        // Resizable because the preset editor puts a preset list and a form side by side; at a fixed 640 pt the
+        // form's text fields were squeezed to nothing and looked read-only.
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 640, height: 480))
+        window.contentMinSize = NSSize(width: 640, height: 480)
+        window.setContentSize(NSSize(width: 820, height: 620))
         window.center()
         window.setFrameAutosaveName("GitwallSettings")
         super.init(window: window)

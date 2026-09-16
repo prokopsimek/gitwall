@@ -42,4 +42,10 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 - Filter categories combine with AND, values inside one category with OR. Two deliberate exceptions live in
   `FilterEngine`: a draft that names me as a reviewer passes a review preset even when drafts are off (cloud
   agents cannot mark their pull requests ready), and author logins are compared without a trailing `[bot]`,
-  because GitHub GraphQL returns `renovate` where REST returns `renovate[bot]`.
+  because GitHub GraphQL returns `renovate` where REST returns `renovate[bot]` (`LoginMatch`).
+- `ItemFilter.query` is GitHub search syntax read by `SearchQuery` and evaluated **locally**, over the snapshot,
+  for both providers; it is never sent to a server. Terms are AND, commas inside a term are OR, a leading `-`
+  excludes — and there are deliberately no `AND`/`OR`/`NOT` keywords and no parentheses, because GitHub does not
+  document them (see `docs/adr/0008`). Only qualifiers `WorkItem` can answer are accepted; anything else is a
+  parse error, and an unreadable query matches nothing so a typo cannot widen a preset. Adding a qualifier means
+  adding it to `SearchQuery.Qualifier`, to `SearchQueryTests` and to the table in the README.

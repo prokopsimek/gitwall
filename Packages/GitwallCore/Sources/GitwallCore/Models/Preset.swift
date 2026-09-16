@@ -53,6 +53,9 @@ public struct ItemFilter: Codable, Hashable, Sendable {
     public var updatedWithinDays: Int?
     public var milestone: String?
     public var text: String?
+    /// Free-form query in GitHub's search syntax, evaluated locally by ``SearchQuery``. Combines with every
+    /// other field through AND. A query Gitwall cannot read matches nothing, so a typo cannot widen a preset.
+    public var query: String?
 
     public init(
         relations: Set<Relation> = [],
@@ -67,7 +70,8 @@ public struct ItemFilter: Codable, Hashable, Sendable {
         mergeStates: Set<MergeState> = [],
         updatedWithinDays: Int? = nil,
         milestone: String? = nil,
-        text: String? = nil
+        text: String? = nil,
+        query: String? = nil
     ) {
         self.relations = relations
         self.includeDrafts = includeDrafts
@@ -82,11 +86,13 @@ public struct ItemFilter: Codable, Hashable, Sendable {
         self.updatedWithinDays = updatedWithinDays
         self.milestone = milestone
         self.text = text
+        self.query = query
     }
 
     private enum CodingKeys: String, CodingKey {
         case relations, includeDrafts, includeDraftsRequestingMyReview, labelsAny, labelsNone
         case authorsAny, authorsNone, reviewStates, ciStates, mergeStates, updatedWithinDays, milestone, text
+        case query
     }
 
     /// Every key is optional so a `config.json` written by an older build keeps loading; missing keys fall back
@@ -107,7 +113,8 @@ public struct ItemFilter: Codable, Hashable, Sendable {
             mergeStates: try container.decodeIfPresent(Set<MergeState>.self, forKey: .mergeStates) ?? [],
             updatedWithinDays: try container.decodeIfPresent(Int.self, forKey: .updatedWithinDays),
             milestone: try container.decodeIfPresent(String.self, forKey: .milestone),
-            text: try container.decodeIfPresent(String.self, forKey: .text)
+            text: try container.decodeIfPresent(String.self, forKey: .text),
+            query: try container.decodeIfPresent(String.self, forKey: .query)
         )
     }
 

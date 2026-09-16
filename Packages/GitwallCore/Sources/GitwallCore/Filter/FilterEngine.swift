@@ -4,7 +4,8 @@ import Foundation
 public enum FilterEngine {
     public static func items(matching preset: Preset, in items: [WorkItem], accounts: [Account], now: Date) -> [WorkItem] {
         let identities = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0.me) })
-        let matching = items.filter { matches($0, preset: preset, identities: identities, now: now) }
+        let query = CompiledQuery(preset.filter.query)
+        let matching = items.filter { matches($0, preset: preset, identities: identities, now: now, query: query) }
         return sort(matching, by: preset.sort)
     }
 
@@ -12,8 +13,9 @@ public enum FilterEngine {
         let identities = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0.me) })
         var counts: [UUID: Int] = [:]
         for preset in presets {
+            let query = CompiledQuery(preset.filter.query)
             counts[preset.id] = items.reduce(into: 0) { partial, item in
-                if matches(item, preset: preset, identities: identities, now: now) { partial += 1 }
+                if matches(item, preset: preset, identities: identities, now: now, query: query) { partial += 1 }
             }
         }
         return counts
@@ -35,10 +37,24 @@ public enum FilterEngine {
 
     // MARK: - Matching
 
-    static func matches(_ item: WorkItem, preset: Preset, identities: [UUID: UserRef?], now: Date) -> Bool {
+    /// `query` lets a caller that runs over many items compile the preset's query once; leave it out and it is
+    /// compiled per call, which is what the handful of items in ``SnapshotDiff`` want.
+    static func matches(
+        _ item: WorkItem,
+        preset: Preset,
+        identities: [UUID: UserRef?],
+        now: Date,
+        query: CompiledQuery? = nil
+    ) -> Bool {
         guard preset.kinds.contains(item.kind) else { return false }
         guard inScope(item, scopes: preset.scopes) else { return false }
-        return matches(item, filter: preset.filter, me: identities[item.accountID] ?? nil, now: now)
+        return matches(
+            item,
+            filter: preset.filter,
+            me: identities[item.accountID] ?? nil,
+            now: now,
+            query: query ?? CompiledQuery(preset.filter.query)
+        )
     }
 
     private static func inScope(_ item: WorkItem, scopes: [PresetScope]) -> Bool {
@@ -50,7 +66,13 @@ public enum FilterEngine {
         }
     }
 
-    static func matches(_ item: WorkItem, filter: ItemFilter, me: UserRef?, now: Date) -> Bool {
+    static func matches(
+        _ item: WorkItem,
+        filter: ItemFilter,
+        me: UserRef?,
+        now: Date,
+        query: CompiledQuery? = nil
+    ) -> Bool {
         if !filter.relations.isEmpty {
             guard let me, filter.relations.contains(where: { relation(relationKind: $0, item: item, me: me) }) else {
                 return false
@@ -62,8 +84,8 @@ public enum FilterEngine {
         if !filter.labelsAny.isEmpty, filter.labelsAny.allSatisfy({ !labels.contains($0.lowercased()) }) { return false }
         if filter.labelsNone.contains(where: { labels.contains($0.lowercased()) }) { return false }
 
-        if !filter.authorsAny.isEmpty, !filter.authorsAny.contains(where: { sameLogin($0, item.author.login) }) { return false }
-        if filter.authorsNone.contains(where: { sameLogin($0, item.author.login) }) { return false }
+        if !filter.authorsAny.isEmpty, !filter.authorsAny.contains(where: { LoginMatch.same($0, item.author.login) }) { return false }
+        if filter.authorsNone.contains(where: { LoginMatch.same($0, item.author.login) }) { return false }
 
         if item.kind == .pullRequest {
             if !filter.reviewStates.isEmpty, !filter.reviewStates.contains(item.reviewState ?? .none) { return false }
@@ -87,24 +109,44 @@ public enum FilterEngine {
             if !haystacks.contains(where: { $0.contains(text) }) { return false }
         }
 
+        guard (query ?? CompiledQuery(filter.query)).matches(item, me: me) else { return false }
+
         return true
+    }
+
+    /// A preset's ``ItemFilter/query`` after parsing. A query Gitwall cannot read matches nothing: matching
+    /// everything would let one typo silently flood the widget, while zero results plus the message the editor
+    /// shows under the field points straight at the mistake.
+    enum CompiledQuery {
+        case unrestricted
+        case query(SearchQuery)
+        case unreadable
+
+        init(_ raw: String?) {
+            guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                self = .unrestricted
+                return
+            }
+            switch SearchQuery.parse(raw) {
+            case .success(let query): self = query.isEmpty ? .unrestricted : .query(query)
+            case .failure: self = .unreadable
+            }
+        }
+
+        func matches(_ item: WorkItem, me: UserRef?) -> Bool {
+            switch self {
+            case .unrestricted: true
+            case .query(let query): query.matches(item, me: me)
+            case .unreadable: false
+            }
+        }
     }
 
     /// A draft nobody asked me to review stays hidden; one that names me as a reviewer does not, because cloud
     /// agents request the review while the pull request is still a draft and cannot mark it ready themselves.
     private static func isDraftAwaitingMyReview(_ item: WorkItem, filter: ItemFilter, me: UserRef?) -> Bool {
         guard filter.includeDraftsRequestingMyReview, filter.relations.contains(.reviewRequestedFromMe), let me else { return false }
-        return item.requestedReviewers.contains { sameLogin($0.login, me.login) }
-    }
-
-    /// Logins differ between providers and APIs: GitHub GraphQL returns `renovate`, REST returns `renovate[bot]`.
-    private static func sameLogin(_ lhs: String, _ rhs: String) -> Bool {
-        func normalized(_ login: String) -> String {
-            var value = login.trimmingCharacters(in: .whitespaces).lowercased()
-            if value.hasSuffix("[bot]") { value.removeLast(5) }
-            return value
-        }
-        return normalized(lhs) == normalized(rhs)
+        return item.requestedReviewers.contains { LoginMatch.same($0.login, me.login) }
     }
 
     private static func relation(relationKind: Relation, item: WorkItem, me: UserRef) -> Bool {

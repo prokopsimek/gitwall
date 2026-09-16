@@ -191,6 +191,41 @@ struct FilterEngineTests {
         #expect(run(Preset(name: "Both", filter: ItemFilter(authorsAny: ["copilot-swe-agent", "jana.v"], authorsNone: ["jana.v"])), items) == [1])
     }
 
+    @Test("query: repeated qualifiers are AND, a comma list is OR")
+    func query() {
+        let items = [
+            item(1, assignees: ["prokopsimek", "lumir-sokol"]),
+            item(2, assignees: ["prokopsimek"]),
+            item(3, assignees: ["franta-dxh", "lumir-sokol"]),
+            item(4, assignees: ["tom-gilsky", "prokopsimek"]),
+        ]
+        let agents = ItemFilter(query: "assignee:prokopsimek assignee:franta-dxh,lumir-sokol,tom-gilsky")
+        #expect(run(Preset(name: "Agent queue", filter: agents), items) == [1, 4])
+    }
+
+    @Test("query combines with the other filter categories through AND")
+    func queryCombinesWithOtherFilters() {
+        let items = [
+            item(1, author: "renovate[bot]", labels: ["bug"]),
+            item(2, author: "renovate[bot]", labels: ["chore"]),
+            item(3, author: "jana.v", labels: ["bug"]),
+        ]
+        let filter = ItemFilter(labelsAny: ["bug"], query: "author:renovate")
+        #expect(run(Preset(name: "Bot bugs", filter: filter), items) == [1])
+    }
+
+    @Test("an unreadable query matches nothing rather than everything")
+    func brokenQueryMatchesNothing() {
+        let items = [item(1), item(2)]
+        #expect(run(Preset(name: "Typo", filter: ItemFilter(query: "assignees:prokopsimek")), items).isEmpty)
+    }
+
+    @Test("a blank query is no restriction")
+    func blankQuery() {
+        let items = [item(1), item(2)]
+        #expect(run(Preset(name: "Blank", filter: ItemFilter(query: "   ")), items) == [1, 2])
+    }
+
     @Test("counts per preset for the menu bar badge")
     func counts() {
         let items = [item(1, author: "me"), item(2)]
