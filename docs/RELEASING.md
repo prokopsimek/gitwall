@@ -165,10 +165,13 @@ the App Store for automatic updates.
 
 1. App Store Connect > App > the new version: attach the processed build.
 2. Fill in "What's New".
-3. Review notes: explain that Gitwall needs a GitHub or GitLab personal access token
-   (read access to a public repository is enough), that it shows a menu bar item plus a
-   main window and optional desktop widgets (right-click the desktop > Edit Widgets >
-   Gitwall), and that the Dock icon can be switched off in Settings > General.
+3. Review notes: **lead with sample data.** App Review rejected 0.4.1 under guideline 2.1(a)
+   because a reviewer without a GitHub token saw nothing, so the notes must say that the
+   walkthrough's "Look around with sample data" fills the whole app, the widgets included,
+   with no account and no token. Then explain the real path: a GitHub or GitLab personal
+   access token (read access to a public repository is enough), the menu bar item plus the
+   main window, desktop widgets (right-click the desktop > Edit Widgets > Gitwall) and that
+   the Dock icon can be switched off in Settings > General.
 4. Submit for review.
 
 ## App Store Connect metadata checklist

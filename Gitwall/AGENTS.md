@@ -28,6 +28,10 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 - `AppEnvironment.start` registers the app as a login item when `AppConfig.shouldRegisterAtLogin` says so, and
   records it in the settings. A sandboxed run (`--debug-fresh`, the test host) never touches login items,
   because `SMAppService.mainApp` would register the developer's own build.
+- Sample data (`AppEnvironment.enterSampleData`) is the user-facing "demonstration mode" App Review asked for
+  under guideline 2.1(a); `--debug-demo` stays a Debug-only screenshot mode with its own popover behaviour, so
+  the two flags are separate. Sample data is offered only while `config.accounts` is empty, and every write path
+  must check `usesSampleContent`, never `isDemo` alone, or fictional accounts reach the App Group.
 - Activation policy: the app is `regular` in Info.plist and drops to `accessory` when the user hides the
   Dock icon. Going the other way at runtime leaves a generic Dock icon, hence the order in
   `applicationWillFinishLaunching`.

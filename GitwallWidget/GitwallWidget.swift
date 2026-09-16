@@ -41,8 +41,13 @@ extension PresetEntry {
         let snapshot = try? SnapshotStore(directoryURL: container).load()
         let staleAfter = config.settings.refreshInterval * 3
 
+        // App Review could not see what a widget does without connecting an account first (guideline 2.1(a)),
+        // and neither can anyone else trying Gitwall out. Sample rows say what they are and link to the accounts
+        // tab, so the prompt to connect is still there.
         guard !config.accounts.isEmpty else {
-            return PresetEntry(date: now, preset: nil, items: [], fetchedAt: snapshot?.fetchedAt, staleAfter: staleAfter, container: container, problem: .noAccounts, attention: false, isDefaultPreset: true, presetCount: config.presets.count)
+            let preset = DemoData.presets.first
+            let items = preset.map { FilterEngine.items(matching: $0, in: DemoData.snapshot().items, accounts: DemoData.config.accounts, now: now) } ?? []
+            return PresetEntry(date: now, preset: preset, items: items, fetchedAt: now, staleAfter: staleAfter, container: container, problem: preset == nil ? .noAccounts : nil, attention: false, isDefaultPreset: true, presetCount: config.presets.count, isSample: preset != nil)
         }
         let chosen = presetID.flatMap { config.preset(id: $0) }
         let preset = chosen ?? config.presets.first

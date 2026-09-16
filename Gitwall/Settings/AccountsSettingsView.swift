@@ -15,6 +15,9 @@ struct AccountsSettingsView: View {
             if environment.needsOnboarding {
                 welcome
             }
+            if environment.isSampleData {
+                sampleDataBanner
+            }
             List {
                 ForEach(environment.config.accounts) { account in
                     AccountRow(
@@ -105,6 +108,22 @@ struct AccountsSettingsView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.4))
+    }
+
+    /// Sample data replaces the whole configuration in memory, so the way out has to be somewhere that is always
+    /// reachable; the accounts tab is where someone goes to connect for real.
+    private var sampleDataBanner: some View {
+        HStack(spacing: 12) {
+            Label("Showing sample data", systemImage: "wand.and.stars")
+                .font(.headline)
+            Text("Fictional accounts and items. Nothing is saved.")
+                .font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button("Stop") { environment.leaveSampleData() }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.tint.opacity(0.12))
     }
 }
 
