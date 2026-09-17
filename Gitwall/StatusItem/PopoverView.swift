@@ -4,6 +4,8 @@ import SwiftUI
 
 /// Compact list shown under the status item. The main window offers the same data with search.
 struct PopoverView: View {
+    static let size = CGSize(width: 400, height: 520)
+
     @Bindable var environment: AppEnvironment
 
     var body: some View {
@@ -14,7 +16,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 400, height: 520)
+        .frame(width: Self.size.width, height: Self.size.height)
     }
 
     private var header: some View {

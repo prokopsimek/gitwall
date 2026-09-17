@@ -32,6 +32,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if environment.isDemo { popover.appearance = NSAppearance(named: .aqua) }
         popover.animates = false
         popover.delegate = self
+        // The hosting controller reports no size before the first `show`, so the popover would be placed for its
+        // 320×320 default and then grow upwards over the menu bar once SwiftUI lays out the real content.
+        popover.contentSize = PopoverView.size
         popover.contentViewController = NSHostingController(rootView: PopoverView(environment: environment))
 
         environment.onShowPopover = { [weak self] in self?.showPopover() }
