@@ -56,10 +56,13 @@ final class AppEnvironment {
     @ObservationIgnored var onOpenSettings: ((SettingsTab) -> Void)?
     @ObservationIgnored var onOpenMainWindow: ((UUID?) -> Void)?
     @ObservationIgnored var onShowWidgetHelp: (() -> Void)?
+    @ObservationIgnored var onShowSampleItem: ((WorkItem) -> Void)?
     @ObservationIgnored private var refreshLoop: Task<Void, Never>?
     @ObservationIgnored private var syncEngine: SyncEngine?
     @ObservationIgnored private let avatars: AvatarDownloader?
     @ObservationIgnored private let defaults: UserDefaults
+    /// Review requests that have "arrived" through Refresh while showing sample data. See `refreshSampleData`.
+    @ObservationIgnored private var sampleArrivals = 0
 
     /// `sandbox` points the config, snapshot and tokens at a throwaway directory so a test run cannot touch
     /// the real installation's accounts (`--debug-fresh`).
@@ -142,7 +145,8 @@ final class AppEnvironment {
     /// Apple's App Review could not get into Gitwall at all, because every screen is empty until someone pastes a
     /// GitHub or GitLab token (guideline 2.1(a), rejected 2026-09-15). Their reply offers "a demonstration mode
     /// that exhibits the app's full features and functionality" as the alternative to handing over a demo
-    /// account, which is what this is.
+    /// account, which is what this is. The second rejection (2026-09-17) came from a Mac that had finished the
+    /// walkthrough with an earlier build, so every screen without an account offers it, not just the walkthrough.
     ///
     /// Only offered while no account is configured, so sample data can never stand in front of someone's real
     /// queue, and nothing here is written to the App Group or the Keychain.
@@ -153,9 +157,11 @@ final class AppEnvironment {
         refreshLoop?.cancel()
         refreshLoop = nil
         isSampleData = true
+        sampleArrivals = 0
         config = DemoData.config
         snapshot = DemoData.snapshot()
         previousSnapshot = nil
+        newItemIDs = []
         selectedPresetID = config.presets.first?.id
         WidgetCenter.shared.reloadAllTimelines()
         log.info("Sample data on: in-memory only, no App Group or Keychain access")
@@ -164,6 +170,7 @@ final class AppEnvironment {
     func leaveSampleData() {
         guard isSampleData else { return }
         isSampleData = false
+        newItemIDs = []
         config = (try? configStore?.load()) ?? .empty
         snapshot = try? snapshotStore?.load()
         previousSnapshot = try? snapshotStore?.loadPrevious()
@@ -224,7 +231,10 @@ final class AppEnvironment {
 
     func refresh() async {
         // Sample accounts have no tokens; fetching them would only write failures into the snapshot.
-        guard !isSampleData else { return }
+        guard !isSampleData else {
+            await refreshSampleData()
+            return
+        }
         guard let syncEngine else { return }
         if isRefreshing {
             refreshPending = true
@@ -273,6 +283,28 @@ final class AppEnvironment {
             lastError = error.localizedDescription
             log.error("Sync failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Refresh while showing sample data: one more review request arrives, and it goes through the same diff and
+    /// notification routing as a real sync, so someone trying Gitwall out can see a notification fire.
+    private func refreshSampleData() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        // Long enough for the spinner to register; a real sync takes a second or two.
+        try? await Task.sleep(for: .milliseconds(700))
+        isRefreshing = false
+        guard isSampleData else { return }
+        sampleArrivals = min(sampleArrivals + 1, DemoData.arrivalCount)
+        let previous = snapshot
+        let current = DemoData.snapshot(arrivals: sampleArrivals)
+        previousSnapshot = previous
+        snapshot = current
+        let changes = SnapshotDiff.changes(from: previous, to: current, accounts: config.accounts)
+        newItemIDs = Set(changes.filter { $0.event == .newItem }.map(\.item.id))
+        let routed = SnapshotDiff.notifications(
+            for: changes, presets: config.presets, accounts: config.accounts, previous: previous, now: Date()
+        )
+        await notifications.deliver(routed, capabilities: providers)
     }
 
     // MARK: Derived data
@@ -343,6 +375,9 @@ final class AppEnvironment {
     func addAccount(kind: ProviderKind, baseURL: URL, credential: StoredToken, authMethod: AuthMethod = .personalAccessToken) async throws -> Account {
         guard let provider = providers[kind] else { throw AppError.unsupportedProvider }
         let me = try await provider.verify(baseURL: baseURL, token: credential.accessToken)
+        // A real account replaces the sample data; otherwise it would only live in memory next to fictional ones
+        // while its token sat in the Keychain.
+        leaveSampleData()
         var account = Account(
             kind: kind,
             baseURL: baseURL,
@@ -391,6 +426,8 @@ final class AppEnvironment {
 
     /// Replaces the credential of an existing account, keeping its id so presets and widgets stay attached.
     func replaceCredential(for account: Account, credential: StoredToken, authMethod: AuthMethod? = nil) async throws {
+        // Sample accounts have no credentials to replace, and a token must never be stored for a fictional one.
+        guard !usesSampleContent else { throw AppError.sampleAccount }
         guard let provider = providers[account.kind] else { throw AppError.unsupportedProvider }
         let me = try await provider.verify(baseURL: account.baseURL, token: credential.accessToken)
         var updatedAccount = account
@@ -456,6 +493,9 @@ final class AppEnvironment {
     }
 
     func resetAllData() {
+        // Resetting while showing sample data resets the real, empty installation underneath and ends sample mode,
+        // which could otherwise not be entered again.
+        leaveSampleData()
         for account in config.accounts { try? tokenStore.removeToken(for: account.id) }
         try? persist(.empty, refresh: false)
         if let snapshotStore {
@@ -503,6 +543,16 @@ final class AppEnvironment {
     func open(itemID: String) {
         guard let item = snapshot?.items.first(where: { $0.id == itemID })
             ?? previousSnapshot?.items.first(where: { $0.id == itemID }) else { return }
+        open(item)
+    }
+
+    /// Opens an item on GitHub or GitLab. Sample items are made up and have no page, so they explain themselves
+    /// instead of sending someone to a 404.
+    func open(_ item: WorkItem) {
+        guard !usesSampleContent else {
+            onShowSampleItem?(item)
+            return
+        }
         NSWorkspace.shared.open(item.url)
     }
 
@@ -597,11 +647,13 @@ enum ListState: Equatable {
 enum AppError: LocalizedError {
     case unsupportedProvider
     case containerUnavailable
+    case sampleAccount
 
     var errorDescription: String? {
         switch self {
         case .unsupportedProvider: "This provider is not available yet."
         case .containerUnavailable: "The shared container is unavailable. Reinstall the app."
+        case .sampleAccount: "Sample accounts have no token. Stop showing sample data and add your own account."
         }
     }
 }

@@ -188,6 +188,12 @@ struct RepositoriesSettingsView: View {
     private func load(force: Bool = false) async {
         guard let account, let provider = environment.provider(for: account) else { return }
         if !force, !repositories.isEmpty { return }
+        // Sample accounts have no token; list what discovery would find so the tab works the same way.
+        if environment.usesSampleContent {
+            (repositories, containers) = DemoData.discovery(for: account.id)
+            loadError = nil
+            return
+        }
         isLoading = true
         loadError = nil
         defer { isLoading = false }

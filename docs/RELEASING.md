@@ -165,14 +165,29 @@ the App Store for automatic updates.
 
 1. App Store Connect > App > the new version: attach the processed build.
 2. Fill in "What's New".
-3. Review notes: **lead with sample data.** App Review rejected 0.4.1 under guideline 2.1(a)
-   because a reviewer without a GitHub token saw nothing, so the notes must say that the
-   walkthrough's "Look around with sample data" fills the whole app, the widgets included,
-   with no account and no token. Then explain the real path: a GitHub or GitLab personal
-   access token (read access to a public repository is enough), the menu bar item plus the
-   main window, desktop widgets (right-click the desktop > Edit Widgets > Gitwall) and that
-   the Dock icon can be switched off in Settings > General.
-4. Submit for review.
+3. Review notes: **lead with sample data**, and name every place it can be started from.
+   App Review rejected 0.4.1 because a reviewer without a GitHub token saw nothing, and
+   rejected 0.5.1 because sample data was only offered in the walkthrough, which their Mac
+   had already finished with an earlier build. Copy the notes from
+   [appstore-listing.md](appstore-listing.md#app-review-information) and keep the two in sync.
+4. Attachment: record the demo with `marketing/media` (see below) and upload it with
+   `Scripts/asc.py upload-review-attachment <appStoreReviewDetailId> <file>`. The notes point
+   at it, so upload it before submitting.
+5. Submit for review.
+
+### The App Review demo recording
+
+`marketing/media/project.json` holds the `app-review` capture scenario for the DX Media SDK's
+macOS driver. It drives the installed app and records the screen, so it needs a Mac that looks
+like a fresh installation:
+
+1. Quit Gitwall, then back up and empty the App Group container
+   (`~/Library/Group Containers/ZHU9NYW7PP.cz.prokopsimek.gitwall`) with `ditto`. The Keychain
+   is left alone: nothing deletes tokens while no account is configured.
+2. Turn on Do Not Disturb, hide desktop items and make sure Gitwall widgets are on the desktop.
+   They show sample data while no account is configured.
+3. Run the capture, check every frame for private data, then restore the container from the
+   backup and start Gitwall again.
 
 ## App Store Connect metadata checklist
 

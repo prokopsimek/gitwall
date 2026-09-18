@@ -63,6 +63,7 @@ final class MainMenuController: NSObject {
         let help = NSMenu(title: "Help")
         help.addItem(withTitle: "Gitwall Help", action: #selector(openWebsite), keyEquivalent: "?").target = self
         help.addItem(withTitle: "Add Widget to Desktop…", action: #selector(showWidgetHelp), keyEquivalent: "").target = self
+        help.addItem(withTitle: "Look Around with Sample Data", action: #selector(showSampleData), keyEquivalent: "").target = self
         help.addItem(.separator())
         help.addItem(withTitle: "Privacy Policy", action: #selector(openPrivacy), keyEquivalent: "").target = self
         help.addItem(withTitle: "Report an Issue", action: #selector(openIssues), keyEquivalent: "").target = self
@@ -85,12 +86,23 @@ final class MainMenuController: NSObject {
     @objc private func refresh() { Task { await environment.refresh() } }
     @objc private func openMainWindow() { environment.openMainWindow() }
     @objc private func showWidgetHelp() { environment.showWidgetHelp() }
+    @objc private func showSampleData() {
+        environment.enterSampleData()
+        environment.openMainWindow()
+    }
     @objc private func openWebsite() { open(Links.website) }
     @objc private func openPrivacy() { open(Links.privacy) }
     @objc private func openIssues() { open(Links.issues) }
 
     private func open(_ string: String) {
         if let url = URL(string: string) { NSWorkspace.shared.open(url) }
+    }
+}
+
+extension MainMenuController: NSMenuItemValidation {
+    /// Sample data is only on offer while no account is connected (`AppEnvironment.canShowSampleData`).
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        menuItem.action == #selector(showSampleData) ? environment.canShowSampleData : true
     }
 }
 

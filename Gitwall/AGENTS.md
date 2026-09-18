@@ -32,6 +32,14 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   under guideline 2.1(a); `--debug-demo` stays a Debug-only screenshot mode with its own popover behaviour, so
   the two flags are separate. Sample data is offered only while `config.accounts` is empty, and every write path
   must check `usesSampleContent`, never `isDemo` alone, or fictional accounts reach the App Group.
+- **Every screen that is empty for lack of an account offers sample data** through `SampleDataOffer`
+  (`Shared/SampleDataOffer.swift`): the walkthrough, Settings › Accounts, the Add Account sheet, the empty
+  popover and main window, and the Help menu. The second rejection (2026-09-17) came from a Mac where the
+  walkthrough had already been finished, and it was the only way in. See
+  [ADR 0010](../docs/adr/0010-sample-data-is-reachable-without-the-walkthrough.md).
+- Sample data behaves like a working installation: Refresh brings in another review request and routes
+  notifications, Settings › Repositories lists `DemoData.discovery`, and items explain themselves instead of
+  opening a fictional URL. A real account added while it is on ends it first, so nothing is left in memory only.
 - Activation policy: the app is `regular` in Info.plist and drops to `accessory` when the user hides the
   Dock icon. Going the other way at runtime leaves a generic Dock icon, hence the order in
   `applicationWillFinishLaunching`.

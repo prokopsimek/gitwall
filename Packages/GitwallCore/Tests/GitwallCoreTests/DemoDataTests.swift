@@ -51,4 +51,38 @@ struct DemoDataTests {
         #expect(DemoData.config == DemoData.config)
         #expect(DemoData.snapshot(now: now) == DemoData.snapshot(now: now))
     }
+
+    @Test("refresh arrivals are new review requests that a subscribed preset is notified about")
+    func arrivalsNotify() throws {
+        let before = DemoData.snapshot(now: now)
+        let after = DemoData.snapshot(now: now.addingTimeInterval(60), arrivals: 1)
+        #expect(after.items.count == before.items.count + 1)
+        #expect(DemoData.snapshot(now: now, arrivals: DemoData.arrivalCount + 3).items.count == before.items.count + DemoData.arrivalCount)
+
+        var presets = DemoData.presets
+        let index = try #require(presets.firstIndex { $0.name == "Waiting for my review" })
+        presets[index].notifications = [.reviewRequested]
+        let changes = SnapshotDiff.changes(from: before, to: after, accounts: DemoData.config.accounts)
+        let routed = SnapshotDiff.notifications(for: changes, presets: presets, accounts: DemoData.config.accounts, previous: before, now: now)
+        #expect(routed.count == 1)
+        #expect(routed.first?.change.event == .reviewRequested)
+    }
+
+    @Test("sample accounts have repositories to discover")
+    func discovery() {
+        for account in DemoData.config.accounts {
+            let found = DemoData.discovery(for: account.id)
+            #expect(!found.repositories.isEmpty)
+            #expect(!found.containers.isEmpty)
+        }
+        #expect(DemoData.discovery(for: UUID()).repositories.isEmpty)
+    }
+
+    @Test("widgets offer the sample presets until an account exists")
+    func widgetPresets() {
+        #expect(DemoData.widgetPresets(for: .empty) == DemoData.presets)
+        let own = Preset(name: "Mine", kinds: [.pullRequest])
+        let configured = AppConfig(accounts: [DemoData.github], presets: [own])
+        #expect(DemoData.widgetPresets(for: configured) == [own])
+    }
 }
