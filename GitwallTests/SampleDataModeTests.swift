@@ -84,4 +84,60 @@ struct SampleDataModeTests {
         environment.leaveSampleData()
         #expect(environment.canShowSampleData)
     }
+
+    /// The second rejection (2026-09-17) came from a Mac that had already finished the walkthrough with an earlier
+    /// build; the walkthrough never came back and nothing else offered sample data.
+    @Test("still offered after the walkthrough was finished")
+    func offeredAfterWalkthrough() {
+        let environment = environment()
+        var settings = environment.config.settings
+        settings.onboardingCompleted = true
+        environment.updateSettings(settings)
+        #expect(environment.config.settings.onboardingCompleted)
+        #expect(environment.canShowSampleData)
+    }
+
+    @Test("refresh brings in a new review request")
+    func refreshBringsNewItem() async {
+        let environment = environment()
+        environment.enterSampleData()
+        let before = environment.snapshot?.items.count ?? 0
+        await environment.refresh()
+        #expect(environment.snapshot?.items.count == before + 1)
+        #expect(environment.newItemIDs.count == 1)
+        #expect(environment.previousSnapshot?.items.count == before)
+        #expect(!environment.isRefreshing)
+    }
+
+    @Test("items open an explanation instead of a made-up URL")
+    func sampleItemsExplainThemselves() throws {
+        let environment = environment()
+        environment.enterSampleData()
+        var shown: WorkItem?
+        environment.onShowSampleItem = { shown = $0 }
+        let item = try #require(environment.snapshot?.items.first)
+        environment.open(item)
+        #expect(shown == item)
+    }
+
+    @Test("sample accounts refuse a new credential")
+    func noCredentialForSampleAccounts() async throws {
+        let environment = environment()
+        environment.enterSampleData()
+        let account = try #require(environment.config.accounts.first)
+        await #expect(throws: AppError.self) {
+            try await environment.replaceCredential(for: account, credential: StoredToken(accessToken: "x", obtainedAt: Date()))
+        }
+        #expect(try environment.tokenStore.token(for: account.id) == nil)
+    }
+
+    @Test("resetting all data ends sample mode so it can be entered again")
+    func resetEndsSampleData() {
+        let environment = environment()
+        environment.enterSampleData()
+        environment.resetAllData()
+        #expect(!environment.isSampleData)
+        #expect(environment.config.accounts.isEmpty)
+        #expect(environment.canShowSampleData)
+    }
 }

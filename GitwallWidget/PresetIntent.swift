@@ -23,9 +23,10 @@ struct PresetEntity: AppEntity, Identifiable {
 }
 
 struct PresetQuery: EntityQuery {
+    /// Without an account the widget shows sample data, so it offers the sample presets too.
     private func presets() -> [Preset] {
         guard let container = AppGroup.containerURL() else { return [] }
-        return (try? ConfigStore(directoryURL: container).load().presets) ?? []
+        return DemoData.widgetPresets(for: (try? ConfigStore(directoryURL: container).load()) ?? .empty)
     }
 
     func entities(for identifiers: [UUID]) async throws -> [PresetEntity] {

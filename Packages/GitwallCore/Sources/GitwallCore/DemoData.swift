@@ -1,8 +1,8 @@
 import Foundation
 
-/// Deterministic sample content for the `--debug-demo` launch mode (App Store screenshots, UI work).
-/// The app swaps its stores for this data, so nothing here is read from or written to the App Group.
-/// Names are fictional; keep real customers and colleagues out of screenshots.
+/// Deterministic sample content: the user-facing sample data mode, widgets without an account, and the
+/// `--debug-demo` launch mode (App Store screenshots, UI work). The app swaps its stores for this data, so nothing
+/// here is read from or written to the App Group. Names are fictional; keep real customers and colleagues out.
 public enum DemoData {
     public static let me = UserRef(login: "prokop", displayName: "Prokop Simek")
 
@@ -41,16 +41,54 @@ public enum DemoData {
 
     public static let config = AppConfig(accounts: [github, gitlab], presets: presets)
 
-    /// A snapshot as if both accounts had just synced at `now`.
-    public static func snapshot(now: Date = Date()) -> Snapshot {
+    /// How many review requests can arrive while someone presses Refresh in sample mode.
+    public static var arrivalCount: Int { arrivals(now: Date()).count }
+
+    /// A snapshot as if both accounts had just synced at `now`. `arrivals` adds that many new review requests on
+    /// top, so pressing Refresh with sample data shows something arriving and can fire a notification.
+    public static func snapshot(now: Date = Date(), arrivals count: Int = 0) -> Snapshot {
         Snapshot(
             fetchedAt: now,
-            items: items(now: now),
+            items: Array(arrivals(now: now).prefix(max(0, count)).reversed()) + items(now: now),
             accountStatus: [
                 github.id: FetchStatus(state: .ok, lastSuccessAt: now),
                 gitlab.id: FetchStatus(state: .ok, lastSuccessAt: now),
             ]
         )
+    }
+
+    /// What repository discovery lists for a sample account, so Settings › Repositories works without a token.
+    public static func discovery(for accountID: UUID) -> (repositories: [RepoRef], containers: [ContainerRef]) {
+        switch accountID {
+        case github.id:
+            return (
+                [
+                    RepoRef(fullName: "northwind/checkout-api", description: "Payments and order capture"),
+                    RepoRef(fullName: "northwind/storefront", description: "Web shop front end"),
+                    RepoRef(fullName: "northwind/design-system", description: "Shared UI components and tokens"),
+                    RepoRef(fullName: "northwind/infra", description: "Clusters, DNS and alerting", isPrivate: true),
+                    RepoRef(fullName: "prokop/dotfiles", description: "Shell and editor setup"),
+                ],
+                [ContainerRef(id: "northwind", name: "northwind", source: .organization(login: "northwind"))]
+            )
+        case gitlab.id:
+            return (
+                [
+                    RepoRef(fullName: "platform/gateway", description: "API gateway", isPrivate: true),
+                    RepoRef(fullName: "platform/auth-service", description: "Sign-in and sessions", isPrivate: true),
+                    RepoRef(fullName: "platform/terraform", description: "Infrastructure as code", isPrivate: true),
+                ],
+                [ContainerRef(id: "platform", name: "platform", source: .group(fullPath: "platform", includeSubgroups: true))]
+            )
+        default:
+            return ([], [])
+        }
+    }
+
+    /// Presets a widget offers and shows. Without an account a widget shows sample data, and Edit Widget offers
+    /// the sample presets, so each widget can still be set to its own view before anything is connected.
+    public static func widgetPresets(for config: AppConfig) -> [Preset] {
+        config.accounts.isEmpty ? presets : config.presets
     }
 
     // MARK: - Content
@@ -148,6 +186,27 @@ public enum DemoData {
                  review: .pending, ci: .failure, labels: [infra], requested: [me], comments: 1, add: 45, del: 2),
             issue(github, "northwind/design-system", 340, "Focus ring invisible on teal buttons", by: jana, hoursAgo: 190,
                   labels: [bug, frontend], milestone: "2.4", comments: 4),
+        ]
+    }
+
+    /// New review requests, newest last in the order they arrive.
+    private static func arrivals(now: Date) -> [WorkItem] {
+        func request(_ account: Account, _ repo: String, _ number: Int, _ title: String, by author: UserRef, labels: [Label], add: Int, del: Int) -> WorkItem {
+            let path = account.kind == .github ? "pull" : "-/merge_requests"
+            return WorkItem(
+                accountID: account.id, kind: .pullRequest, repoFullName: repo, number: number, title: title,
+                url: account.baseURL.appendingPathComponent("\(repo)/\(path)/\(number)"), author: author,
+                createdAt: now.addingTimeInterval(-120), updatedAt: now.addingTimeInterval(-60),
+                labels: labels, reviewState: .pending, ciState: .running, mergeState: .clean,
+                requestedReviewers: [me], additions: add, deletions: del
+            )
+        }
+        return [
+            request(github, "northwind/storefront", 1293, "Search: highlight matched terms in results", by: tomas, labels: [frontend], add: 76, del: 18),
+            request(gitlab, "platform/gateway", 217, "Health check for the rate limiter store", by: mara, labels: [backend], add: 42, del: 5),
+            request(github, "northwind/checkout-api", 486, "Log capture latency per payment provider", by: ondrej, labels: [backend], add: 58, del: 11),
+            request(github, "northwind/design-system", 359, "Date picker: keyboard navigation", by: jana, labels: [frontend], add: 133, del: 29),
+            request(gitlab, "platform/auth-service", 92, "Shorter session lifetime for admin roles", by: tomas, labels: [security], add: 24, del: 9),
         ]
     }
 

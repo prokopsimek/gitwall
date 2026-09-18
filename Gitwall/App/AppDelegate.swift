@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.onOpenSettings = { [weak self] tab in self?.showSettings(tab) }
         environment.onOpenMainWindow = { [weak self] presetID in self?.showMainWindow(presetID: presetID) }
         environment.onShowWidgetHelp = { [weak self] in self?.showWidgetHelp() }
+        environment.onShowSampleItem = { [weak self] item in self?.showSampleItem(item) }
         statusItem = StatusItemController(environment: environment)
         environment.start()
         applyDebugArguments()
@@ -173,6 +174,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func showWidgetHelp() {
         showMainWindow(presetID: nil)
         mainWindow?.showWidgetHelp()
+    }
+
+    /// Sample items are made up, so there is no page to open. Says so, and offers the way to real ones.
+    func showSampleItem(_ item: WorkItem) {
+        let alert = NSAlert()
+        alert.messageText = "This is a sample \(item.kind == .pullRequest ? "pull request" : "issue")"
+        alert.informativeText = "“\(item.title)” is part of the sample data and has no page to open. With a connected account, clicking an item opens it on GitHub or GitLab."
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Add Account…")
+        NSApp.activate()
+        if alert.runModal() == .alertSecondButtonReturn {
+            environment.openSettings(.accounts)
+        }
     }
 
     /// Development helper: `Gitwall --debug-reset --debug-github-token <pat> [--debug-repos owner/a,owner/b]`

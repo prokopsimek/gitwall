@@ -9,6 +9,7 @@ Environment: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH (the .p8 file, keep it outs
   Scripts/asc.py patch /v1/appInfos/<id> '{"data": {...}}'
   Scripts/asc.py delete /v1/appScreenshots/<id>
   Scripts/asc.py upload-screenshots <appStoreVersionLocalizationId> APP_DESKTOP file.png [file.png ...]
+  Scripts/asc.py upload-review-attachment <appStoreReviewDetailId> demo.mp4 [--replace]
 """
 
 import base64
@@ -78,6 +79,61 @@ def request(method: str, path: str, body=None, raw: bytes | None = None, headers
         sys.exit(f"{method} {url} -> {error.code}\n{detail}")
 
 
+def checksum(path: str) -> str:
+    digest = hashlib.md5()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def deliver(resource: str, created: dict, path: str) -> str:
+    """Runs a reservation's upload operations, commits it and waits for the asset to be accepted.
+
+    Shared by screenshots and review attachments: same three steps, same commit that occasionally does not take
+    on the first try and leaves the asset in UPLOAD_COMPLETE, which blocks submission.
+    """
+    with open(path, "rb") as handle:
+        for operation in created["attributes"]["uploadOperations"]:
+            handle.seek(operation["offset"])
+            headers = {h["name"]: h["value"] for h in operation["requestHeaders"]}
+            request(operation["method"], operation["url"], raw=handle.read(operation["length"]), headers=headers)
+    digest = checksum(path)
+    state = "UPLOAD_COMPLETE"
+    for attempt in range(40):
+        if attempt % 5 == 0:
+            request("PATCH", f"/v1/{resource}/{created['id']}", {"data": {
+                "type": resource, "id": created["id"],
+                "attributes": {"uploaded": True, "sourceFileChecksum": digest},
+            }})
+        time.sleep(3)
+        state = request("GET", f"/v1/{resource}/{created['id']}")["data"]["attributes"]["assetDeliveryState"]["state"]
+        if state == "COMPLETE":
+            return state
+        if state == "FAILED":
+            sys.exit(f"{path}: asset delivery failed")
+    sys.exit(f"{path}: still {state} after waiting; commit it again with PATCH uploaded=true")
+
+
+def upload_review_attachment(detail_id: str, path: str, replace: bool = False):
+    """The demo recording App Review asks for under guideline 2.1(a), on App Review Information."""
+    existing = request("GET", f"/v1/appStoreReviewDetails/{detail_id}/appStoreReviewAttachments")["data"]
+    for attachment in existing:
+        name = attachment["attributes"].get("fileName")
+        if replace:
+            request("DELETE", f"/v1/appStoreReviewAttachments/{attachment['id']}")
+            print(f"removed\t{name}\t{attachment['id']}")
+        else:
+            print(f"kept\t{name}\t{attachment['id']}\t(pass --replace to remove)")
+    created = request("POST", "/v1/appStoreReviewAttachments", {"data": {
+        "type": "appStoreReviewAttachments",
+        "attributes": {"fileName": os.path.basename(path), "fileSize": os.path.getsize(path)},
+        "relationships": {"appStoreReviewDetail": {"data": {"type": "appStoreReviewDetails", "id": detail_id}}},
+    }})["data"]
+    state = deliver("appStoreReviewAttachments", created, path)
+    print(f"{os.path.basename(path)}\t{created['id']}\t{state}")
+
+
 def upload_screenshots(localization_id: str, display_type: str, files: list[str]):
     sets = request("GET", f"/v1/appStoreVersionLocalizations/{localization_id}/appScreenshotSets")["data"]
     existing = next((s for s in sets if s["attributes"]["screenshotDisplayType"] == display_type), None)
@@ -89,34 +145,12 @@ def upload_screenshots(localization_id: str, display_type: str, files: list[str]
         }})["data"]
     set_id = existing["id"]
     for path in files:
-        blob = open(path, "rb").read()
         created = request("POST", "/v1/appScreenshots", {"data": {
             "type": "appScreenshots",
-            "attributes": {"fileName": os.path.basename(path), "fileSize": len(blob)},
+            "attributes": {"fileName": os.path.basename(path), "fileSize": os.path.getsize(path)},
             "relationships": {"appScreenshotSet": {"data": {"type": "appScreenshotSets", "id": set_id}}},
         }})["data"]
-        for operation in created["attributes"]["uploadOperations"]:
-            chunk = blob[operation["offset"]:operation["offset"] + operation["length"]]
-            headers = {h["name"]: h["value"] for h in operation["requestHeaders"]}
-            request(operation["method"], operation["url"], raw=chunk, headers=headers)
-        # The commit occasionally does not take on the first try and the asset stays in UPLOAD_COMPLETE,
-        # which blocks submission; repeat it until App Store Connect reports the asset as processing or done.
-        checksum = hashlib.md5(blob).hexdigest()
-        state = "UPLOAD_COMPLETE"
-        for attempt in range(40):
-            if attempt % 5 == 0:
-                request("PATCH", f"/v1/appScreenshots/{created['id']}", {"data": {
-                    "type": "appScreenshots", "id": created["id"],
-                    "attributes": {"uploaded": True, "sourceFileChecksum": checksum},
-                }})
-            time.sleep(3)
-            state = request("GET", f"/v1/appScreenshots/{created['id']}")["data"]["attributes"]["assetDeliveryState"]["state"]
-            if state == "COMPLETE":
-                break
-            if state == "FAILED":
-                sys.exit(f"{path}: asset delivery failed")
-        if state != "COMPLETE":
-            sys.exit(f"{path}: still {state} after waiting; commit it again with PATCH uploaded=true")
+        state = deliver("appScreenshots", created, path)
         print(f"{os.path.basename(path)}\t{created['id']}\t{state}")
     print(f"set\t{set_id}")
 
@@ -133,6 +167,8 @@ def main(argv: list[str]):
         print(json.dumps(request(command.upper(), argv[2], json.loads(argv[3])), indent=2))
     elif command == "upload-screenshots":
         upload_screenshots(argv[2], argv[3], argv[4:])
+    elif command == "upload-review-attachment":
+        upload_review_attachment(argv[2], argv[3], "--replace" in argv[4:])
     else:
         sys.exit(__doc__)
 

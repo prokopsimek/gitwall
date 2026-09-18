@@ -165,13 +165,7 @@ struct OnboardingView: View {
                 }
                 .controlSize(.large)
                 .buttonStyle(.borderedProminent)
-                if environment.canShowSampleData {
-                    Button("Look around with sample data") { environment.enterSampleData() }
-                        .buttonStyle(.link)
-                    Text("Fictional pull requests and issues, so you can see what Gitwall does before connecting anything. Nothing is saved and no account is needed.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                SampleDataOffer(environment: environment)
             } else if environment.isSampleData {
                 Label("Showing sample data", systemImage: "wand.and.stars")
                     .font(.headline)

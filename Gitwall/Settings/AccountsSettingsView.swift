@@ -25,6 +25,7 @@ struct AccountsSettingsView: View {
                         status: environment.snapshot?.accountStatus[account.id],
                         expiresAt: environment.expiry(for: account),
                         usesOAuth: environment.usesOAuth(account),
+                        isSample: environment.usesSampleContent,
                         onRepositories: {
                             state.focusedAccountID = account.id
                             state.tab = .repositories
@@ -104,6 +105,8 @@ struct AccountsSettingsView: View {
             Text("Connect a GitHub or GitLab account, pick the repositories you care about, and add the Gitwall widget to your desktop. Pull requests and issues will show up sorted by latest activity.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            SampleDataOffer(environment: environment, style: .button)
+                .padding(.top, 6)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -132,6 +135,7 @@ private struct AccountRow: View {
     let status: FetchStatus?
     let expiresAt: Date?
     let usesOAuth: Bool
+    let isSample: Bool
     let onRepositories: () -> Void
     let onReauth: () -> Void
     let onAddPresets: () -> Void
@@ -146,7 +150,7 @@ private struct AccountRow: View {
                 Text(account.displayName).font(.headline)
                 HStack(spacing: 6) {
                     Text(account.baseURL.host ?? account.baseURL.absoluteString)
-                    Text(usesOAuth ? "signed in" : "personal access token")
+                    Text(isSample ? "sample" : usesOAuth ? "signed in" : "personal access token")
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(.quaternary, in: Capsule())
@@ -174,6 +178,7 @@ private struct AccountRow: View {
             Button("Repositories…", action: onRepositories)
             Menu {
                 Button(usesOAuth ? "Sign in again…" : "Replace Token…", action: onReauth)
+                    .disabled(isSample)
                 Button("Add Default Presets", action: onAddPresets)
                     .help("Assigned pull requests, assigned issues and reviews waiting for you, for this account. Presets you already have are not duplicated.")
                 Divider()
@@ -276,6 +281,7 @@ struct AddAccountSheet: View {
             }
 
             HStack {
+                SampleDataOffer(environment: environment, explains: false) { dismiss() }
                 Spacer()
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)

@@ -30,7 +30,7 @@ struct ItemRowButton: View {
 
     var body: some View {
         Button {
-            NSWorkspace.shared.open(item.url)
+            environment.open(item)
         } label: {
             WorkItemRow(
                 item: item,
@@ -46,7 +46,7 @@ struct ItemRowButton: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .contextMenu {
-            Button("Open in Browser") { NSWorkspace.shared.open(item.url) }
+            Button("Open in Browser") { environment.open(item) }
             Button("Copy Link") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(item.url.absoluteString, forType: .string)
@@ -75,12 +75,15 @@ struct EmptyStateView: View {
     let symbol: String
     let message: String
     var action: (String, () -> Void)?
+    /// Offered under the action while no account exists (`EmptyStateKind.noAccounts`).
+    var sampleData: AppEnvironment?
 
-    init(title: String, symbol: String, message: String, action: (String, () -> Void)? = nil) {
+    init(title: String, symbol: String, message: String, action: (String, () -> Void)? = nil, sampleData: AppEnvironment? = nil) {
         self.title = title
         self.symbol = symbol
         self.message = message
         self.action = action
+        self.sampleData = sampleData
     }
 
     init(kind: EmptyStateKind, environment: AppEnvironment) {
@@ -89,9 +92,10 @@ struct EmptyStateView: View {
             self.init(title: "Shared container unavailable", symbol: "exclamationmark.triangle",
                       message: "Gitwall cannot store data. Reinstalling the app usually fixes this.")
         case .noAccounts:
-            self.init(title: "Connect GitHub to get started", symbol: "person.crop.circle.badge.plus",
-                      message: "Add an account with a personal access token, choose repositories, and your pull requests and issues appear here and in desktop widgets.",
-                      action: ("Add Account…", { environment.openSettings(.accounts) }))
+            self.init(title: "Connect GitHub or GitLab to get started", symbol: "person.crop.circle.badge.plus",
+                      message: "Sign in or add a personal access token, choose repositories, and your pull requests and issues appear here and in desktop widgets.",
+                      action: ("Add Account…", { environment.openSettings(.accounts) }),
+                      sampleData: environment)
         case .noPresets:
             self.init(title: "No presets", symbol: "slider.horizontal.3",
                       message: "A preset decides which items are shown. Create one in Settings.",
@@ -117,6 +121,11 @@ struct EmptyStateView: View {
                 .frame(maxWidth: 420)
             if let action {
                 Button(action.0, action: action.1).padding(.top, 4)
+            }
+            if let sampleData {
+                SampleDataOffer(environment: sampleData, alignment: .center)
+                    .frame(maxWidth: 420)
+                    .padding(.top, 2)
             }
             Spacer()
         }

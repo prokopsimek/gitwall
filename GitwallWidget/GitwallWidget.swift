@@ -45,7 +45,8 @@ extension PresetEntry {
         // and neither can anyone else trying Gitwall out. Sample rows say what they are and link to the accounts
         // tab, so the prompt to connect is still there.
         guard !config.accounts.isEmpty else {
-            let preset = DemoData.presets.first
+            // Edit Widget offers the sample presets here (`PresetQuery`), so honour the one picked.
+            let preset = presetID.flatMap { id in DemoData.presets.first { $0.id == id } } ?? DemoData.presets.first
             let items = preset.map { FilterEngine.items(matching: $0, in: DemoData.snapshot().items, accounts: DemoData.config.accounts, now: now) } ?? []
             return PresetEntry(date: now, preset: preset, items: items, fetchedAt: now, staleAfter: staleAfter, container: container, problem: preset == nil ? .noAccounts : nil, attention: false, isDefaultPreset: true, presetCount: config.presets.count, isSample: preset != nil)
         }
