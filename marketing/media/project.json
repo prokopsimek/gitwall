@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 2,
+  "id": "gitwall",
+  "sdkVersion": "0.2.0",
+  "sourcePaths": [
+    "Gitwall",
+    "GitwallWidget",
+    "Packages"
+  ],
+  "captures": {
+    "app-review": {
+      "driver": "macos",
+      "bundleId": "cz.prokopsimek.gitwall",
+      "hideOthers": true,
+      "region": {
+        "x": 560,
+        "y": 0,
+        "width": 1240,
+        "height": 1150
+      },
+      "steps": [
+        {
+          "action": "launch",
+          "caption": "Gitwall 0.5.2 — pull requests and issues from GitHub and GitLab"
+        },
+        {
+          "action": "waitFor",
+          "selector": "statusItem:gitwall-status-item",
+          "seconds": 25
+        },
+        {
+          "action": "hold",
+          "seconds": 2
+        },
+        {
+          "action": "click",
+          "selector": "statusItem:gitwall-status-item",
+          "caption": "The menu bar icon shows what is waiting for review"
+        },
+        {
+          "action": "hold",
+          "seconds": 6
+        },
+        {
+          "action": "click",
+          "selector": "id:preset-picker",
+          "caption": "Views are saved mixes of accounts, repositories and filters"
+        },
+        {
+          "action": "hold",
+          "seconds": 4
+        },
+        {
+          "action": "press",
+          "value": "down"
+        },
+        {
+          "action": "press",
+          "value": "return"
+        },
+        {
+          "action": "hold",
+          "seconds": 5
+        },
+        {
+          "action": "click",
+          "selector": "title:Window",
+          "caption": "The main window lists every view, with search"
+        },
+        {
+          "action": "hold",
+          "seconds": 2
+        },
+        {
+          "action": "hold",
+          "seconds": 5
+        },
+        {
+          "action": "fill",
+          "selector": "id:main-search",
+          "value": "gateway"
+        },
+        {
+          "action": "hold",
+          "seconds": 4
+        },
+        {
+          "action": "fill",
+          "selector": "id:main-search",
+          "value": ""
+        },
+        {
+          "action": "hold",
+          "seconds": 2
+        },
+        {
+          "action": "press",
+          "value": "cmd+,",
+          "caption": "Settings › Presets: filters and sorting per view"
+        },
+        {
+          "action": "hold",
+          "seconds": 3
+        },
+        {
+          "action": "click",
+          "selector": "title:Presets"
+        },
+        {
+          "action": "hold",
+          "seconds": 7
+        },
+        {
+          "action": "click",
+          "selector": "title:Query",
+          "caption": "Queries use GitHub search syntax, with AND, OR and parentheses"
+        },
+        {
+          "action": "hold",
+          "seconds": 6
+        },
+        {
+          "action": "click",
+          "selector": "title:Repositories",
+          "caption": "Repositories and organisations each account watches"
+        },
+        {
+          "action": "hold",
+          "seconds": 6
+        },
+        {
+          "action": "click",
+          "selector": "title:General",
+          "caption": "Refresh interval, Dock icon and launch at login"
+        },
+        {
+          "action": "hold",
+          "seconds": 6
+        },
+        {
+          "action": "click",
+          "selector": "title:Accounts",
+          "caption": "Accounts: sign in with GitHub or GitLab, or paste a personal access token"
+        },
+        {
+          "action": "hold",
+          "seconds": 5
+        },
+        {
+          "action": "click",
+          "selector": "id:add-account"
+        },
+        {
+          "action": "hold",
+          "seconds": 5
+        },
+        {
+          "action": "click",
+          "selector": "title:Use a personal access token instead"
+        },
+        {
+          "action": "hold",
+          "seconds": 5
+        },
+        {
+          "action": "click",
+          "selector": "title:Cancel",
+          "caption": "With no account connected, this screen offers “Look Around with Sample Data”: the demonstration mode for App Review"
+        },
+        {
+          "action": "hold",
+          "seconds": 7
+        },
+        {
+          "action": "click",
+          "selector": "id:main-search",
+          "caption": "Refresh fetches the latest activity"
+        },
+        {
+          "action": "press",
+          "value": "escape"
+        },
+        {
+          "action": "hold",
+          "seconds": 2
+        },
+        {
+          "action": "press",
+          "value": "cmd+r"
+        },
+        {
+          "action": "hold",
+          "seconds": 8
+        },
+        {
+          "action": "press",
+          "value": "cmd+q",
+          "caption": "Widgets keep showing the latest items even when Gitwall is not open"
+        },
+        {
+          "action": "hold",
+          "seconds": 8
+        },
+        {
+          "action": "rightClick",
+          "text": "Waiting for my review",
+          "caption": "Every widget can be set to a different view"
+        },
+        {
+          "action": "hold",
+          "seconds": 3
+        },
+        {
+          "action": "click",
+          "text": "Gitwall Board"
+        },
+        {
+          "action": "hold",
+          "seconds": 7
+        },
+        {
+          "action": "press",
+          "value": "escape",
+          "caption": ""
+        },
+        {
+          "action": "hold",
+          "seconds": 3
+        }
+      ]
+    }
+  }
+}
