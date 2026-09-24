@@ -45,7 +45,7 @@ make install         # Release build into ~/Applications (daily driver); overrid
 make test-packages   # swift test for every package
 make test            # packages + xcodebuild test
 make archive         # Release archive for the App Store / notarization
-make release         # archive, notarize, staple, zip, GitHub Release (see docs/RELEASING.md)
+make release         # Developer ID archive, notarize, staple, zip; prints the `gh release create` command (see docs/RELEASING.md)
 ```
 
 Debug launch arguments (see `Gitwall/AGENTS.md`): `--debug-fresh`, `--debug-reset`, `--debug-github-token`,
@@ -58,3 +58,10 @@ Unified log: `/usr/bin/log stream --predicate 'subsystem == "cz.prokopsimek.gitw
 
 Talk to Prokop in Czech. Code, identifiers, comments and commit messages in English.
 Commits follow Conventional Commits.
+
+## Ship recipe
+- Integrace: branch + PR, squash merge for code; `chore(release): version X, build N` bump commits go straight to `main`
+- Release: manual from Prokop's Mac with the App Store Connect API key and the Developer ID certificate, following `docs/RELEASING.md`: bump `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` in `project.yml` → `chore(release)` commit → `make test` → `make archive` and the App Store export/upload → `make release` (notarized zip) → `gh release create vX.Y.Z` with the zip and `.sha256` → App Store submission; TODO(Prokop): who may submit a stable release
+- Deploy: none (no server); `docs/` is the GitHub Pages site (legacy build from `main:/docs`), rebuilt on every push → https://prokopsimek.github.io/gitwall/
+- Ověření: `gh release view vX.Y.Z --repo prokopsimek/gitwall` lists the zip and `.sha256`; `spctl -a -vv -t exec Gitwall.app` reports "Notarized Developer ID"; version and build = `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION`; App Store state via `Scripts/asc.py`; smoke: `make test`, then `make run` and check the popover, one widget per size and a `gitwall://` link; migrations: none
+- Board: none (no GitHub Project; status and milestones live in `docs/PLAN.md`)
