@@ -160,6 +160,26 @@ private struct PresetEditor: View {
                         ScopeRow(account: account, scope: scopeBinding(for: account))
                     }
                 }
+                // Such an account syncs fine and brings nothing, so "0 items match now" would have no explanation.
+                // One row for all of them: a second `ForEach` over accounts next to the one above gives the form
+                // two rows with the same identity, and it draws the account's toggle twice instead of the hint.
+                let idle = environment.config.idleAccounts(visibleTo: preset)
+                if !idle.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(idle) { account in
+                            HStack(alignment: .firstTextBaseline) {
+                                Label("\(account.displayName) watches no repositories yet, so it adds no items.", systemImage: "exclamationmark.triangle")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Spacer()
+                                Button("Choose Repositories…") { environment.openSettings(.repositories, accountID: account.id) }
+                                    .controlSize(.small)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("preset-idle-account")
+                }
             }
 
             Section("Relation to me") {

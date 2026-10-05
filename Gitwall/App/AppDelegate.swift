@@ -43,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        environment.onOpenSettings = { [weak self] tab in self?.showSettings(tab) }
+        environment.onOpenSettings = { [weak self] tab, accountID in self?.showSettings(tab, accountID: accountID) }
         environment.onOpenMainWindow = { [weak self] presetID in self?.showMainWindow(presetID: presetID) }
         environment.onShowWidgetHelp = { [weak self] in self?.showWidgetHelp() }
         environment.onShowSampleItem = { [weak self] item in self?.showSampleItem(item) }
@@ -94,8 +94,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Opens every window the screenshot script captures, at a fixed size so shots are reproducible.
     /// `--debug-demo-preset <index>` picks the preset shown in the main window and popover.
+    /// `--debug-demo-idle-account <index>` first turns that sample account into one that watches nothing; its three
+    /// presets land at the end of the list.
     private func presentDemoWindows() {
         let args = CommandLine.arguments
+        #if DEBUG
+        if let index = args.firstIndex(of: "--debug-demo-idle-account"), args.indices.contains(index + 1),
+           let position = Int(args[index + 1]) {
+            environment.makeDemoAccountIdle(at: position)
+        }
+        #endif
         if let index = args.firstIndex(of: "--debug-demo-preset"), args.indices.contains(index + 1),
            let position = Int(args[index + 1]), environment.config.presets.indices.contains(position) {
             environment.selectedPresetID = environment.config.presets[position].id
@@ -164,11 +172,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onboardingWindow?.show()
     }
 
-    func showSettings(_ tab: SettingsTab) {
+    func showSettings(_ tab: SettingsTab, accountID: UUID? = nil) {
         if settingsWindow == nil {
             settingsWindow = SettingsWindowController(environment: environment)
         }
-        settingsWindow?.show(tab: tab)
+        settingsWindow?.show(tab: tab, accountID: accountID)
     }
 
     func showWidgetHelp() {

@@ -1,5 +1,15 @@
 import Foundation
 
+/// Why a preset that shows no items shows none.
+public enum PresetEmptiness: Equatable, Sendable {
+    /// None of the accounts the preset looks at watches anything, so nothing was fetched for it. Carries the
+    /// first of them, the one to send the user to.
+    case nothingWatched(Account)
+    /// Items are fetched and none pass the preset. `idle` is an account of the preset that watches nothing, when
+    /// there is one: its items would be missing whatever the filter says.
+    case nothingMatches(idle: Account?)
+}
+
 /// How accounts and their default presets enter and leave a configuration. Pure functions, so the rules are tested
 /// here instead of living in the app target.
 extension AppConfig {
@@ -56,7 +66,53 @@ extension AppConfig {
         return updated
     }
 
+    // MARK: - Recognising an account
+
+    /// The one account a freshly verified credential already belongs to: same provider, same server, same login,
+    /// however that account signs in. Watched repositories, presets and widgets hang on the account record, so a
+    /// second sign-in by the same person should replace the credential of that record instead of starting an
+    /// empty twin. Several accounts under one login are deliberate (one fine-grained token per organization), and
+    /// then there is no single account to offer (see `docs/adr/0011`).
+    public func replaceableAccount(kind: ProviderKind, baseURL: URL, login: String) -> Account? {
+        let server = Self.server(baseURL)
+        let matches = accounts.filter { account in
+            account.kind == kind
+                && Self.server(account.baseURL) == server
+                && account.me?.login.caseInsensitiveCompare(login) == .orderedSame
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    // MARK: - Accounts that fetch nothing
+
+    /// The accounts a preset looks at that watch no repository, organization or group. Such an account fetches
+    /// nothing and still syncs successfully, so the app has to name it instead of showing an empty list.
+    public func idleAccounts(visibleTo preset: Preset) -> [Account] {
+        accounts(visibleTo: preset).filter(\.sources.isEmpty)
+    }
+
+    /// Why a preset that shows no items shows none.
+    public func emptiness(of preset: Preset) -> PresetEmptiness {
+        let visible = accounts(visibleTo: preset)
+        let idle = visible.filter(\.sources.isEmpty)
+        if let first = idle.first, idle.count == visible.count { return .nothingWatched(first) }
+        return .nothingMatches(idle: idle.first)
+    }
+
     // MARK: - Private
+
+    private func accounts(visibleTo preset: Preset) -> [Account] {
+        guard !preset.scopes.isEmpty else { return accounts }
+        return accounts.filter { account in preset.scopes.contains { $0.accountID == account.id } }
+    }
+
+    /// Host, port and path of a base URL, without the scheme, the case of the host or a trailing slash.
+    private static func server(_ url: URL) -> String {
+        let host = url.host?.lowercased() ?? ""
+        let port = url.port.map { ":\($0)" } ?? ""
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return "\(host)\(port)/\(path)"
+    }
 
     private func defaultPresets(for account: Account, pullRequestTerm: String) -> [Preset] {
         let countTaken = presets.contains(where: \.showCountInMenuBar)

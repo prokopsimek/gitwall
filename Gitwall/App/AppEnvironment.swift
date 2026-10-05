@@ -53,7 +53,8 @@ final class AppEnvironment {
     let notifications = NotificationDispatcher()
 
     @ObservationIgnored var onShowPopover: (() -> Void)?
-    @ObservationIgnored var onOpenSettings: ((SettingsTab) -> Void)?
+    /// The account is the one to preselect in the Repositories tab, when the caller has one in mind.
+    @ObservationIgnored var onOpenSettings: ((SettingsTab, UUID?) -> Void)?
     @ObservationIgnored var onOpenMainWindow: ((UUID?) -> Void)?
     @ObservationIgnored var onShowWidgetHelp: (() -> Void)?
     @ObservationIgnored var onShowSampleItem: ((WorkItem) -> Void)?
@@ -65,11 +66,18 @@ final class AppEnvironment {
     @ObservationIgnored private var sampleArrivals = 0
 
     /// `sandbox` points the config, snapshot and tokens at a throwaway directory so a test run cannot touch
-    /// the real installation's accounts (`--debug-fresh`).
-    init(defaults: UserDefaults = .standard, tokenStore: (any TokenStore)? = nil, demo: Bool = false, sandbox: URL? = nil) {
+    /// the real installation's accounts (`--debug-fresh`). `providers` lets a test put a stub transport under a
+    /// real provider; everything else gets the two that talk to the network.
+    init(
+        defaults: UserDefaults = .standard,
+        tokenStore: (any TokenStore)? = nil,
+        demo: Bool = false,
+        sandbox: URL? = nil,
+        providers: [ProviderKind: any GitProvider]? = nil
+    ) {
         self.defaults = defaults
         self.tokenStore = tokenStore ?? (sandbox == nil ? KeychainTokenStore() : InMemoryTokenStore())
-        self.providers = [.github: GitHubProvider(), .gitlab: GitLabProvider()]
+        self.providers = providers ?? [.github: GitHubProvider(), .gitlab: GitLabProvider()]
         isDemo = demo
         isSandbox = sandbox != nil
         container = demo ? nil : (sandbox ?? AppGroup.containerURL())
@@ -93,6 +101,26 @@ final class AppEnvironment {
     }
 
     var containerAvailable: Bool { container != nil || isDemo }
+
+    #if DEBUG
+    /// `--debug-demo-idle-account <index>`: the sample account at `index` as it is right after being removed and
+    /// added again — nothing watched, nothing fetched, only its own three presets. Shows what an account without
+    /// repositories looks like on every screen without touching a real one.
+    func makeDemoAccountIdle(at index: Int) {
+        guard isDemo, config.accounts.indices.contains(index),
+              let provider = providers[config.accounts[index].kind] else { return }
+        var account = config.accounts[index]
+        account.sources = []
+        config = config.removing(accountID: account.id).adding(account, pullRequestTerm: provider.capabilities.pullRequestTerm)
+        if let snapshot {
+            self.snapshot = Snapshot(
+                fetchedAt: snapshot.fetchedAt,
+                items: snapshot.items.filter { $0.accountID != account.id },
+                accountStatus: snapshot.accountStatus
+            )
+        }
+    }
+    #endif
 
     // MARK: Lifecycle
 
@@ -424,7 +452,19 @@ final class AppEnvironment {
         try? persist(updated, refresh: false)
     }
 
-    /// Replaces the credential of an existing account, keeping its id so presets and widgets stay attached.
+    /// The account a credential that is about to be added already belongs to, if there is exactly one. Add
+    /// Account asks before it makes a second record for the same person, because repositories, presets and
+    /// widgets stay with the first one; ``replaceCredential(for:credential:authMethod:)`` is the other answer.
+    func connectedAccount(kind: ProviderKind, baseURL: URL, credential: StoredToken) async throws -> Account? {
+        // Sample accounts are fictional and have no credential to replace.
+        guard !usesSampleContent else { return nil }
+        guard let provider = providers[kind] else { throw AppError.unsupportedProvider }
+        let me = try await provider.verify(baseURL: baseURL, token: credential.accessToken)
+        return config.replaceableAccount(kind: kind, baseURL: baseURL, login: me.login)
+    }
+
+    /// Replaces the credential of an existing account, keeping its id so its repositories, presets and widgets
+    /// stay attached. Also how an account moves between a token and signing in.
     func replaceCredential(for account: Account, credential: StoredToken, authMethod: AuthMethod? = nil) async throws {
         // Sample accounts have no credentials to replace, and a token must never be stored for a fictional one.
         guard !usesSampleContent else { throw AppError.sampleAccount }
@@ -576,12 +616,16 @@ final class AppEnvironment {
         let items = items(for: preset)
         if !items.isEmpty { return .items(items) }
         if snapshot == nil || isRefreshing { return .empty(.loading) }
-        if config.accounts.allSatisfy(\.sources.isEmpty) { return .empty(.noRepositories) }
-        return .empty(.nothingMatches(presetName: preset.name))
+        // An account that watches nothing fetches nothing and still syncs fine, so say which one it is.
+        switch config.emptiness(of: preset) {
+        case .nothingWatched(let account): return .empty(.noRepositories(account: account))
+        case .nothingMatches(let idle): return .empty(.nothingMatches(presetName: preset.name, idle: idle))
+        }
     }
 
-    func openSettings(_ tab: SettingsTab = .accounts) {
-        onOpenSettings?(tab)
+    /// `accountID` preselects that account in the Repositories tab.
+    func openSettings(_ tab: SettingsTab = .accounts, accountID: UUID? = nil) {
+        onOpenSettings?(tab, accountID)
     }
 
     func avatar(for url: URL?) -> NSImage? {
