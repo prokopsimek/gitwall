@@ -134,6 +134,11 @@ server has no application for Gitwall, or when you want a credential that can on
 Settings › Accounts › + › *Use a personal access token instead*. Gitwall keeps it in the macOS Keychain and warns
 you a week before it expires.
 
+To move an account from a token to signing in, or back, use its menu in Settings › Accounts
+(*Sign in with GitHub…*, *Use a Token Instead…*). The account keeps its repositories, presets and widgets. Removing
+the account and adding it again does not: repositories and presets belong to the account, so a new one starts
+empty. Add Account notices when you are already connected and offers to replace the sign-in instead.
+
 | | Fine-grained token | Classic (GitHub) or legacy (GitLab) token |
 |---|---|---|
 | **GitHub** | Read-only. One token covers one owner: your account or one organization. | Scopes `repo` and `read:org`. One token covers all your organizations, but `repo` also allows writing. |

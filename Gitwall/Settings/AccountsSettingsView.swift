@@ -25,12 +25,14 @@ struct AccountsSettingsView: View {
                         status: environment.snapshot?.accountStatus[account.id],
                         expiresAt: environment.expiry(for: account),
                         usesOAuth: environment.usesOAuth(account),
+                        canSignIn: OAuthCoordinator.canSignIn(kind: account.kind, baseURL: account.baseURL),
                         isSample: environment.usesSampleContent,
                         onRepositories: {
                             state.focusedAccountID = account.id
                             state.tab = .repositories
                         },
-                        onReauth: { reauth(account) },
+                        onSignIn: { signIn(account) },
+                        onUseToken: { reauthAccount = account },
                         onAddPresets: { environment.addDefaultPresets(for: account) },
                         onRemove: { environment.removeAccount(account) }
                     )
@@ -74,15 +76,13 @@ struct AccountsSettingsView: View {
         }
     }
 
-    /// OAuth accounts are repaired by signing in again; token accounts need a new token pasted in.
-    private func reauth(_ account: Account) {
-        guard environment.usesOAuth(account) else {
-            reauthAccount = account
-            return
-        }
+    /// Signs in through the provider and stores the result on `account`, which keeps its repositories, presets and
+    /// widgets. Repairs a signed-in account, and moves one that used a token over to signing in.
+    private func signIn(_ account: Account) {
         signInError = nil
         Task {
             do {
+                // An account that used a token has no client of its own; the built-in one for its host is used.
                 let clientID: String? = if case .oauth(let id) = account.authMethod { id } else { nil }
                 let result: OAuthCoordinator.Result = switch account.kind {
                 case .github: try await coordinator.signInWithGitHub(baseURL: account.baseURL, clientID: clientID)
@@ -135,9 +135,12 @@ private struct AccountRow: View {
     let status: FetchStatus?
     let expiresAt: Date?
     let usesOAuth: Bool
+    /// Whether Gitwall can sign in to this account's host without the user registering an application first.
+    let canSignIn: Bool
     let isSample: Bool
     let onRepositories: () -> Void
-    let onReauth: () -> Void
+    let onSignIn: () -> Void
+    let onUseToken: () -> Void
     let onAddPresets: () -> Void
     let onRemove: () -> Void
 
@@ -157,9 +160,17 @@ private struct AccountRow: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                Text(sourcesDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if watchesNothing {
+                    // The sync of such an account succeeds with nothing in it, so nothing else would say why.
+                    Label("No repositories selected, so nothing is fetched", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier("account-no-repositories")
+                } else {
+                    Text(sourcesDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if let status, status.state != .ok {
                     Label(status.message ?? status.state.rawValue, systemImage: "exclamationmark.triangle")
                         .font(.caption)
@@ -175,10 +186,23 @@ private struct AccountRow: View {
                 Button(usesOAuth ? "Sign in again" : "Replace Token…", action: onReauth)
                     .buttonStyle(.borderedProminent)
             }
-            Button("Repositories…", action: onRepositories)
+            if watchesNothing, !needsAttention {
+                Button("Choose Repositories…", action: onRepositories)
+                    .buttonStyle(.borderedProminent)
+            } else {
+                Button("Repositories…", action: onRepositories)
+            }
             Menu {
                 Button(usesOAuth ? "Sign in again…" : "Replace Token…", action: onReauth)
                     .disabled(isSample)
+                // The other way to sign in, on the same account: repositories, presets and widgets stay.
+                if usesOAuth {
+                    Button("Use a Token Instead…", action: onUseToken)
+                        .disabled(isSample)
+                } else if canSignIn {
+                    Button("Sign in with \(account.kind == .github ? "GitHub" : "GitLab")…", action: onSignIn)
+                        .disabled(isSample)
+                }
                 Button("Add Default Presets", action: onAddPresets)
                     .help("Assigned pull requests, assigned issues and reviews waiting for you, for this account. Presets you already have are not duplicated.")
                 Divider()
@@ -195,6 +219,11 @@ private struct AccountRow: View {
     private var needsAttention: Bool {
         status?.state == .needsReauth || expiringSoon
     }
+
+    /// Repairing an account uses the way it signs in now.
+    private var onReauth: () -> Void { usesOAuth ? onSignIn : onUseToken }
+
+    private var watchesNothing: Bool { account.sources.isEmpty }
 
     private var expiringSoon: Bool {
         guard let expiresAt else { return false }
@@ -233,11 +262,31 @@ struct AddAccountSheet: View {
     @State private var isWorking = false
     @State private var error: String?
     @State private var coordinator = OAuthCoordinator()
+    @State private var pending: PendingCredential?
+
+    /// A verified credential whose owner is already connected. Nothing is stored until the user says whether it
+    /// replaces that account's sign-in or becomes an account of its own.
+    private struct PendingCredential {
+        let existing: Account
+        let kind: ProviderKind
+        let baseURL: URL
+        let credential: StoredToken
+        let authMethod: AuthMethod
+    }
 
     var body: some View {
-        // DeviceCodeView brings its own padding and width; the form gets them here.
+        // DeviceCodeView and AlreadyConnectedView bring their own padding and width; the form gets them here.
         if let code = coordinator.deviceCode {
             deviceCodeStep(code)
+        } else if let pending {
+            AlreadyConnectedView(
+                account: pending.existing,
+                error: error,
+                isWorking: isWorking,
+                replace: { Task { await resolve(pending, replacing: true) } },
+                addSeparately: { Task { await resolve(pending, replacing: false) } },
+                cancel: { dismiss() }
+            )
         } else {
             form
                 .padding(20)
@@ -399,9 +448,7 @@ struct AddAccountSheet: View {
             case .github: try await coordinator.signInWithGitHub(baseURL: baseURL, clientID: custom)
             case .gitlab: try await coordinator.signInWithGitLab(baseURL: baseURL, clientID: custom, anchor: NSApp.keyWindow)
             }
-            let account = try await environment.addAccount(kind: kind, baseURL: baseURL, credential: result.token, authMethod: result.authMethod)
-            dismiss()
-            onAdded(account)
+            try await connect(kind: kind, baseURL: baseURL, credential: result.token, authMethod: result.authMethod)
         } catch OAuthError.cancelled {
             error = nil
         } catch {
@@ -416,9 +463,39 @@ struct AddAccountSheet: View {
         defer { isWorking = false }
         do {
             let credential = StoredToken(accessToken: token.trimmingCharacters(in: .whitespacesAndNewlines), obtainedAt: Date())
-            let account = try await environment.addAccount(kind: kind, baseURL: baseURL, credential: credential)
-            dismiss()
-            onAdded(account)
+            try await connect(kind: kind, baseURL: baseURL, credential: credential, authMethod: .personalAccessToken)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    /// Adds the account, unless its owner is already connected: then the user chooses first.
+    private func connect(kind: ProviderKind, baseURL: URL, credential: StoredToken, authMethod: AuthMethod) async throws {
+        if let existing = try await environment.connectedAccount(kind: kind, baseURL: baseURL, credential: credential) {
+            pending = PendingCredential(existing: existing, kind: kind, baseURL: baseURL, credential: credential, authMethod: authMethod)
+            return
+        }
+        try await add(kind: kind, baseURL: baseURL, credential: credential, authMethod: authMethod)
+    }
+
+    private func add(kind: ProviderKind, baseURL: URL, credential: StoredToken, authMethod: AuthMethod) async throws {
+        let account = try await environment.addAccount(kind: kind, baseURL: baseURL, credential: credential, authMethod: authMethod)
+        dismiss()
+        onAdded(account)
+    }
+
+    private func resolve(_ pending: PendingCredential, replacing: Bool) async {
+        isWorking = true
+        error = nil
+        defer { isWorking = false }
+        do {
+            if replacing {
+                let account = environment.config.account(id: pending.existing.id) ?? pending.existing
+                try await environment.replaceCredential(for: account, credential: pending.credential, authMethod: pending.authMethod)
+                dismiss()
+            } else {
+                try await add(kind: pending.kind, baseURL: pending.baseURL, credential: pending.credential, authMethod: pending.authMethod)
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -435,9 +512,15 @@ struct ReplaceTokenSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Replace Token for \(account.displayName)").font(.title3.weight(.semibold))
+            Text(environment.usesOAuth(account) ? "Use a Token for \(account.displayName)" : "Replace Token for \(account.displayName)")
+                .font(.title3.weight(.semibold))
             SecureField("New personal access token", text: $token)
                 .textFieldStyle(.roundedBorder)
+            if environment.usesOAuth(account) {
+                Text("The account keeps its repositories, presets and widgets; only the way it signs in changes.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let error { Text(error).foregroundStyle(.red).font(.callout) }
             HStack {
                 Spacer()
@@ -461,6 +544,45 @@ struct ReplaceTokenSheet: View {
         }
         .padding(20)
         .frame(width: 420)
+    }
+}
+
+/// Add Account found that the owner of the new credential is already connected. Repositories, presets and widgets
+/// belong to the account record, so a second record for the same person starts empty; this is where the user
+/// learns that before it happens (see `docs/adr/0011`).
+struct AlreadyConnectedView: View {
+    let account: Account
+    var error: String?
+    var isWorking = false
+    let replace: () -> Void
+    let addSeparately: () -> Void
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("\(account.displayName) is already connected").font(.title2.weight(.semibold))
+            Text("This is the same person on the same server. Replacing the sign-in keeps the account with its repositories, presets and widgets. A separate account starts with no repositories and with presets of its own.")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let error {
+                Text(error).font(.callout).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Button("Cancel", action: cancel)
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Add as Separate Account", action: addSeparately)
+                    .disabled(isWorking)
+                    .accessibilityIdentifier("account-add-separately")
+                Button("Replace Sign-In", action: replace)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(isWorking)
+                    .accessibilityIdentifier("account-replace-sign-in")
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
     }
 }
 

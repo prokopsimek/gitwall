@@ -37,4 +37,15 @@ struct RepositoryPickerTests {
         )
         #expect(RepositoryPicker.watchedRepositories(of: account) == ["acme/retired"])
     }
+
+    @Test("the list is loaded once per account: again when another account is picked or a reload is asked for")
+    func loadsOncePerAccount() {
+        let github = UUID()
+        let gitlab = UUID()
+        #expect(RepositoryPicker.shouldLoad(for: github, loaded: nil, force: false))
+        #expect(!RepositoryPicker.shouldLoad(for: github, loaded: github, force: false))
+        // The reported case: the list of the account shown before must not stand in for this one.
+        #expect(RepositoryPicker.shouldLoad(for: github, loaded: gitlab, force: false))
+        #expect(RepositoryPicker.shouldLoad(for: github, loaded: github, force: true))
+    }
 }

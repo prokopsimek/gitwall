@@ -8,6 +8,11 @@ struct RepositoriesSettingsView: View {
     @State private var selectedAccountID: UUID?
     @State private var repositories: [RepoRef] = []
     @State private var containers: [ContainerRef] = []
+    /// The account `repositories` and `containers` belong to. The tab lives in a `TabView`, so its state outlasts
+    /// a change of account; without this the list of the previous account stayed on screen for the next one.
+    @State private var loadedAccountID: UUID?
+    /// Counts loads so that an answer that arrives after a newer load started is dropped.
+    @State private var loadGeneration = 0
     @State private var isLoading = false
     @State private var loadError: String?
     @State private var search = ""
@@ -187,16 +192,27 @@ struct RepositoriesSettingsView: View {
 
     private func load(force: Bool = false) async {
         guard let account, let provider = environment.provider(for: account) else { return }
-        if !force, !repositories.isEmpty { return }
+        guard RepositoryPicker.shouldLoad(for: account.id, loaded: loadedAccountID, force: force) else { return }
+        if loadedAccountID != account.id {
+            // What is on screen belongs to another account; it must not stand in while this one loads.
+            repositories = []
+            containers = []
+            search = ""
+            manualEntry = ""
+            loadedAccountID = nil
+        }
+        loadError = nil
+        loadGeneration += 1
+        let generation = loadGeneration
         // Sample accounts have no token; list what discovery would find so the tab works the same way.
         if environment.usesSampleContent {
             (repositories, containers) = DemoData.discovery(for: account.id)
-            loadError = nil
+            loadedAccountID = account.id
+            isLoading = false
             return
         }
         isLoading = true
-        loadError = nil
-        defer { isLoading = false }
+        defer { if generation == loadGeneration { isLoading = false } }
         do {
             guard let token = try environment.tokenStore.token(for: account.id)?.accessToken else {
                 loadError = "No token stored for this account."
@@ -204,9 +220,14 @@ struct RepositoriesSettingsView: View {
             }
             async let repos = provider.discoverRepositories(baseURL: account.baseURL, token: token, query: nil)
             async let orgs = provider.discoverContainers(baseURL: account.baseURL, token: token)
-            repositories = try await repos
-            containers = try await orgs
+            let (found, organizations) = try await (repos, orgs)
+            // Another account was picked, or a reload started, while the server was answering.
+            guard generation == loadGeneration else { return }
+            repositories = found
+            containers = organizations
+            loadedAccountID = account.id
         } catch {
+            guard generation == loadGeneration else { return }
             loadError = error.localizedDescription
         }
     }

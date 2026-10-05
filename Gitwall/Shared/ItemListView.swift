@@ -65,9 +65,11 @@ enum EmptyStateKind: Equatable {
     case containerUnavailable
     case noAccounts
     case noPresets
-    case noRepositories
+    /// None of the preset's accounts watches anything; `account` is the first of them.
+    case noRepositories(account: Account)
     case loading
-    case nothingMatches(presetName: String)
+    /// `idle` is an account of the preset that watches nothing: its items are missing whatever the filter says.
+    case nothingMatches(presetName: String, idle: Account?)
 }
 
 struct EmptyStateView: View {
@@ -100,14 +102,18 @@ struct EmptyStateView: View {
             self.init(title: "No presets", symbol: "slider.horizontal.3",
                       message: "A preset decides which items are shown. Create one in Settings.",
                       action: ("Open Settings", { environment.openSettings(.presets) }))
-        case .noRepositories:
+        case .noRepositories(let account):
             self.init(title: "No repositories selected", symbol: "folder.badge.plus",
-                      message: "Choose which repositories or organizations Gitwall should watch.",
-                      action: ("Choose Repositories…", { environment.openSettings(.repositories) }))
+                      message: "\(account.displayName) watches no repositories yet, so nothing is fetched for it. Choose the repositories or organizations Gitwall should watch.",
+                      action: ("Choose Repositories…", { environment.openSettings(.repositories, accountID: account.id) }))
         case .loading:
             self.init(title: "Loading…", symbol: "arrow.triangle.2.circlepath", message: "Fetching the latest activity.")
-        case .nothingMatches(let presetName):
+        case .nothingMatches(let presetName, nil):
             self.init(title: "Nothing here", symbol: "checkmark.circle", message: "No open items match “\(presetName)”.")
+        case .nothingMatches(let presetName, let idle?):
+            self.init(title: "Nothing here", symbol: "checkmark.circle",
+                      message: "No open items match “\(presetName)”. \(idle.displayName) watches no repositories yet, so its items are not fetched.",
+                      action: ("Choose Repositories…", { environment.openSettings(.repositories, accountID: idle.id) }))
         }
     }
 
@@ -129,6 +135,10 @@ struct EmptyStateView: View {
             }
             Spacer()
         }
+        // The texts take the height they need at the offered width. Offered none, which is how a window asks for
+        // its smallest size, they wrap one letter per line and report a height of two thousand points; the split
+        // view of the main window then lays itself out that tall and its sidebar and header leave the window.
+        .frame(minWidth: 280)
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -23,6 +23,19 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 - `AppEnvironment.addAccount` and `replaceCredential` take a `StoredToken`, so refresh tokens and expiry
   dates survive. The sync engine reads through `RefreshingTokenReader`, which refreshes OAuth tokens
   silently; the user signs in once.
+- Repositories, presets and widgets hang on the account record. Changing how an account signs in goes through
+  `replaceCredential`, never through remove and add; Add Account asks first when the owner of a credential is
+  already connected (`AppEnvironment.connectedAccount`, which matches by provider, server and login). See
+  [ADR 0011](../docs/adr/0011-switching-sign-in-keeps-the-account.md).
+- An account without sources fetches nothing and still syncs as `ok`. Every place that can be empty because of it
+  names the account and links to Settings › Repositories for it: `AppEnvironment.listState(for:)` through
+  `AppConfig.emptiness(of:)`, the Accounts row, and the preset editor through `AppConfig.idleAccounts(visibleTo:)`.
+- A text with `.fixedSize(horizontal: false, vertical: true)` needs a minimum width from an ancestor. A window
+  asks for its smallest size by offering no room; the text answers with one letter per line, and the
+  `NavigationSplitView` of the main window lays itself out that tall, so the sidebar and the header leave the
+  window (`GitwallTests/EmptyStateLayoutTests`).
+- Two `ForEach` over the same models in one `Form` section give two rows one identity, and the second draws the
+  first one's row. Put the second inside a container of its own, as the preset editor does for idle accounts.
 - `OAuthCoordinator` owns only the window-bound parts (device code display, `ASWebAuthenticationSession`).
   The protocol work is in GitwallAuth.
 - `AppEnvironment.start` registers the app as a login item when `AppConfig.shouldRegisterAtLogin` says so, and
@@ -52,4 +65,5 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | `--debug-reset` | Wipes accounts, tokens and snapshot. Refuses to run without `--debug-fresh`. |
 | `--debug-github-token <pat> [--debug-repos a/b,c/d]` | Creates a GitHub account without clicking. |
 | `--debug-demo [--debug-demo-preset <n>] [--debug-demo-widgets]` | Fictional data from `GitwallCore.DemoData` for App Store screenshots; widgets appear as borderless windows. |
+| `--debug-demo --debug-demo-idle-account <n>` | The sample account at that index as if it had just been removed and added again: no repositories, no items, its three presets at the end of the list (`--debug-demo-preset 7` shows the first of them). For the hints that send the user to Settings › Repositories. |
 | `--debug-onboarding-step <step>` | Opens the walkthrough at one step (`welcome`, `account`, `repositories`, `presets`, `notifications`, `startup`, `widget`), so a screen can be checked without clicking through. Pairs well with `--debug-demo`. |
