@@ -163,8 +163,12 @@ the App Store for automatic updates.
 
 ## 6. Submit to the App Store
 
-1. App Store Connect > App > the new version: attach the processed build.
-2. Fill in "What's New".
+1. App Store Connect > App > the new version: attach the processed build. Once a version is in the
+   store, the next one is a new record (`POST /v1/appStoreVersions` with `platform`, `versionString`
+   and `releaseType`). It copies the description, the keywords, the screenshots and the review notes
+   from the previous record, but **not the promotional text and not the review attachment**: set the
+   first again and upload the second again (step 4).
+2. Fill in "What's New" and keep a copy in [appstore-listing.md](appstore-listing.md).
 3. Review notes: **lead with sample data**, and name every place it can be started from.
    App Review rejected 0.4.1 because a reviewer without a GitHub token saw nothing, and
    rejected 0.5.1 because sample data was only offered in the walkthrough, which their Mac
@@ -264,5 +268,3 @@ The layouts expect captures in `Scripts/out/shots/w` (preset "All open" with wid
 
 - Increase `CURRENT_PROJECT_VERSION` in `project.yml` right away so the next upload
   cannot collide.
-- Once the App Store listing is live, replace the "coming soon" line in `docs/index.md`
-  with the App Store link.

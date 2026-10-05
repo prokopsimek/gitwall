@@ -27,7 +27,7 @@ the browser. There is no server: your Mac talks to GitHub and GitLab directly.
 
 **[Download the latest release](https://github.com/prokopsimek/gitwall/releases/latest)**, unzip it and move
 Gitwall.app to Applications. The build is signed with a Developer ID and notarized by Apple, so it opens without a
-Gatekeeper warning. It does not update itself; the Mac App Store version (in review) will.
+Gatekeeper warning. It does not update itself; the [Mac App Store version](https://apps.apple.com/app/gitwall/id6810724454?mt=12) does.
 
 Requires macOS 14 Sonoma or later.
 

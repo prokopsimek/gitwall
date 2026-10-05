@@ -42,7 +42,7 @@ Gitwall is a free, open-source macOS menu bar app with desktop widgets. It gathe
 
 - Direct download: [the latest Gitwall release](https://github.com/prokopsimek/gitwall/releases/latest), signed with a
   Developer ID and notarized by Apple. Unzip and move Gitwall.app to Applications. It does not update itself.
-- Mac App Store: in review; the store version will update automatically.
+- Mac App Store: [Gitwall on the Mac App Store](https://apps.apple.com/app/gitwall/id6810724454?mt=12), which updates automatically.
 
 ## Links
 

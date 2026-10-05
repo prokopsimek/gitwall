@@ -68,6 +68,16 @@ Support URL: <https://github.com/prokopsimek/gitwall/issues>
 Marketing URL: <https://prokopsimek.github.io/gitwall/>
 Copyright: `2026 Prokop Simek`
 
+What's New (0.5.3):
+
+```
+Switching an account between a personal access token and signing in now keeps its repositories, presets and widgets. Add Account notices an account that is already connected and offers to replace its sign-in, and the account menu has "Sign in with GitHub…" and "Use a Token Instead…".
+
+An account that watches no repositories now says so, with a shortcut to choose them, instead of leaving its presets empty.
+
+Settings › Repositories shows the list of the account you select.
+```
+
 What's New (0.3.0, the first update after 0.1.0 in the store, so it covers 0.2.0 too):
 
 ```
