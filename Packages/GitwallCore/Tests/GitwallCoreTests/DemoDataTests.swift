@@ -46,6 +46,23 @@ struct DemoDataTests {
         #expect(snapshot.items.contains { $0.kind == .issue })
     }
 
+    @Test("sample priorities come from projects on GitHub and labels on GitLab, and Open bugs puts P0 first")
+    func priorities() throws {
+        let config = DemoData.config
+        let snapshot = DemoData.snapshot(now: now)
+        let github = snapshot.items.filter { $0.accountID == DemoData.github.id }
+        let gitlab = snapshot.items.filter { $0.accountID == DemoData.gitlab.id }
+        #expect(github.contains { $0.projectPriority != nil })
+        #expect(gitlab.allSatisfy { $0.projectPriority == nil })
+        #expect(gitlab.contains { $0.priority != nil })
+        #expect(Set(snapshot.items.compactMap(\.priority)) == Set(Priority.allCases))
+
+        let bugs = try #require(config.presets.first { $0.name == "Open bugs" })
+        let sorted = FilterEngine.items(matching: bugs, in: snapshot.items, accounts: config.accounts, now: now)
+        #expect(sorted.first?.priority == .p0)
+        #expect(sorted.last?.priority == nil)
+    }
+
     @Test("demo config is deterministic across calls")
     func deterministic() {
         #expect(DemoData.config == DemoData.config)

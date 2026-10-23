@@ -11,6 +11,8 @@ public enum SortOrder: String, Codable, Hashable, Sendable, CaseIterable {
     case lastActivity
     case newestCreated
     case oldestCreated
+    /// P0 first, items without a priority last; the oldest created first inside a level.
+    case priority
 }
 
 public enum NotificationEvent: String, Codable, Hashable, Sendable, CaseIterable {

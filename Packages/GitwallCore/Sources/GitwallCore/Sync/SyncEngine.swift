@@ -68,6 +68,34 @@ public actor SyncEngine {
         let status: FetchStatus
     }
 
+    /// Puts the outcome of a priority lookup on freshly fetched items. A lookup that failed for a passing reason keeps
+    /// the previous project priorities and access state, so a list sorted by priority does not reshuffle on a hiccup.
+    static func applying(
+        _ lookup: PriorityLookup,
+        to items: [WorkItem],
+        previous: [WorkItem],
+        previousAccess: ProjectAccess?
+    ) -> (items: [WorkItem], access: ProjectAccess?) {
+        func setting(_ priority: (WorkItem) -> Priority?) -> [WorkItem] {
+            items.map { item in
+                var item = item
+                item.projectPriority = priority(item)
+                return item
+            }
+        }
+        switch lookup {
+        case .unsupported:
+            return (items, nil)
+        case .found(let priorities):
+            return (setting { priorities[$0.id] }, .granted)
+        case .missingPermission:
+            return (setting { _ in nil }, .denied)
+        case .failed:
+            let kept = Dictionary(previous.map { ($0.id, $0.projectPriority) }, uniquingKeysWith: { first, _ in first })
+            return (setting { kept[$0.id] ?? nil }, previousAccess)
+        }
+    }
+
     /// Union of kinds requested by presets that can see the account; both kinds when no preset narrows it.
     static func kindsNeeded(for account: Account, presets: [Preset]) -> Set<ItemKind> {
         var kinds: Set<ItemKind> = []
@@ -85,7 +113,8 @@ public actor SyncEngine {
             AccountOutcome(
                 accountID: account.id,
                 items: previousItems,
-                status: FetchStatus(state: state, lastSuccessAt: previousStatus?.lastSuccessAt, message: message)
+                status: FetchStatus(state: state, lastSuccessAt: previousStatus?.lastSuccessAt, message: message,
+                                    projectAccess: previousStatus?.projectAccess)
             )
         }
 
@@ -102,23 +131,28 @@ public actor SyncEngine {
             return failure(.error, "No provider registered for \(account.kind.rawValue).")
         }
 
-        func succeed(_ items: [WorkItem]) -> AccountOutcome {
-            AccountOutcome(
+        // Priorities are read after the list and cannot fail it; see `docs/adr/0012`.
+        func succeed(_ items: [WorkItem], token: String) async -> AccountOutcome {
+            let lookup = await provider.projectPriorities(account: account, token: token, items: items)
+            let (prioritized, access) = Self.applying(
+                lookup, to: items, previous: previousItems, previousAccess: previousStatus?.projectAccess
+            )
+            return AccountOutcome(
                 accountID: account.id,
-                items: items,
-                status: FetchStatus(state: .ok, lastSuccessAt: timestamp, message: nil)
+                items: prioritized,
+                status: FetchStatus(state: .ok, lastSuccessAt: timestamp, message: nil, projectAccess: access)
             )
         }
 
         do {
-            return succeed(try await provider.fetchItems(account: account, token: token, kinds: kinds))
+            return await succeed(try await provider.fetchItems(account: account, token: token, kinds: kinds), token: token)
         } catch ProviderError.unauthorized {
             // The token may just have expired. Give the reader one chance to refresh it silently.
             do {
                 guard let refreshed = try await tokens.tokenAfterUnauthorized(for: account.id) else {
                     return failure(.needsReauth, ProviderError.unauthorized.localizedDescription)
                 }
-                return succeed(try await provider.fetchItems(account: account, token: refreshed, kinds: kinds))
+                return await succeed(try await provider.fetchItems(account: account, token: refreshed, kinds: kinds), token: refreshed)
             } catch ProviderError.unauthorized {
                 return failure(.needsReauth, ProviderError.unauthorized.localizedDescription)
             } catch {

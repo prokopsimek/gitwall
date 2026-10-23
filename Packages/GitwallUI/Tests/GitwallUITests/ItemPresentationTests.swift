@@ -14,6 +14,31 @@ struct ItemPresentationTests {
                  reviewState: reviewState, ciState: ciState, mergeState: mergeState)
     }
 
+    @Test("priority badge: the level, its source, and colour only for P0 and P1")
+    func priorityBadge() {
+        var plain = item()
+        #expect(ItemPresentation.priorityBadge(for: plain) == nil)
+        plain.labels = [Label(name: "p1")]
+        #expect(ItemPresentation.priorityBadge(for: plain) == .init(text: "P1", help: "Priority P1, from a label", tone: .warning))
+        plain.projectPriority = .p0
+        #expect(ItemPresentation.priorityBadge(for: plain) == .init(text: "P0", help: "Priority P0, set in a project", tone: .negative))
+        plain.projectPriority = .p3
+        #expect(ItemPresentation.priorityBadge(for: plain)?.tone == .neutral)
+        // Issues carry priorities as well as pull requests.
+        var issue = item(kind: .issue)
+        issue.labels = [Label(name: "P2")]
+        #expect(ItemPresentation.priorityBadge(for: issue)?.text == "P2")
+    }
+
+    @Test("a priority label is not repeated next to its capsule, but one that contradicts a project stays")
+    func displayedLabels() {
+        var labelled = item()
+        labelled.labels = [Label(name: "bug"), Label(name: "p1")]
+        #expect(ItemPresentation.displayedLabels(for: labelled).map(\.name) == ["bug"])
+        labelled.projectPriority = .p3
+        #expect(ItemPresentation.displayedLabels(for: labelled).map(\.name) == ["bug", "p1"])
+    }
+
     @Test("repository is shortened to its name with the number")
     func repoLabel() {
         #expect(ItemPresentation.repoLabel(for: item()) == "mcp-gateway #42")

@@ -221,25 +221,28 @@ enum PreviewData {
         let account = UUID()
         let now = Date()
         func pr(_ number: Int, _ repo: String, _ title: String, _ author: String, minutesAgo: Double, review: ReviewState, ci: CIState,
-                merge: MergeState = .clean, draft: Bool = false, labels: [GitwallCore.Label] = [], comments: Int = 0, add: Int? = nil, del: Int? = nil) -> WorkItem {
+                merge: MergeState = .clean, draft: Bool = false, labels: [GitwallCore.Label] = [], comments: Int = 0, add: Int? = nil, del: Int? = nil,
+                priority: Priority? = nil) -> WorkItem {
             WorkItem(accountID: account, kind: .pullRequest, repoFullName: repo, number: number, title: title,
                      url: URL(string: "https://github.com")!, author: UserRef(login: author),
                      createdAt: now.addingTimeInterval(-minutesAgo * 60 - 86_400), updatedAt: now.addingTimeInterval(-minutesAgo * 60),
                      isDraft: draft, labels: labels, commentCount: comments,
-                     reviewState: review, ciState: ci, mergeState: merge, additions: add, deletions: del)
+                     reviewState: review, ciState: ci, mergeState: merge, additions: add, deletions: del, projectPriority: priority)
         }
-        func issue(_ number: Int, _ repo: String, _ title: String, _ author: String, minutesAgo: Double, labels: [GitwallCore.Label] = [], comments: Int = 0) -> WorkItem {
+        func issue(_ number: Int, _ repo: String, _ title: String, _ author: String, minutesAgo: Double, labels: [GitwallCore.Label] = [], comments: Int = 0,
+                   priority: Priority? = nil) -> WorkItem {
             WorkItem(accountID: account, kind: .issue, repoFullName: repo, number: number, title: title,
                      url: URL(string: "https://github.com")!, author: UserRef(login: author),
                      createdAt: now.addingTimeInterval(-minutesAgo * 60 - 3 * 86_400), updatedAt: now.addingTimeInterval(-minutesAgo * 60),
-                     labels: labels, commentCount: comments)
+                     labels: labels, commentCount: comments, projectPriority: priority)
         }
         return [
             pr(42, "dxheroes/mcp-gateway", "Add GitLab provider", "prokopsimek", minutesAgo: 9, review: .approved, ci: .success,
                labels: [GitwallCore.Label(name: "provider", colorHex: "0E8A16")], comments: 3, add: 120, del: 7),
-            pr(17, "dxheroes/web", "Fix hero layout on narrow screens", "alice", minutesAgo: 75, review: .pending, ci: .failure, merge: .conflict, draft: true),
+            pr(17, "dxheroes/web", "Fix hero layout on narrow screens", "alice", minutesAgo: 75, review: .pending, ci: .failure, merge: .conflict, draft: true,
+               priority: .p1),
             issue(7, "dxheroes/mcp-gateway", "Widget shows stale data after sleep", "bob", minutesAgo: 60 * 26,
-                  labels: [GitwallCore.Label(name: "bug", colorHex: "D73A4A")], comments: 1),
+                  labels: [GitwallCore.Label(name: "bug", colorHex: "D73A4A")], comments: 1, priority: .p0),
             pr(311, "dxheroes/dx-scanner", "Bump TypeScript to 5.9 and fix strict warnings", "renovate", minutesAgo: 60 * 30, review: ReviewState.none, ci: .running,
                labels: [GitwallCore.Label(name: "dependencies", colorHex: "0366D6")]),
             pr(88, "dxheroes/knowledge-base", "Document the OAuth device flow", "carol", minutesAgo: 60 * 41, review: .changesRequested, ci: .success, comments: 5, add: 64, del: 3),

@@ -58,6 +58,9 @@ public struct WorkItemRow: View {
                         Circle().fill(Color.accentColor).frame(width: 6, height: 6)
                             .accessibilityLabel("New")
                     }
+                    if let priority = ItemPresentation.priorityBadge(for: item) {
+                        priorityView(priority)
+                    }
                     Text(item.title)
                         .font(style == .compact ? .caption : .body)
                         .fontWeight(.medium)
@@ -86,7 +89,7 @@ public struct WorkItemRow: View {
                     Spacer(minLength: 4)
                     badges
                 }
-                if style == .regular, !item.labels.isEmpty || item.commentCount > 0 || item.additions != nil {
+                if style == .regular, !labels.isEmpty || item.commentCount > 0 || item.additions != nil {
                     detailLine
                 }
             }
@@ -111,6 +114,18 @@ public struct WorkItemRow: View {
         .padding(.top, 1)
     }
 
+    private func priorityView(_ priority: ItemPresentation.PriorityBadge) -> some View {
+        Text(priority.text)
+            .font(.caption2.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(priority.tone.color)
+            .padding(.horizontal, 4)
+            .background(priority.tone.color.opacity(0.15), in: Capsule())
+            .fixedSize()
+            .help(priority.help)
+            .accessibilityLabel(priority.help)
+    }
+
     private var badges: some View {
         HStack(spacing: 3) {
             ForEach(ItemPresentation.badges(for: item)) { badge in
@@ -123,17 +138,19 @@ public struct WorkItemRow: View {
         }
     }
 
+    private var labels: [GitwallCore.Label] { ItemPresentation.displayedLabels(for: item) }
+
     private var detailLine: some View {
         HStack(spacing: 6) {
-            ForEach(item.labels.prefix(3), id: \.name) { label in
+            ForEach(labels.prefix(3), id: \.name) { label in
                 Text(label.name)
                     .font(.caption2)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
                     .background((Color(hex: label.colorHex) ?? .secondary).opacity(0.18), in: Capsule())
             }
-            if item.labels.count > 3 {
-                Text("+\(item.labels.count - 3)").font(.caption2).foregroundStyle(.tertiary)
+            if labels.count > 3 {
+                Text("+\(labels.count - 3)").font(.caption2).foregroundStyle(.tertiary)
             }
             Spacer(minLength: 4)
             if item.commentCount > 0 {

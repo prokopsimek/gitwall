@@ -39,6 +39,12 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   membership query (`GraphQLQueries.viewerTeams`, classic tokens need `read:org`) runs at most once per
   `fetchItems`, and only for a batch that actually contains a team request; a refusal is logged and leaves the
   queue as it was.
+- Priority (`WorkItem.priority`) is the GitHub Projects field `Priority` (`projectPriority`), else the most urgent
+  `p0`–`p3` label. The project value comes from `GitProvider.projectPriorities`, a separate request after
+  `fetchItems` that never throws and never fails the sync: a refused scope is `.missingPermission`
+  (`FetchStatus.projectAccess = .denied`, a hint in Settings), anything else `.failed`, which keeps the previous
+  values. Never put `projectItems` into the list queries: a token without `read:project` would lose the whole list
+  (see `docs/adr/0012`).
 - Filter categories combine with AND, values inside one category with OR. Two deliberate exceptions live in
   `FilterEngine`: a draft that names me as a reviewer passes a review preset even when drafts are off (cloud
   agents cannot mark their pull requests ready), and author logins are compared without a trailing `[bot]`,
@@ -49,4 +55,5 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   `NOT` is no operator — all checked against GitHub's own search (see `docs/adr/0009`). Commas inside a term are
   OR, which GitHub only honours for `label:`. Only qualifiers `WorkItem` can answer are accepted; anything else is
   a parse error, and an unreadable query matches nothing so a typo cannot widen a preset. Adding a qualifier means
-  adding it to `SearchQuery.Qualifier`, to `SearchQueryTests` and to the table in the README.
+  adding it to `SearchQuery.Qualifier`, to `SearchQueryTests` and to the table in the README. `priority:` is the one
+  qualifier taken from GitHub Projects' filter syntax rather than issue search.

@@ -156,6 +156,34 @@ struct FilterEngineTests {
         #expect(run(Preset(name: "Oldest", sort: .oldestCreated), items) == [2, 3, 1])
     }
 
+    @Test("priority sort: P0 first, oldest created first inside a level, items without a priority last")
+    func sortingByPriority() {
+        var fromProject = item(5, createdDaysAgo: 1, labels: ["p3"])
+        fromProject.projectPriority = .p0
+        let items = [
+            item(1, createdDaysAgo: 1, labels: ["p2"]),
+            item(2, createdDaysAgo: 9),
+            item(3, createdDaysAgo: 2, labels: ["P1"]),
+            item(4, createdDaysAgo: 4, labels: ["p2"]),
+            fromProject,
+            item(6, createdDaysAgo: 3, labels: ["bug"]),
+            item(7, createdDaysAgo: 6, labels: ["p1"]),
+        ]
+        // 5 is P0 from its project, which beats its p3 label; 2 and 6 have no priority and keep oldest-first.
+        #expect(run(Preset(name: "Priority", sort: .priority), items) == [5, 7, 3, 4, 1, 2, 6])
+    }
+
+    @Test("query: priority: reads the same value as the sort")
+    func priorityQuery() {
+        var fromProject = item(3, labels: ["p0"])
+        fromProject.projectPriority = .p2
+        let items = [item(1, labels: ["p0"]), item(2, labels: ["P1"]), fromProject, item(4)]
+        #expect(run(Preset(name: "P0", filter: ItemFilter(query: "priority:P0")), items) == [1])
+        #expect(run(Preset(name: "Urgent", filter: ItemFilter(query: "priority:p0 OR priority:P1")), items) == [1, 2])
+        #expect(run(Preset(name: "P2", filter: ItemFilter(query: "priority:P2")), items) == [3])
+        #expect(run(Preset(name: "None", filter: ItemFilter(query: "-priority:P0,P1,P2,P3")), items) == [4])
+    }
+
     @Test("a draft that asks for my review still counts as waiting for me")
     func draftsRequestingMyReview() {
         // Cloud agents (Copilot, the Claude and Codex GitHub apps) open a draft and request a review;

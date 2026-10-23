@@ -22,13 +22,25 @@ public enum FilterEngine {
     }
 
     public static func sort(_ items: [WorkItem], by order: SortOrder) -> [WorkItem] {
-        items.sorted { lhs, rhs in
+        // `priority` reads the labels when no project gave one: work it out once per item, not per comparison.
+        let priorities: [String: Priority?] = order == .priority
+            ? Dictionary(items.map { ($0.id, $0.priority) }, uniquingKeysWith: { first, _ in first })
+            : [:]
+        return items.sorted { lhs, rhs in
             switch order {
             case .lastActivity:
                 if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }
             case .newestCreated:
                 if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
             case .oldestCreated:
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+            case .priority:
+                let (left, right) = (priorities[lhs.id] ?? nil, priorities[rhs.id] ?? nil)
+                if left != right {
+                    guard let left else { return false }
+                    guard let right else { return true }
+                    return left < right
+                }
                 if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
             }
             return lhs.id < rhs.id

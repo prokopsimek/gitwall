@@ -1,0 +1,84 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4695,
+      "resetAt": "2026-10-23T06:42:40Z"
+    },
+    "nodes": [
+      null,
+      {
+        "id": "I_kwDOGitwallAAAAAP2issue",
+        "projectItems": {
+          "nodes": [
+            {
+              "project": {
+                "closed": false
+              },
+              "fieldValueByName": {
+                "name": "P2"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "I_kwDOGitwallAAAAAP1issue",
+        "projectItems": {
+          "nodes": [
+            {
+              "project": {
+                "closed": false
+              },
+              "fieldValueByName": {
+                "name": "P1"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "I_kwDOGitwallAAAAAnoneis",
+        "projectItems": {
+          "nodes": [
+            {
+              "project": {
+                "closed": false
+              },
+              "fieldValueByName": null
+            }
+          ]
+        }
+      },
+      {
+        "id": "PR_kwDOGitwallAAAAAnone-A",
+        "projectItems": {
+          "nodes": [
+            {
+              "project": {
+                "closed": false
+              },
+              "fieldValueByName": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "nodes",
+        0
+      ],
+      "locations": [
+        {
+          "line": 3,
+          "column": 3
+        }
+      ],
+      "message": "Could not resolve to a node with the global id of 'I_kwDOAAAAAAAAAAAAAAAAAA'"
+    }
+  ]
+}

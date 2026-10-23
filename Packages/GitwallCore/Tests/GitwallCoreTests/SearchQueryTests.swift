@@ -327,6 +327,34 @@ struct SearchQueryTests {
         #expect(value == "merged")
     }
 
+    @Test("priority: matches P0 to P3 in any case, from the project or a label")
+    func priority() throws {
+        let labelled = item(labels: ["bug", "p1"])
+        var fromProject = item(labels: ["p3"])
+        fromProject.projectPriority = .p0
+        let none = item(labels: ["bug"])
+        #expect(try parse("priority:P1").matches(labelled, me: me))
+        #expect(try parse("priority:p1").matches(labelled, me: me))
+        #expect(try parse("priority:P0").matches(fromProject, me: me))
+        #expect(try !parse("priority:P3").matches(fromProject, me: me))
+        #expect(try parse("priority:P0,P1").matches(labelled, me: me))
+        #expect(try parse("priority:P0 OR priority:P1").matches(fromProject, me: me))
+        #expect(try !parse("priority:P0 OR priority:P1").matches(none, me: me))
+        #expect(try parse("-priority:P0").matches(none, me: me))
+    }
+
+    @Test("priority: takes only a level and says which ones", arguments: ["P4", "high", "1", "P0-x"])
+    func unknownPriority(value: String) {
+        guard case .unknownValue(let qualifier, let rejected)? = error("priority:\(value)") else {
+            Issue.record("expected an unknownValue error")
+            return
+        }
+        #expect(qualifier == "priority")
+        #expect(rejected == value)
+        #expect(SearchQueryError.unknownValue(qualifier: qualifier, value: rejected).message.hasSuffix("Try P0, P1, P2, P3."))
+        #expect(SearchQuery.supportedQualifiers.contains("priority"))
+    }
+
     // MARK: - Free text
 
     @Test("bare words match the title, the repository or the number")

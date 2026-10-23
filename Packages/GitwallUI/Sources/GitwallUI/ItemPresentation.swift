@@ -61,6 +61,34 @@ public enum ItemPresentation {
         return badges
     }
 
+    public struct PriorityBadge: Hashable, Sendable {
+        /// "P0" to "P3".
+        public let text: String
+        /// Tooltip and accessibility label: the level and where it came from.
+        public let help: String
+        public let tone: Tone
+    }
+
+    /// The small capsule before the title; nil for an item without a priority. Only P0 and P1 get a colour, so the
+    /// list stays calm when most items carry one.
+    public static func priorityBadge(for item: WorkItem) -> PriorityBadge? {
+        guard let priority = item.priority else { return nil }
+        let source = item.projectPriority != nil ? "set in a project" : "from a label"
+        let tone: Tone = switch priority {
+        case .p0: .negative
+        case .p1: .warning
+        case .p2, .p3: .neutral
+        }
+        return PriorityBadge(text: priority.rawValue, help: "Priority \(priority.rawValue), \(source)", tone: tone)
+    }
+
+    /// Labels for the detail line. A `p1` label that already shows as the priority capsule is left out; one that
+    /// disagrees with a project's value stays, so the conflict remains visible.
+    public static func displayedLabels(for item: WorkItem) -> [Label] {
+        guard item.projectPriority == nil else { return item.labels }
+        return item.labels.filter { Priority(parsing: $0.name) == nil }
+    }
+
     public static func kindSymbol(for kind: ItemKind) -> String {
         switch kind {
         case .pullRequest: "arrow.triangle.pull"

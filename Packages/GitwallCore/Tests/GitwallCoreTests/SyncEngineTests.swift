@@ -12,6 +12,9 @@ struct SyncEngineTests {
         /// Overrides `results` when the call arrives with this token, so a retry after a refresh can succeed.
         var resultsAfterToken: [String: [WorkItem]] = [:]
         var requestedKinds: [UUID: Set<ItemKind>] = [:]
+        var priorityLookup: PriorityLookup = .unsupported
+        /// Tokens the priority lookup was called with, in order.
+        var priorityTokens: [String] = []
 
         init(kind: ProviderKind) { self.kind = kind }
 
@@ -28,6 +31,10 @@ struct SyncEngineTests {
             if let items = resultsAfterToken[token] { return items }
             guard let result = results[account.id] else { return [] }
             return try result.get()
+        }
+        func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup {
+            priorityTokens.append(token)
+            return priorityLookup
         }
     }
 
@@ -213,4 +220,91 @@ struct SyncEngineTests {
         #expect(result.snapshot.accountStatus[env.github.id]?.state == .needsReauth)
     }
 
+    // MARK: - Priorities
+
+    @Test("project priorities land on the items and the account reads projects")
+    func prioritiesFound() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let urgent = env.item(1, account: env.github)
+        env.githubProvider.results[env.github.id] = .success([urgent, env.item(2, account: env.github)])
+        env.githubProvider.priorityLookup = .found([urgent.id: .p0])
+
+        let result = try await env.engine().sync()
+
+        let byNumber = Dictionary(uniqueKeysWithValues: result.snapshot.items.map { ($0.number, $0.projectPriority) })
+        #expect(byNumber[1] == .p0)
+        #expect(byNumber[2] == .some(nil))
+        #expect(result.snapshot.accountStatus[env.github.id]?.projectAccess == .granted)
+        #expect(env.githubProvider.priorityTokens == ["gh"])
+    }
+
+    @Test("a token that may not read projects keeps the sync ok and marks the account")
+    func prioritiesDenied() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        env.githubProvider.priorityLookup = .missingPermission
+
+        let result = try await env.engine().sync()
+
+        let status = try #require(result.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .ok)
+        #expect(status.projectAccess == .denied)
+        #expect(result.snapshot.items.map(\.number) == [1])
+        #expect(result.snapshot.items.allSatisfy { $0.projectPriority == nil })
+    }
+
+    @Test("a lookup that fails for a passing reason keeps the previous priorities and access")
+    func prioritiesFailedKeepsPrevious() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let urgent = env.item(1, account: env.github)
+        env.githubProvider.results[env.github.id] = .success([urgent, env.item(2, account: env.github)])
+        env.githubProvider.priorityLookup = .found([urgent.id: .p1])
+        _ = try await env.engine().sync()
+
+        env.githubProvider.results[env.github.id] = .success([urgent, env.item(2, account: env.github), env.item(3, account: env.github)])
+        env.githubProvider.priorityLookup = .failed("rate limited")
+        let result = try await env.engine().sync()
+
+        let byNumber = Dictionary(uniqueKeysWithValues: result.snapshot.items.map { ($0.number, $0.projectPriority) })
+        #expect(byNumber[1] == .p1)
+        #expect(byNumber[3] == .some(nil))
+        #expect(result.snapshot.accountStatus[env.github.id]?.state == .ok)
+        #expect(result.snapshot.accountStatus[env.github.id]?.projectAccess == .granted)
+    }
+
+    @Test("a provider without projects leaves the access unknown; a failed fetch keeps the last one")
+    func prioritiesUnsupportedAndFailedFetch() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        env.githubProvider.priorityLookup = .missingPermission
+        env.gitlabProvider.results[env.gitlab.id] = .success([env.item(2, account: env.gitlab)])
+        _ = try await env.engine().sync()
+
+        env.githubProvider.results[env.github.id] = .failure(.network("offline"))
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.accountStatus[env.gitlab.id]?.projectAccess == nil)
+        #expect(result.snapshot.accountStatus[env.github.id]?.state == .error)
+        #expect(result.snapshot.accountStatus[env.github.id]?.projectAccess == .denied)
+    }
+
+    @Test("after a refresh the priority lookup uses the new token")
+    func prioritiesUseRefreshedToken() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .failure(.unauthorized)
+        env.githubProvider.resultsAfterToken["gh-new"] = [env.item(1, account: env.github)]
+        env.githubProvider.priorityLookup = .found([:])
+        let tokens = RefreshingTokens(first: [env.github.id: "gh-old", env.gitlab.id: "gl"], refreshed: [env.github.id: "gh-new"])
+        let engine = SyncEngine(providers: [.github: env.githubProvider, .gitlab: env.gitlabProvider],
+                                tokens: tokens, configStore: env.configStore, snapshotStore: env.snapshotStore, now: { env.now })
+
+        _ = try await engine.sync()
+
+        #expect(env.githubProvider.priorityTokens == ["gh-new"])
+    }
 }

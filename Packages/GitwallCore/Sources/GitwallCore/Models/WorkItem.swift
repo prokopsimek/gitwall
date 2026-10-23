@@ -78,6 +78,11 @@ public struct WorkItem: Codable, Hashable, Identifiable, Sendable {
     public var requestedReviewers: [UserRef]
     public var additions: Int?
     public var deletions: Int?
+    /// The provider's own global identifier, for follow-up lookups such as ``projectPriority``. GitHub's GraphQL node
+    /// id; nil for GitLab and for snapshots written before it was stored.
+    public var nodeID: String?
+    /// The value of a GitHub Projects field named Priority. ``priority`` falls back to labels when this is nil.
+    public var projectPriority: Priority?
 
     public init(
         accountID: UUID,
@@ -100,7 +105,9 @@ public struct WorkItem: Codable, Hashable, Identifiable, Sendable {
         reviewers: [UserRef] = [],
         requestedReviewers: [UserRef] = [],
         additions: Int? = nil,
-        deletions: Int? = nil
+        deletions: Int? = nil,
+        nodeID: String? = nil,
+        projectPriority: Priority? = nil
     ) {
         self.id = Self.makeID(accountID: accountID, repoFullName: repoFullName, number: number, kind: kind)
         self.accountID = accountID
@@ -124,6 +131,8 @@ public struct WorkItem: Codable, Hashable, Identifiable, Sendable {
         self.requestedReviewers = requestedReviewers
         self.additions = additions
         self.deletions = deletions
+        self.nodeID = nodeID
+        self.projectPriority = projectPriority
     }
 
     public static func makeID(accountID: UUID, repoFullName: String, number: Int, kind: ItemKind) -> String {
