@@ -34,6 +34,16 @@ struct GitHubDeviceFlowTests {
         #expect(request.formFields["scope"] == "repo read:org")
     }
 
+    @Test("signing in with the built-in client also asks to read projects, for priorities")
+    func builtInScopes() async throws {
+        let transport = FakeOAuthTransport()
+        transport.enqueue("/login/device/code", json: #"{"device_code":"dev123","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":899,"interval":5}"#)
+
+        _ = try await GitHubDeviceFlow(client: OAuthClients.github, transport: transport).requestCode()
+
+        #expect(transport.requests[0].formFields["scope"] == "repo read:org read:project")
+    }
+
     @Test("polls until authorized, honouring slow_down")
     func polling() async throws {
         let transport = FakeOAuthTransport()

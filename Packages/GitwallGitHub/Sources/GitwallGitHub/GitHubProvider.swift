@@ -238,6 +238,61 @@ public struct GitHubProvider: GitProvider {
     }
 }
 
+// MARK: - Project priorities
+
+extension GitHubProvider {
+    /// Reads the Priority field of every item's open projects in batches of 100 node ids, after the lists. A token
+    /// without `read:project` (classic, OAuth) or Projects: Read (fine-grained) yields `.missingPermission`, never an
+    /// error: the items keep their label priority and the sync stays green. See `docs/adr/0012`.
+    public func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup {
+        var itemIDs: [String: String] = [:]
+        for item in items {
+            guard let nodeID = item.nodeID, GraphQLQueries.isNodeID(nodeID) else { continue }
+            itemIDs[nodeID] = item.id
+        }
+        // Nothing to ask about; the last lookup's state stands.
+        guard !itemIDs.isEmpty else { return .failed("No items to look up") }
+
+        let endpoints = GitHubEndpoints(baseURL: account.baseURL)
+        let nodeIDs = itemIDs.keys.sorted()
+        var priorities: [String: Priority] = [:]
+        var refused = false
+        for start in stride(from: 0, to: nodeIDs.count, by: GraphQLQueries.maxPriorityLookupsPerRequest) {
+            let batch = Array(nodeIDs[start..<min(start + GraphQLQueries.maxPriorityLookupsPerRequest, nodeIDs.count)])
+            do {
+                let response = try await client.graphQL(PriorityNodesData.self, endpoint: endpoints.graphQL, token: token,
+                                                        query: GraphQLQueries.projectPriorities(nodeIDs: batch))
+                // A field GitHub refuses on its own comes back as a partial answer with an error beside it.
+                refused = refused || (response.errors ?? []).contains { Self.refusesProjects($0) }
+                for node in response.data?.nodes ?? [] {
+                    guard let node, let id = node.id, let itemID = itemIDs[id], let priority = node.priority else { continue }
+                    priorities[itemID] = priority
+                }
+            } catch ProviderError.unauthorized {
+                // `INSUFFICIENT_SCOPES` or `FORBIDDEN` without data. The lists were just read with this token, so it
+                // is the projects the token may not read, not the token itself.
+                gitHubLog.info("Project priorities skipped for \(account.displayName, privacy: .public): the token may not read projects")
+                return .missingPermission
+            } catch {
+                gitHubLog.info("Project priorities unavailable: \(error.localizedDescription, privacy: .public)")
+                return .failed(error.localizedDescription)
+            }
+        }
+        if refused, priorities.isEmpty {
+            gitHubLog.info("Project priorities refused for \(account.displayName, privacy: .public)")
+            return .missingPermission
+        }
+        return .found(priorities)
+    }
+
+    private static func refusesProjects(_ error: GraphQLError) -> Bool {
+        switch error.type?.uppercased() {
+        case "FORBIDDEN", "INSUFFICIENT_SCOPES": true
+        default: false
+        }
+    }
+}
+
 // MARK: - REST models
 
 private struct RESTUser: Decodable {

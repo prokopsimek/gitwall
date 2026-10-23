@@ -46,6 +46,12 @@ which events notify you.
 Archived repositories never show up: nothing in them can be merged or closed, so Gitwall leaves them out of every
 list and does not offer them when you pick repositories.
 
+**What to do first.** Gitwall reads the *Priority* field of your GitHub Projects (P0–P3) and shows it as a small
+capsule before the title. Sort a preset by *Priority* to get P0 at the top, the oldest item first within each level,
+and everything without a priority at the end. Without a project field, a `p0`–`p3` label counts; on GitLab, labels are
+the only source. An item in several projects takes its most urgent value. Reading projects needs one more scope, see
+[GitHub and projects](#github-and-projects).
+
 Pull requests that a cloud agent opened for you stay in "Waiting for my review" even though they are drafts:
 Copilot and the Claude and Codex GitHub apps request the review before a person marks the pull request ready.
 Filter the agents themselves with author logins such as `copilot-swe-agent` or `cursor`.
@@ -77,6 +83,7 @@ so prefer `OR` when the query should work in both places.
 | `involves:` | author, assignee or reviewer |
 | `repo:` / `org:` | `acme/app` / `acme` |
 | `is:` / `type:` | `pr`, `issue`, `draft`, `open` |
+| `priority:` | `P0` to `P3`, from a project field or a label (GitHub Projects' syntax, not issue search) |
 | a bare word | the title, the repository or `#number` |
 
 `@me` is the account you signed in with; `assignee:@octocat` and `assignee:octocat` mean the same. Put values
@@ -141,7 +148,7 @@ empty. Add Account notices when you are already connected and offers to replace 
 
 | | Fine-grained token | Classic (GitHub) or legacy (GitLab) token |
 |---|---|---|
-| **GitHub** | Read-only. One token covers one owner: your account or one organization. | Scopes `repo` and `read:org`. One token covers all your organizations, but `repo` also allows writing. |
+| **GitHub** | Read-only. One token covers one owner: your account or one organization. Priorities only from projects of an organization. | Scopes `repo`, `read:org` and `read:project`. One token covers all your organizations, but `repo` also allows writing. |
 | **GitLab** | Read-only, GitLab 19.2 or newer, but without each reviewer's review state. Needed where a group or the instance enforces fine-grained tokens. | Scope `read_api`, GitLab 16 or newer. |
 
 #### GitHub fine-grained token
@@ -167,7 +174,10 @@ empty. Add Account notices when you are already connected and offers to replace 
 
    Account permissions are not needed. Contents also lets the token read your code. If you do not need the CI
    state, leave out Contents and Commit statuses; everything else keeps working.
-6. Select **Generate token** and paste it into Gitwall.
+6. **Permissions › Organization**, only when the resource owner is an organization: **Projects** › *Read-only*, for
+   priorities from that organization's projects. The prefilled form does not set it, because it applies only to an
+   organization owner.
+7. Select **Generate token** and paste it into Gitwall.
 
 Good to know:
 
@@ -178,6 +188,8 @@ Good to know:
   reads only public repositories. Single sign-on (SAML) is handled while you create the token.
 - **CI state without a Checks permission.** Fine-grained tokens cannot get *Checks*, but GitHub still reports
   the combined state of GitHub Actions and other checks when the token has Contents and Commit statuses.
+- **Projects of your personal account.** GitHub documents fine-grained tokens for organization projects only; for
+  priorities from projects of your own account, use a classic token.
 </details>
 
 #### GitHub classic token
@@ -185,13 +197,28 @@ Good to know:
 <details>
 <summary>One token for every organization. Also the choice for GitHub Enterprise Server.</summary>
 
-1. Open the [prefilled token form](https://github.com/settings/tokens/new?scopes=repo,read:org&description=Gitwall).
+1. Open the [prefilled token form](https://github.com/settings/tokens/new?scopes=repo,read:org,read:project&description=Gitwall).
    Without the link: Settings › Developer settings › Personal access tokens › Tokens (classic) › Generate new
    token (classic). On GitHub Enterprise Server, open the same page on your server.
-2. **Scopes:** `repo` for private repositories, `read:org` for your organizations.
+2. **Scopes:** `repo` for private repositories, `read:org` for your organizations, `read:project` for priorities
+   from GitHub Projects.
 3. Pick an expiration, select **Generate token** and paste it into Gitwall.
 4. For an organization with single sign-on (SAML): next to the token select **Configure SSO** › **Authorize**.
 </details>
+
+#### GitHub and projects
+
+Priorities come from a single-select field named exactly **Priority** (GitHub compares the name with case) in an
+open project, with the options `P0`–`P3`; `P1 - high` counts too, `High` does not. Reading it needs:
+
+| How the account signs in | What to add |
+|---|---|
+| Sign in with GitHub | Nothing for new sign-ins. An account that signed in before this version: Settings › Accounts › … › *Sign in again…* and approve the new `read:project` scope. |
+| Classic token | The scope `read:project`. You can add it to the existing token on GitHub (Settings › Developer settings › Tokens (classic) › the token › *Update token*); the token itself stays the same. |
+| Fine-grained token | Organization permission *Projects: Read-only*, edited on the existing token. |
+
+Without it, Gitwall keeps working with label priorities and says so under the account in Settings › Accounts. The
+lookup is one extra request per 100 items and costs about one point of GitHub's hourly rate limit.
 
 #### GitLab fine-grained token
 

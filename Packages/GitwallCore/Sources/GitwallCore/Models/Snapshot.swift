@@ -7,15 +7,25 @@ public enum FetchState: String, Codable, Sendable, Hashable {
     case needsReauth
 }
 
+/// Whether the credential could read the provider's planning boards, the source of ``WorkItem/projectPriority``.
+public enum ProjectAccess: String, Codable, Sendable, Hashable {
+    case granted
+    /// Priorities come from labels only until the account signs in again or gets a token that may read projects.
+    case denied
+}
+
 public struct FetchStatus: Codable, Hashable, Sendable {
     public var state: FetchState
     public var lastSuccessAt: Date?
     public var message: String?
+    /// Nil when the provider has no planning boards or the account has not synced since this was added.
+    public var projectAccess: ProjectAccess?
 
-    public init(state: FetchState, lastSuccessAt: Date? = nil, message: String? = nil) {
+    public init(state: FetchState, lastSuccessAt: Date? = nil, message: String? = nil, projectAccess: ProjectAccess? = nil) {
         self.state = state
         self.lastSuccessAt = lastSuccessAt
         self.message = message
+        self.projectAccess = projectAccess
     }
 }
 

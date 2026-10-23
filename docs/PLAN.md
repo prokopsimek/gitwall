@@ -24,6 +24,10 @@
   když neběží). Jen jednou – `AppSettings.launchAtLoginConfigured` – takže vypnutí v Obecných už nic nepřepíše;
   existující instalace (má účet nebo dokončený onboarding) se nechává, jak si ji uživatel nastavil.
 - SSH klíče nelze použít místo tokenu: metadata PR/issues (review, CI, štítky) poskytuje jen HTTP API.
+- 2026-10-23: priorita P0–P3 z pole Priority v GitHub Projects, jinak ze štítku `p0`–`p3` (GitLab jen štítky).
+  Řazení „Priority“, kvalifikátor `priority:` a štítek P0–P3 na řádcích. Čtení projektů potřebuje `read:project`
+  (OAuth, klasický token) nebo Projects: Read (fine-grained); bez něj zůstanou jen štítky a Settings to řeknou
+  (`docs/adr/0012`). **Neověřeno proti fine-grained tokenu.**
 
 ## Context
 

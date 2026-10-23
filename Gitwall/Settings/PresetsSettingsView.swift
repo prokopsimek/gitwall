@@ -132,6 +132,11 @@ private struct PresetEditor: View {
                     Text("Latest activity").tag(SortOrder.lastActivity)
                     Text("Newest created").tag(SortOrder.newestCreated)
                     Text("Oldest created").tag(SortOrder.oldestCreated)
+                    Text("Priority").tag(SortOrder.priority)
+                }
+                if preset.sort == .priority {
+                    Text("P0 first, the oldest first within a level, items without a priority last. Priority comes from a GitHub project field named Priority, otherwise from a p0–p3 label.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Toggle("Show count next to the menu bar icon", isOn: $preset.showCountInMenuBar)
             } header: {
@@ -362,7 +367,7 @@ private struct QueryField: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(verbatim: SearchQuery.supportedQualifiers.map { "\($0):" }.joined(separator: "  "))
                         .font(.system(.caption, design: .monospaced))
-                    Text("@me stands for the account you signed in with. is: and type: take pr, issue, draft or open. Values with spaces go in quotes. A bare word matches the title, the repository or #number.")
+                    Text("@me stands for the account you signed in with. is: and type: take pr, issue, draft or open; priority: takes P0 to P3. Values with spaces go in quotes. A bare word matches the title, the repository or #number.")
                         .font(.caption).foregroundStyle(.secondary)
                     Divider()
                     ForEach(Self.examples, id: \.0) { example, explanation in
@@ -383,6 +388,7 @@ private struct QueryField: View {
         ("assignee:@me assignee:franta-dxh,lumir-sokol", "The same with a comma; GitHub itself ignores the list"),
         ("label:bug OR (is:pr review-requested:@me)", "Every bug, plus pull requests waiting for my review"),
         ("is:issue -label:blocked label:bug,security", "Issues labelled bug or security, never blocked"),
+        ("priority:P0 OR priority:P1", "The two most urgent levels, from a project or a label"),
         (#"milestone:"Q4 2026" -author:renovate"#, "In that milestone, not opened by renovate"),
     ]
 }

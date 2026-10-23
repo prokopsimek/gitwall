@@ -29,7 +29,7 @@ struct TokenSetupLinksTests {
         #expect(params["contents"] == "read")
         #expect(params.filter { $0.value == "write" }.isEmpty)
 
-        #expect(links[1].url.absoluteString == "https://github.com/settings/tokens/new?scopes=repo,read:org&description=Gitwall")
+        #expect(links[1].url.absoluteString == "https://github.com/settings/tokens/new?scopes=repo,read:org,read:project&description=Gitwall")
         #expect(links[2].url.absoluteString == "https://github.com/prokopsimek/gitwall#personal-access-tokens")
     }
 
@@ -37,7 +37,7 @@ struct TokenSetupLinksTests {
     func githubEnterprise() {
         let links = TokenSetupLinks.links(kind: .github, baseURL: URL(string: "https://github.example.com/"))
         #expect(links.map(\.title) == ["Create a classic token…", "Token setup guide"])
-        #expect(links[0].url.absoluteString == "https://github.example.com/settings/tokens/new?scopes=repo,read:org&description=Gitwall")
+        #expect(links[0].url.absoluteString == "https://github.example.com/settings/tokens/new?scopes=repo,read:org,read:project&description=Gitwall")
     }
 
     @Test("GitLab gets the prefilled read_api token page on its own host")

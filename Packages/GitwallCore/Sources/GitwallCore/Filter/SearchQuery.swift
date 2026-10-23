@@ -22,7 +22,7 @@ public enum SearchQueryError: Error, Equatable, Hashable, Sendable {
         case .unknownQualifier(let name):
             "Unknown qualifier “\(name)”. Supported: \(SearchQuery.supportedQualifiers.joined(separator: ", "))."
         case .unknownValue(let qualifier, let value):
-            "“\(qualifier):\(value)” is not something Gitwall can check. Try \(SearchQuery.supportedIsValues.joined(separator: ", "))."
+            "“\(qualifier):\(value)” is not something Gitwall can check. Try \(SearchQuery.supportedValues(for: qualifier).joined(separator: ", "))."
         case .emptyValue(let name):
             "“\(name):” has no value."
         case .unclosedQuote:
@@ -68,6 +68,8 @@ public struct SearchQuery: Equatable, Sendable {
         case org
         case `is`
         case type
+        /// GitHub Projects' filter syntax, not issue search: `priority:P0`. See ``Priority``.
+        case priority
     }
 
     /// The `is:` and `type:` values the snapshot can answer. Gitwall only ever fetches open items, so
@@ -100,6 +102,12 @@ public struct SearchQuery: Equatable, Sendable {
 
     public static let supportedQualifiers = Qualifier.allCases.map(\.rawValue).sorted()
     public static let supportedIsValues = State.allCases.map(\.rawValue).sorted()
+    public static let supportedPriorityValues = Priority.allCases.map(\.rawValue)
+
+    /// The values a qualifier with a fixed set accepts, for the error message.
+    static func supportedValues(for qualifier: String) -> [String] {
+        Qualifier(rawValue: qualifier) == .priority ? supportedPriorityValues : supportedIsValues
+    }
     /// GitHub's limit for nested parentheses.
     static let maxDepth = 5
 
@@ -286,6 +294,12 @@ public struct SearchQuery: Equatable, Sendable {
                 return .failure(.unknownValue(qualifier: name, value: value))
             }
         }
+        // Exactly a level here, unlike an option name or a label: `priority:P0-x` is a typo, not P0.
+        if qualifier == .priority {
+            for value in values where Priority(rawValue: value.uppercased()) == nil {
+                return .failure(.unknownValue(qualifier: name, value: value))
+            }
+        }
         return .success(Term(qualifier: qualifier, values: values, isNegated: isNegated))
     }
 
@@ -334,6 +348,8 @@ public struct SearchQuery: Equatable, Sendable {
             return owner.caseInsensitiveCompare(value) == .orderedSame
         case .is, .type:
             return matchesState(item, State(rawValue: value.lowercased()))
+        case .priority:
+            return item.priority?.rawValue == value.uppercased()
         }
     }
 

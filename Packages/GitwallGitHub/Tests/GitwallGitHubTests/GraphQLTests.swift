@@ -311,5 +311,19 @@ struct GitHubIntegrationTests {
         let withCI = pulls.filter { $0.ciState != CIState.none }
         print("integration: \(repo): \(pulls.count) pull requests (\(withCI.count) with CI state), \(items.count - pulls.count) issues")
         #expect(!items.isEmpty, "The token cannot read \(repo), or it has no open pull requests or issues")
+
+        // Priorities never fail; a token without `read:project` / Projects: Read reports `.missingPermission`.
+        let lookup = await GitHubProvider().projectPriorities(account: account, token: token, items: items)
+        switch lookup {
+        case .found(let priorities):
+            let levels = Dictionary(grouping: priorities.values, by: \.rawValue).mapValues(\.count)
+            print("integration: \(repo): project priorities for \(priorities.count) of \(items.count) items \(levels.sorted { $0.key < $1.key })")
+        case .missingPermission:
+            print("integration: \(repo): the token may not read projects")
+        case .failed(let message):
+            Issue.record("Priority lookup failed: \(message)")
+        case .unsupported:
+            Issue.record("GitHub reads project priorities")
+        }
     }
 }

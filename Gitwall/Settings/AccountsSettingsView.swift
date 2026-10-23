@@ -180,6 +180,13 @@ private struct AccountRow: View {
                         .font(.caption)
                         .foregroundStyle(expiringSoon ? .orange : .secondary)
                 }
+                if status?.projectAccess == .denied {
+                    // The sync is fine without projects, so nothing else would say why priorities are missing.
+                    Label(projectsHint, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier("account-projects-denied")
+                }
             }
             Spacer()
             if needsAttention {
@@ -214,6 +221,13 @@ private struct AccountRow: View {
             .frame(width: 28)
         }
         .padding(.vertical, 4)
+    }
+
+    /// A sign-in gets the scope by signing in again; a token can be edited on GitHub and keeps working as it is.
+    private var projectsHint: String {
+        usesOAuth
+            ? "To read priorities from GitHub Projects, sign in again (… › Sign in again…)."
+            : "To read priorities from GitHub Projects, give this token read:project (classic) or Projects: Read (fine-grained) on GitHub."
     }
 
     private var needsAttention: Bool {

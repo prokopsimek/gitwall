@@ -101,8 +101,30 @@ public protocol GitProvider: Sendable {
     /// When the credential stops working, when the provider can tell. Never throws: an unknown expiry is `nil`,
     /// so settings can warn about an expiring personal access token without turning it into a sync failure.
     func tokenExpiry(baseURL: URL, token: String) async -> Date?
+
+    /// Priorities from the provider's planning boards for `items`, which `fetchItems` just returned. Never throws:
+    /// priorities are optional, and a token that may not read the boards must not cost the user the list itself.
+    /// See `docs/adr/0012-priority-comes-from-a-projects-field-then-labels.md`.
+    func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup
 }
 
 extension GitProvider {
     public func tokenExpiry(baseURL: URL, token: String) async -> Date? { nil }
+
+    /// Providers without planning boards; their items rely on labels.
+    public func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup {
+        .unsupported
+    }
+}
+
+/// What ``GitProvider/projectPriorities(account:token:items:)`` could read.
+public enum PriorityLookup: Hashable, Sendable {
+    /// The provider has no planning boards (GitLab).
+    case unsupported
+    /// ``WorkItem/id`` → priority for every item a project gives one to. Items not in the map have none.
+    case found([String: Priority])
+    /// The credential may not read projects: classic scope `read:project`, fine-grained permission Projects: Read.
+    case missingPermission
+    /// Anything else, such as the network or the rate limit. The previous values are kept until the next sync.
+    case failed(String)
 }

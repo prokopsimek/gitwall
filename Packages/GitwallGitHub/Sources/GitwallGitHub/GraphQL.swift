@@ -13,7 +13,7 @@ enum GraphQLQueries {
 
     static let pullRequestFragment = """
     fragment PR on PullRequest {
-      number title url isDraft createdAt updatedAt
+      id number title url isDraft createdAt updatedAt
       author { login avatarUrl ... on User { name } }
       labels(first: 20) { nodes { name color } }
       assignees(first: 10) { nodes { login name avatarUrl } }
@@ -29,7 +29,7 @@ enum GraphQLQueries {
 
     static let issueFragment = """
     fragment Issue on Issue {
-      number title url createdAt updatedAt
+      id number title url createdAt updatedAt
       author { login avatarUrl ... on User { name } }
       labels(first: 20) { nodes { name color } }
       assignees(first: 10) { nodes { login name avatarUrl } }
@@ -87,6 +87,31 @@ enum GraphQLQueries {
       }
     }
     """
+
+    /// The project field Gitwall reads priorities from. `fieldValueByName` compares with case, so this is exactly the
+    /// name GitHub's own project templates use. See `docs/adr/0012`.
+    static let priorityFieldName = "Priority"
+    /// `nodes(ids:)` takes at most 100 ids per request.
+    static let maxPriorityLookupsPerRequest = 100
+    static let projectsPerItem = 10
+
+    /// Project priorities of up to ``maxPriorityLookupsPerRequest`` issues and pull requests, by node id. Kept out of the
+    /// list queries on purpose: GitHub rejects a whole query when one field needs a scope the token lacks, and a
+    /// failed non-null `projectItems` nulls the item that holds it. Costs one rate-limit point per 100 ids.
+    static func projectPriorities(nodeIDs: [String]) -> String {
+        let ids = nodeIDs.map { "\"\($0)\"" }.joined(separator: ", ")
+        let items = """
+        projectItems(first: \(projectsPerItem), includeArchived: false) { nodes { project { closed } \
+        fieldValueByName(name: "\(priorityFieldName)") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } }
+        """
+        return "query {\n  \(rateLimitField)\n  nodes(ids: [\(ids)]) { ... on Issue { id \(items) } ... on PullRequest { id \(items) } }\n}\n"
+    }
+
+    /// Node ids are base64-like (`I_kwDOAbc`, `PR_kwDO-x`, legacy `MDU6SXNzdWUx==`); anything else is not inlined.
+    static func isNodeID(_ id: String) -> Bool {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-=+/"))
+        return !id.isEmpty && id.unicodeScalars.allSatisfy { $0.isASCII && allowed.contains($0) }
+    }
 
     static let search = """
     query($q: String!, $after: String) {
@@ -172,6 +197,37 @@ struct ViewerTeamsData: Decodable {
     }
 }
 
+struct PriorityNodesData: Decodable, RateLimitCarrying {
+    let rateLimitInfo: RateLimitInfo?
+    /// Null for an id GitHub could not resolve, or one the token may not see.
+    let nodes: [PriorityNode?]
+
+    enum CodingKeys: String, CodingKey {
+        case rateLimitInfo = "rateLimit"
+        case nodes
+    }
+}
+
+struct PriorityNode: Decodable {
+    struct ProjectItem: Decodable {
+        struct Project: Decodable { let closed: Bool? }
+        /// Empty when the field is not a single select; `name` is the chosen option.
+        struct Value: Decodable { let name: String? }
+        let project: Project?
+        let fieldValueByName: Value?
+    }
+
+    let id: String?
+    let projectItems: Connection<ProjectItem>?
+
+    /// The most urgent option across the item's open projects; see `docs/adr/0012`.
+    var priority: Priority? {
+        Priority.mostUrgent(in: (projectItems?.items ?? []).compactMap { item in
+            item.project?.closed == true ? nil : item.fieldValueByName?.name
+        })
+    }
+}
+
 struct SearchData: Decodable, RateLimitCarrying {
     let rateLimitInfo: RateLimitInfo?
     let search: Connection<ItemNode>
@@ -239,6 +295,7 @@ struct ItemNode: Decodable {
     struct Repository: Decodable { let nameWithOwner: String }
 
     let __typename: String?
+    let id: String?
     let number: Int
     let title: String
     let url: URL
@@ -284,7 +341,7 @@ enum GraphQLMapping {
                 accountID: accountID, kind: .issue, repoFullName: repo, number: node.number, title: node.title, url: node.url,
                 author: author, createdAt: node.createdAt, updatedAt: node.updatedAt, isDraft: false,
                 labels: labels, assignees: assignees, milestone: node.milestone?.title,
-                commentCount: node.comments?.totalCount ?? 0
+                commentCount: node.comments?.totalCount ?? 0, nodeID: node.id
             )
         }
 
@@ -317,7 +374,8 @@ enum GraphQLMapping {
             reviewers: reviewers,
             requestedReviewers: requested,
             additions: node.additions,
-            deletions: node.deletions
+            deletions: node.deletions,
+            nodeID: node.id
         )
     }
 

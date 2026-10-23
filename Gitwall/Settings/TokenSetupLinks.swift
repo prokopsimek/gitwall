@@ -18,7 +18,7 @@ enum TokenSetupLinks {
                 if baseURL.host?.lowercased() == "github.com" {
                     links.append(link("Create a fine-grained token…", "\(base)/settings/personal-access-tokens/new?\(fineGrainedGitHubQuery)"))
                 }
-                links.append(link("Create a classic token…", "\(base)/settings/tokens/new?scopes=repo,read:org&description=Gitwall"))
+                links.append(link("Create a classic token…", "\(base)/settings/tokens/new?scopes=repo,read:org,read:project&description=Gitwall"))
             case .gitlab:
                 links.append(link("Create a token on GitLab…", "\(base)/-/user_settings/personal_access_tokens?name=Gitwall&scopes=read_api"))
             }

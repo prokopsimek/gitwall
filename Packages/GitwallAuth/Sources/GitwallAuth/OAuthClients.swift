@@ -20,12 +20,13 @@ public struct OAuthClient: Hashable, Sendable {
 
 /// Gitwall's own registrations on github.com and gitlab.com, plus resolution for self-hosted instances.
 public enum OAuthClients {
-    /// GitHub OAuth App "Gitwall" (Device Flow enabled, tokens do not expire).
+    /// GitHub OAuth App "Gitwall" (Device Flow enabled, tokens do not expire). `read:project` is for priorities from
+    /// GitHub Projects (`docs/adr/0012`); a sign-in from before it was added keeps working without them.
     public static let github = OAuthClient(
         kind: .github,
         baseURL: URL(string: "https://github.com")!,
         clientID: gitHubClientID,
-        scopes: ["repo", "read:org"]
+        scopes: ["repo", "read:org", "read:project"]
     )
 
     /// GitLab.com application "Gitwall" (non-confidential, PKCE, redirect `gitwall://oauth/gitlab`).
