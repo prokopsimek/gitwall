@@ -75,7 +75,7 @@ Gitwall now shows what to do first. It reads the Priority field (P0 to P3) of yo
 
 Presets can sort by Priority and filter with priority:P0, priority:P0 OR priority:P1 or -priority:P3.
 
-Reading projects needs the read:project permission. Accounts that signed in earlier are asked to sign in again once; Settings › Accounts tells you when a connection cannot read projects.
+Reading projects needs the read:project permission. Accounts you signed in with earlier need to sign in again once; Settings › Accounts tells you when a connection cannot read projects.
 ```
 
 What's New (0.5.3):
