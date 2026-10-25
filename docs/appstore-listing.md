@@ -68,6 +68,16 @@ Support URL: <https://github.com/prokopsimek/gitwall/issues>
 Marketing URL: <https://prokopsimek.github.io/gitwall/>
 Copyright: `2026 Prokop Simek`
 
+What's New (0.6.0):
+
+```
+Gitwall now shows what to do first. It reads the Priority field (P0 to P3) of your GitHub Projects, or p0 to p3 labels when a project has none, and shows it as a small capsule before each title in the menu bar, the window and the widgets.
+
+Presets can sort by Priority and filter with priority:P0, priority:P0 OR priority:P1 or -priority:P3.
+
+Reading projects needs the read:project permission. Accounts that signed in earlier are asked to sign in again once; Settings › Accounts tells you when a connection cannot read projects.
+```
+
 What's New (0.5.3):
 
 ```
