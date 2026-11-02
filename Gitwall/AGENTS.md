@@ -36,6 +36,10 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   window (`GitwallTests/EmptyStateLayoutTests`).
 - Two `ForEach` over the same models in one `Form` section give two rows one identity, and the second draws the
   first one's row. Put the second inside a container of its own, as the preset editor does for idle accounts.
+- The preset editor works on its own copy of the preset (`@State`). Whatever changes a preset from outside the editor
+  while it is on screen, as *Paste Presets…* does, must give the editor a new identity (`PresetsSettingsView.pasteCount`),
+  or the editor keeps the old values and its next edit writes them back. Copy and paste of presets only move text
+  between the pasteboard and `PresetTransfer` (GitwallCore, `docs/adr/0013`).
 - `OAuthCoordinator` owns only the window-bound parts (device code display, `ASWebAuthenticationSession`).
   The protocol work is in GitwallAuth.
 - `AppEnvironment.start` registers the app as a login item when `AppConfig.shouldRegisterAtLogin` says so, and
