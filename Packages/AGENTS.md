@@ -9,7 +9,7 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 
 | Package | Owns |
 |---|---|
-| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`. |
+| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`, `PresetTransfer` (preset JSON for copy and paste). |
 | `GitwallUI` | Row views, status icons, time formatting shared by popover, window and widget. |
 | `GitwallAuth` | Keychain `TokenStore`, `StoredToken`, OAuth flows (`GitHubDeviceFlow`, `GitLabPKCEFlow`), `PKCE`, `TokenRefresher`, `RefreshingTokenReader`, token expiry parsing, `OAuthClients` (public client IDs). |
 | `GitwallGitHub` | `GitHubProvider`: GraphQL for lists, REST for identity and discovery, Link pagination. |
@@ -57,3 +57,7 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   a parse error, and an unreadable query matches nothing so a typo cannot widen a preset. Adding a qualifier means
   adding it to `SearchQuery.Qualifier`, to `SearchQueryTests` and to the table in the README. `priority:` is the one
   qualifier taken from GitHub Projects' filter syntax rather than issue search.
+- The preset JSON of `PresetTransfer` is a public contract (`docs/adr/0013`, README *Sharing presets*): `id`, `name`,
+  `query`, `icon`, `sort`, `kinds` under `"version": 1`. Unknown keys are errors, everything is validated before
+  anything is written, a paste never deletes, and an export round-trips exactly. A new key or a changed meaning needs
+  version 2. The JSON spells `SortOrder` and `ItemKind` by their raw values, so renaming a case breaks pasted files.

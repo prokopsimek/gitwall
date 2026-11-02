@@ -137,10 +137,13 @@ public struct Preset: Codable, Hashable, Identifiable, Sendable {
     public var notifications: Set<NotificationEvent>
     public var showCountInMenuBar: Bool
 
+    /// The icon of a preset that does not choose one.
+    public static let defaultIcon = "tray.full"
+
     public init(
         id: UUID = UUID(),
         name: String,
-        icon: String = "tray.full",
+        icon: String = Preset.defaultIcon,
         scopes: [PresetScope] = [],
         kinds: Set<ItemKind> = [.pullRequest],
         filter: ItemFilter = .any,

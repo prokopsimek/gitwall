@@ -522,6 +522,33 @@ final class AppEnvironment {
         try? persist(updated, refresh: false)
     }
 
+    // MARK: Preset transfer (docs/adr/0013)
+
+    /// Puts `presets` on the pasteboard as JSON. Returns what the JSON could not carry, for a warning, or nil.
+    func copyPresetsAsJSON(_ presets: [Preset], to pasteboard: NSPasteboard = .general) -> String? {
+        pasteboard.clearContents()
+        pasteboard.setString(PresetTransfer.encode(presets), forType: .string)
+        return PresetTransfer.copyWarning(for: presets)
+    }
+
+    /// Reads presets from the pasteboard without writing anything; ``pastePresets(_:)`` writes them.
+    func presetsOnPasteboard(_ pasteboard: NSPasteboard = .general) -> Result<[Preset], PresetTransferError> {
+        PresetTransfer.decode(pasteboard.string(forType: .string) ?? "") { name in
+            NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
+        }
+    }
+
+    /// What ``pastePresets(_:)`` would do to the current presets, for the confirmation.
+    func pastePreview(_ incoming: [Preset]) -> PresetMerge {
+        PresetTransfer.merge(incoming, into: config.presets)
+    }
+
+    func pastePresets(_ incoming: [Preset]) {
+        var updated = config
+        updated.presets = PresetTransfer.merge(incoming, into: config.presets).presets
+        try? persist(updated, refresh: false)
+    }
+
     // MARK: Settings
 
     func updateSettings(_ settings: AppSettings) {

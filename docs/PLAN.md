@@ -28,6 +28,9 @@
   Řazení „Priority“, kvalifikátor `priority:` a štítek P0–P3 na řádcích. Čtení projektů potřebuje `read:project`
   (OAuth, klasický token) nebo Projects: Read (fine-grained); bez něj zůstanou jen štítky a Settings to řeknou
   (`docs/adr/0012`). **Neověřeno proti fine-grained tokenu.**
+- 2026-11-02: presety se dají kopírovat a vkládat jako JSON (Settings › Presets › ⋯), aby mohly žít v souboru
+  v jiném repozitáři. Formát má verzi 1 a stabilní UUID, neznámý klíč je chyba, vložení nic nemaže a u nahrazeného
+  presetu nechá účty, notifikace a počet v menu baru (`docs/adr/0013`).
 
 ## Context
 

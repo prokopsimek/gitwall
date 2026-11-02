@@ -92,6 +92,8 @@ with spaces in quotes: `milestone:"Q4 2026"`. A bare `@lumir-sokol` is an error,
 parentheses. A query Gitwall cannot read matches nothing and says why, so a typo can never quietly widen a
 preset.
 
+Presets can also live outside Gitwall, as JSON in a repository of your own: see [Sharing presets](#sharing-presets).
+
 **Issues too, not just pull requests.**
 
 ![Open bugs preset in the main window and a widget](docs/screenshots/03-issues.jpg)
@@ -272,6 +274,55 @@ Good to know:
 A group on gitlab.com can refuse legacy tokens after a date its owner sets, and an administrator can stop new
 legacy tokens on a self-managed instance. Use a fine-grained token there.
 </details>
+
+## Sharing presets
+
+Keep your presets as a JSON file wherever you like, for example in the repository of the team or the agents they
+watch, and set them up in Gitwall by copy and paste. In **Settings › Presets › ⋯**:
+
+- **Copy as JSON** copies the selected preset, **Copy All as JSON** every preset.
+- **Paste Presets…** reads the clipboard, checks every preset, says how many are new and how many it replaces, and
+  writes nothing until you confirm. From a terminal: `pbcopy < presets.json`.
+
+```json
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "6F0C2D6A-1B7E-4C55-9E0A-2D8E4B1F7A10",
+      "name": "Waiting for me · agents",
+      "query": "involves:franta-dxh (label:needs:approval OR (review-requested:@me -is:draft))",
+      "icon": "hand.raised",
+      "sort": "priority",
+      "kinds": ["pullRequest", "issue"]
+    }
+  ]
+}
+```
+
+| Key | Required | Value |
+|---|---|---|
+| `id` | yes | A UUID, for example from `uuidgen`. Pasting a preset whose id Gitwall already has replaces that preset instead of adding a second one. |
+| `name` | yes | Not blank. |
+| `query` | yes | What the *Query* field takes (see [Features](#features)); it must parse. `""` shows every item. |
+| `icon` | no | An SF Symbol name. Default `tray.full`. |
+| `sort` | no | `lastActivity` (default), `newestCreated`, `oldestCreated` or `priority`. |
+| `kinds` | no | `pullRequest`, `issue` or both (default). |
+
+A bare list `[ … ]` of presets works too. With the wrapper, `version` must be `1`.
+
+- **Strict.** An unknown key, a query Gitwall cannot read, an id that is not a UUID or appears twice, an unknown
+  icon, sort or kind: the paste stops, says which preset (counted from 1) and why, and changes nothing.
+- **Nothing is deleted.** Presets that are not in the paste stay as they are.
+- **A replaced preset keeps what is set on this Mac**: its accounts and repositories, notifications and the menu bar
+  count. Its other filters (relation to me, drafts, review, labels and the rest) give way to the pasted query, which
+  defines a preset from a file on its own. Put the conditions in the query: `repo:`, `org:`, `assignee:`, `label:` ….
+- **Copy writes every key**, so copying and pasting back gives exactly the same presets and the same text. When a
+  copied preset is narrowed to accounts or uses filters outside its query, Gitwall copies it anyway and tells you
+  what was left out.
+
+The format is versioned and will not change under the same version; see
+[ADR 0013](docs/adr/0013-presets-travel-as-json-with-stable-ids.md).
 
 ## Development
 

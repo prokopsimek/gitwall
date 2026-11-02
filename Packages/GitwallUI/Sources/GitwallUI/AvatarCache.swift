@@ -19,4 +19,10 @@ public enum PresetIcons {
         "flame", "bolt", "star", "flag", "tag", "folder", "building.2", "person.2", "hammer",
         "ladybug", "shippingbox", "arrow.triangle.pull", "smallcircle.filled.circle",
     ]
+
+    /// The offered icons plus `icon` when it is not one of them. A pasted preset may use any SF Symbol, and a
+    /// picker without a matching choice shows nothing.
+    public static func choices(including icon: String) -> [String] {
+        all.contains(icon) ? all : all + [icon]
+    }
 }
