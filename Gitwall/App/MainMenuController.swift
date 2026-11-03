@@ -42,6 +42,7 @@ final class MainMenuController: NSObject {
         edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         edit.addItem(.separator())
+        edit.addItem(withTitle: "Copy Configuration as JSON", action: #selector(copyConfiguration), keyEquivalent: "").target = self
         edit.addItem(withTitle: "Paste Configuration…", action: #selector(pasteConfiguration), keyEquivalent: "V").target = self
         main.addItem(submenu(edit, title: "Edit"))
 
@@ -93,6 +94,7 @@ final class MainMenuController: NSObject {
     @objc private func refresh() { Task { await environment.refresh() } }
     @objc private func openMainWindow() { environment.openMainWindow() }
     @objc private func openWalls() { environment.openWalls() }
+    @objc private func copyConfiguration() { ConfigurationPaste.copyConfiguration(environment: environment) }
     @objc private func pasteConfiguration() { ConfigurationPaste.run(environment: environment) }
     @objc private func showWidgetHelp() { environment.showWidgetHelp() }
     @objc private func showSampleData() {
@@ -109,9 +111,14 @@ final class MainMenuController: NSObject {
 }
 
 extension MainMenuController: NSMenuItemValidation {
-    /// Sample data is only on offer while no account is connected (`AppEnvironment.canShowSampleData`).
+    /// Sample data is only on offer while no account is connected (`AppEnvironment.canShowSampleData`). An empty
+    /// configuration copies to a file nothing can paste.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        menuItem.action == #selector(showSampleData) ? environment.canShowSampleData : true
+        switch menuItem.action {
+        case #selector(showSampleData): environment.canShowSampleData
+        case #selector(copyConfiguration): !environment.config.presets.isEmpty || !environment.config.walls.isEmpty
+        default: true
+        }
     }
 }
 

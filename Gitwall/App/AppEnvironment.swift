@@ -22,10 +22,11 @@ final class AppEnvironment {
     // MARK: State
 
     private(set) var config: AppConfig = .empty {
-        didSet { itemsCache.removeAll() }
+        // Walls show presets but change nothing a preset finds.
+        didSet { if config.differsOutsideWalls(from: oldValue) { filterCache.removeAll() } }
     }
     private(set) var snapshot: Snapshot? {
-        didSet { itemsCache.removeAll() }
+        didSet { filterCache.removeAll() }
     }
     private(set) var previousSnapshot: Snapshot?
     private(set) var isRefreshing = false
@@ -61,6 +62,9 @@ final class AppEnvironment {
     @ObservationIgnored var onOpenSettings: ((SettingsTab, UUID?) -> Void)?
     @ObservationIgnored var onOpenMainWindow: ((UUID?) -> Void)?
     @ObservationIgnored var onOpenWalls: (() -> Void)?
+    /// A paste gave walls that were here new content (`GitwallFileMerge.replacesWalls`); the Walls window forgets
+    /// its undo history, which would write the old content back.
+    @ObservationIgnored var onWallsReplacedByPaste: (() -> Void)?
     @ObservationIgnored var onShowWidgetHelp: (() -> Void)?
     @ObservationIgnored var onShowSampleItem: ((WorkItem) -> Void)?
     @ObservationIgnored private var refreshLoop: Task<Void, Never>?
@@ -69,7 +73,10 @@ final class AppEnvironment {
     @ObservationIgnored private let defaults: UserDefaults
     /// Review requests that have "arrived" through Refresh while showing sample data. See `refreshSampleData`.
     @ObservationIgnored private var sampleArrivals = 0
-    @ObservationIgnored private let itemsCache = ItemsCache()
+    @ObservationIgnored private(set) var filterCache = FilterCache()
+    /// Bumped by every paste of a configuration, wherever it starts. A paste can replace the preset in the preset
+    /// editor, which works on its own copy, so the editor takes this into its identity to load the pasted values.
+    private(set) var pasteCount = 0
 
     /// `sandbox` points the config, snapshot and tokens at a throwaway directory so a test run cannot touch
     /// the real installation's accounts (`--debug-fresh`). `providers` lets a test put a stub transport under a
@@ -347,11 +354,14 @@ final class AppEnvironment {
         config.preset(id: selectedPresetID ?? UUID()) ?? config.presets.first
     }
 
-    /// Remembered per preset until the snapshot or the configuration changes (`ItemsCache`).
+    /// Remembered per saved preset for the minute, until the snapshot or what presets find changes (`FilterCache`).
+    /// The preset editor's unsaved copy is worked out every time.
     func items(for preset: Preset) -> [WorkItem] {
         guard let snapshot else { return [] }
-        return itemsCache.items(for: preset) {
-            FilterEngine.items(matching: preset, in: snapshot.items, accounts: config.accounts, now: Date())
+        let accounts = config.accounts
+        let now = Date()
+        return filterCache.items(for: preset, saved: config.preset(id: preset.id), now: now) {
+            FilterEngine.items(matching: preset, in: snapshot.items, accounts: accounts, now: now)
         }
     }
 
@@ -540,24 +550,6 @@ final class AppEnvironment {
         return PresetTransfer.copyWarning(for: presets)
     }
 
-    /// Reads presets from the pasteboard without writing anything; ``pastePresets(_:)`` writes them.
-    func presetsOnPasteboard(_ pasteboard: NSPasteboard = .general) -> Result<[Preset], PresetTransferError> {
-        PresetTransfer.decode(pasteboard.string(forType: .string) ?? "") { name in
-            NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
-        }
-    }
-
-    /// What ``pastePresets(_:)`` would do to the current presets, for the confirmation.
-    func pastePreview(_ incoming: [Preset]) -> PresetMerge {
-        PresetTransfer.merge(incoming, into: config.presets)
-    }
-
-    func pastePresets(_ incoming: [Preset]) {
-        var updated = config
-        updated.presets = PresetTransfer.merge(incoming, into: config.presets).presets
-        try? persist(updated, refresh: false)
-    }
-
     // MARK: Walls and the Gitwall file (docs/adr/0014)
 
     func setWalls(_ walls: [Wall]) {
@@ -567,7 +559,7 @@ final class AppEnvironment {
     }
 
     /// Reads presets and walls from the pasteboard without writing anything; ``pasteConfiguration(_:)`` writes them.
-    /// Takes a version 1 preset file as well, exactly as ``presetsOnPasteboard(_:)`` does.
+    /// Takes a version 1 preset file and a bare list as well, as `PresetTransfer` reads them.
     func configurationOnPasteboard(_ pasteboard: NSPasteboard = .general) -> Result<GitwallFile, GitwallFileError> {
         GitwallFile.decode(pasteboard.string(forType: .string) ?? "", presetsInApp: Set(config.presets.map(\.id))) { name in
             NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
@@ -579,12 +571,22 @@ final class AppEnvironment {
         GitwallFile.merge(file, presets: config.presets, walls: config.walls)
     }
 
+    /// Every paste goes through here: Edit › Paste Configuration…, the empty Walls window and Settings.
     func pasteConfiguration(_ file: GitwallFile) {
         let merge = pastePreview(file)
         var updated = config
         updated.presets = merge.presets.presets
         updated.walls = merge.walls
         try? persist(updated, refresh: false)
+        pasteCount += 1
+        if merge.replacesWalls { onWallsReplacedByPaste?() }
+    }
+
+    /// Puts every preset and every wall on the pasteboard. Returns what the JSON could not carry, or nil.
+    func copyConfigurationAsJSON(to pasteboard: NSPasteboard = .general) -> String? {
+        pasteboard.clearContents()
+        pasteboard.setString(GitwallFile.encodeConfiguration(presets: config.presets, walls: config.walls), forType: .string)
+        return GitwallFile.copyWarning(presets: config.presets, walls: config.walls)
     }
 
     /// Puts `wall` and the presets it shows on the pasteboard. Returns what the JSON could not carry, or nil.
@@ -629,9 +631,11 @@ final class AppEnvironment {
             return
         }
         guard let configStore else { throw AppError.containerUnavailable }
+        // Widgets show presets with the accounts and settings; no widget shows a wall.
+        let reachesWidgets = updated.differsOutsideWalls(from: config)
         try configStore.save(updated)
         config = updated
-        WidgetCenter.shared.reloadAllTimelines()
+        if reachesWidgets { WidgetCenter.shared.reloadAllTimelines() }
         if refresh {
             Task { await self.refresh() }
         }

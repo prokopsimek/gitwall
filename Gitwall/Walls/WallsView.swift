@@ -158,7 +158,6 @@ struct WallsView: View {
 private struct WallTab: View {
     @Bindable var model: WallsModel
     let wall: Wall
-    @State private var draft = ""
     @FocusState private var focused: Bool
 
     private var isSelected: Bool { model.currentWall?.id == wall.id }
@@ -166,18 +165,16 @@ private struct WallTab: View {
     var body: some View {
         Group {
             if model.renamingWallID == wall.id {
-                TextField("Wall name", text: $draft)
+                // The model holds what is typed, so switching walls in the middle keeps it.
+                TextField("Wall name", text: $model.renameDraft)
                     .textFieldStyle(.plain)
                     .frame(width: 160)
                     .focused($focused)
-                    .onAppear {
-                        draft = wall.name
-                        focused = true
-                    }
-                    .onSubmit { model.rename(wall.id, to: draft) }
-                    .onExitCommand { model.renamingWallID = nil }
+                    .onAppear { focused = true }
+                    .onSubmit { model.commitRename() }
+                    .onExitCommand { model.cancelRename() }
                     .onChange(of: focused) { _, isFocused in
-                        if !isFocused, model.renamingWallID == wall.id { model.rename(wall.id, to: draft) }
+                        if !isFocused, model.renamingWallID == wall.id { model.commitRename() }
                     }
             } else {
                 Text(wall.name)
@@ -196,12 +193,12 @@ private struct WallTab: View {
         .onTapGesture { model.selectWall(wall.id) }
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             model.selectWall(wall.id)
-            model.renamingWallID = wall.id
+            model.beginRename(wall.id)
         })
         .contextMenu {
             Button("Rename") {
                 model.selectWall(wall.id)
-                model.renamingWallID = wall.id
+                model.beginRename(wall.id)
             }
             Button("Duplicate") { model.duplicate(wall.id) }
             Button("Copy as JSON") { ConfigurationPaste.copy(wall, environment: model.environment) }

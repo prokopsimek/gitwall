@@ -6,9 +6,6 @@ struct PresetsSettingsView: View {
     @Bindable var environment: AppEnvironment
     @State private var selection: UUID?
     @State private var transferAlert: TransferAlert?
-    /// Bumped by every paste. A paste can replace the preset on screen, and the editor works on its own copy, so the
-    /// editor needs a new identity to load the pasted values; otherwise its next edit writes the old ones back.
-    @State private var pasteCount = 0
 
     var body: some View {
         HSplitView {
@@ -92,8 +89,10 @@ struct PresetsSettingsView: View {
 
             Group {
                 if let preset = selected {
+                    // A paste from anywhere can replace the preset on screen, and the editor works on its own copy:
+                    // without a new identity its next edit would write the old values back.
                     PresetEditor(environment: environment, preset: preset)
-                        .id("\(preset.id) \(pasteCount)")
+                        .id("\(preset.id) \(environment.pasteCount)")
                 } else {
                     ContentUnavailableView(
                         "Presets",
@@ -131,7 +130,6 @@ struct PresetsSettingsView: View {
     /// the paste changes.
     private func paste() {
         guard let file = ConfigurationPaste.run(environment: environment) else { return }
-        pasteCount += 1
         if let first = file.presets.first { selection = first.id }
     }
 }

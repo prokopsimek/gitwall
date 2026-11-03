@@ -23,8 +23,9 @@ final class WallsModel {
     var selectedTileID: UUID?
     var selectedItemID: String?
     var isEditing = false
-    /// The tab whose name is being typed.
-    var renamingWallID: UUID?
+    /// The tab whose name is being typed (``beginRename(_:)``), and what is typed so far.
+    private(set) var renamingWallID: UUID?
+    var renameDraft = ""
     var zoom: Double {
         didSet { defaults.set(zoom, forKey: Keys.zoom) }
     }
@@ -49,6 +50,8 @@ final class WallsModel {
         zoom = defaults.object(forKey: Keys.zoom) as? Double ?? 1
         rotates = defaults.bool(forKey: Keys.rotates)
         rotation = WallRotation(storedInterval: defaults.object(forKey: Keys.rotationInterval) as? Double)
+        // Undoing an edit of a wall a paste has replaced would write the old content over the pasted one.
+        environment.onWallsReplacedByPaste = { [weak self] in self?.undoManager?.removeAllActions() }
     }
 
     // MARK: What is on screen
@@ -82,14 +85,32 @@ final class WallsModel {
         return visibleItems(for: tile).first { $0.id == selectedItemID }
     }
 
+    /// What `WallsCommand.isEnabled` needs. The window says whether it is the key window and whether a text field
+    /// has the keyboard.
+    func state(isKeyWindow: Bool, isTyping: Bool) -> WallsState {
+        WallsState(
+            isKeyWindow: isKeyWindow,
+            isTyping: isTyping || renamingWallID != nil,
+            hasContent: environment.containerAvailable && !environment.needsOnboarding,
+            wallCount: walls.count,
+            tileCount: currentWall?.tiles.count ?? 0,
+            hasSelectedTile: selectedTile != nil,
+            hasSelectedItem: selectedItem != nil,
+            isEditing: isEditing,
+            presetCount: environment.config.presets.count,
+            zoom: zoom
+        )
+    }
+
     // MARK: Moving around
 
+    /// A name being typed is kept before the other wall comes up.
     func selectWall(_ id: Wall.ID) {
         guard id != currentWall?.id else { return }
+        commitRename()
         selectedWallID = id
         selectedTileID = nil
         selectedItemID = nil
-        renamingWallID = nil
     }
 
     /// Next (1) or previous (-1) wall, wrapping around.
@@ -145,13 +166,31 @@ final class WallsModel {
     func newWall() {
         let wall = Wall(name: "New Wall")
         apply(WallChange(before: nil, after: wall, index: walls.count), actionName: "New Wall")
-        renamingWallID = wall.id
+        beginRename(wall.id)
     }
 
     /// One medium tile per preset, in their order.
     func newWallFromPresets() {
         let wall = Wall.fromPresets(environment.config.presets, name: "All Presets")
         apply(WallChange(before: nil, after: wall, index: walls.count), actionName: "New Wall from Presets")
+    }
+
+    /// Starts typing a name for `id`, or for the wall on screen.
+    func beginRename(_ id: Wall.ID? = nil) {
+        let target = id ?? currentWall?.id
+        guard let wall = walls.first(where: { $0.id == target }) else { return }
+        renamingWallID = wall.id
+        renameDraft = wall.name
+    }
+
+    /// Writes the name being typed; an empty one keeps the old name.
+    func commitRename() {
+        guard let id = renamingWallID else { return }
+        rename(id, to: renameDraft)
+    }
+
+    func cancelRename() {
+        renamingWallID = nil
     }
 
     func rename(_ id: Wall.ID, to name: String) {
@@ -209,10 +248,8 @@ final class WallsModel {
             MainActor.assumeIsolated { model.apply(change.inverse, actionName: actionName) }
         }
         undoManager?.setActionName(actionName)
-        if let after = change.after {
-            if after.id != currentWall?.id { selectWall(after.id) }
-        } else if selectedWallID == change.before?.id || currentWall == nil {
-            selectedWallID = walls.isEmpty ? nil : walls[min(change.index, walls.count - 1)].id
+        if case .select(let id) = WallNavigation.selection(after: change, in: walls, selected: selectedWallID) {
+            selectedWallID = id
             selectedTileID = nil
             selectedItemID = nil
         }

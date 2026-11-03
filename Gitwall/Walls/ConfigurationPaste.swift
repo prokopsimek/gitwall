@@ -3,7 +3,8 @@ import GitwallCore
 
 /// Edit › Paste Configuration…, Settings › Presets › Paste Presets… and the empty Walls window all paste the same
 /// way: read the clipboard, say what would change, write only after the user agrees (docs/adr/0014). The rules are
-/// `GitwallFile`'s; this only shows the alerts.
+/// `GitwallFile`'s; this only shows the alerts. Edit › Copy Configuration as JSON and Copy Wall as JSON are the other
+/// direction.
 @MainActor
 enum ConfigurationPaste {
     /// Returns the pasted file when something was written, nil when nothing was.
@@ -34,6 +35,13 @@ enum ConfigurationPaste {
     /// Copy Wall as JSON, with a note when the copy had to leave something out.
     static func copy(_ wall: Wall, environment: AppEnvironment) {
         if let warning = environment.copyWallAsJSON(wall) {
+            inform("Copied, with some settings left out", warning)
+        }
+    }
+
+    /// Edit › Copy Configuration as JSON: every preset and every wall, with the same note.
+    static func copyConfiguration(environment: AppEnvironment) {
+        if let warning = environment.copyConfigurationAsJSON() {
             inform("Copied, with some settings left out", warning)
         }
     }

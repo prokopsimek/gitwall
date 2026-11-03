@@ -15,6 +15,8 @@ import GitwallCore
     func wallsOpenItem(_ sender: Any?)
     func wallsOpenItemInBrowser(_ sender: Any?)
     func wallsToggleEditing(_ sender: Any?)
+    /// Escape while editing. No menu item shows it; Edit Wall turns editing off as well.
+    func wallsFinishEditing(_ sender: Any?)
     /// The menu item's tag is ``TileSize/number``.
     func wallsSetTileSize(_ sender: NSMenuItem)
     /// The menu item's represented object is the preset id.
@@ -123,6 +125,43 @@ final class WallsMenu: NSObject, NSMenuDelegate {
         let items = menu.items
         menu.removeAllItems()
         return items
+    }
+
+    // MARK: Commands
+
+    /// The action of each `WallsCommand`. The keys the window answers itself (`WallsKeys`) are sent as the same
+    /// actions, so the menu and the keys are enabled by one rule (`WallsCommand.isEnabled`).
+    static func selector(for command: WallsCommand) -> Selector {
+        switch command {
+        case .nextWall: #selector(WallsMenuActions.wallsNextWall(_:))
+        case .previousWall: #selector(WallsMenuActions.wallsPreviousWall(_:))
+        case .nextTile: #selector(WallsMenuActions.wallsNextTile(_:))
+        case .previousTile: #selector(WallsMenuActions.wallsPreviousTile(_:))
+        case .nextItem: #selector(WallsMenuActions.wallsNextItem(_:))
+        case .previousItem: #selector(WallsMenuActions.wallsPreviousItem(_:))
+        case .openItem: #selector(WallsMenuActions.wallsOpenItem(_:))
+        case .openItemInBrowser: #selector(WallsMenuActions.wallsOpenItemInBrowser(_:))
+        case .toggleEditing: #selector(WallsMenuActions.wallsToggleEditing(_:))
+        case .finishEditing: #selector(WallsMenuActions.wallsFinishEditing(_:))
+        case .setTileSize: #selector(WallsMenuActions.wallsSetTileSize(_:))
+        case .addTile: #selector(WallsMenuActions.wallsAddTile(_:))
+        case .removeTile: #selector(WallsMenuActions.wallsRemoveTile(_:))
+        case .newWall: #selector(WallsMenuActions.wallsNewWall(_:))
+        case .newWallFromPresets: #selector(WallsMenuActions.wallsNewWallFromPresets(_:))
+        case .renameWall: #selector(WallsMenuActions.wallsRenameWall(_:))
+        case .duplicateWall: #selector(WallsMenuActions.wallsDuplicateWall(_:))
+        case .copyWallAsJSON: #selector(WallsMenuActions.wallsCopyWallAsJSON(_:))
+        case .deleteWall: #selector(WallsMenuActions.wallsDeleteWall(_:))
+        case .zoomIn: #selector(WallsMenuActions.wallsZoomIn(_:))
+        case .zoomOut: #selector(WallsMenuActions.wallsZoomOut(_:))
+        case .actualSize: #selector(WallsMenuActions.wallsActualSize(_:))
+        case .toggleRotation: #selector(WallsMenuActions.wallsToggleRotation(_:))
+        case .setRotationInterval: #selector(WallsMenuActions.wallsSetRotationInterval(_:))
+        }
+    }
+
+    static func command(for action: Selector) -> WallsCommand? {
+        WallsCommand.allCases.first { selector(for: $0) == action }
     }
 
     // MARK: NSMenuDelegate
