@@ -2,8 +2,8 @@
   "data" : {
     "rateLimit" : {
       "cost" : 1,
-      "remaining" : 4433,
-      "resetAt" : "2026-11-03T06:40:59Z"
+      "remaining" : 4498,
+      "resetAt" : "2026-11-03T07:41:00Z"
     },
     "repository" : {
       "issueOrPullRequest" : {
@@ -40,6 +40,9 @@
                 "login" : "adam-fowler"
               },
               "body" : "Not looked in detail at this yet. But one thing that could be addressed. Where you have replaced `Max2Sequence` with a `TinyFastSequence` containing 3 timers you have introduced a new allocation. Perhaps `TinyFastSequence` should include a case for three elements to avoid this.",
+              "comments" : {
+                "totalCount" : 0
+              },
               "createdAt" : "2026-09-29T08:21:10Z",
               "id" : "PRR_kwDOCPpRxc8AAAABPt1u1g",
               "state" : "COMMENTED",
@@ -53,6 +56,9 @@
                 "login" : "0xTim"
               },
               "body" : "Couple of edge cases to fix",
+              "comments" : {
+                "totalCount" : 2
+              },
               "createdAt" : "2026-11-03T01:50:38Z",
               "id" : "PRR_kwDOCPpRxc8AAAABVn8XAg",
               "state" : "CHANGES_REQUESTED",

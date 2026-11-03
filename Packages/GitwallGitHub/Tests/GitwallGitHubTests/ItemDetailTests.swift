@@ -51,6 +51,7 @@ struct ItemDetailTests {
         let conversation = try #require(queries.first { $0.contains(Self.conversation) })
         #expect(conversation.contains("comments(last: 20)"))
         #expect(conversation.contains("reviews(last: 10)"))
+        #expect(conversation.contains("comments { totalCount }"))
         #expect(conversation.contains("timelineItems(last: 30"))
         let status = try #require(queries.first { $0.contains(Self.status) })
         #expect(status.contains("files(first: 100)"))
@@ -72,6 +73,7 @@ struct ItemDetailTests {
         #expect(comments.first?.url == URL(string: "https://github.com/vapor/postgres-nio/pull/686#issuecomment-5868273241"))
         #expect(comments.first?.createdAt == iso.date(from: "2026-09-28T10:39:26Z"))
         #expect(comments.first?.body.contains("<details>") == true)
+        #expect(comments.first?.authorIsBot == true)
 
         let reviews = try detail.reviews.get()
         #expect(reviews.map(\.author.login) == ["adam-fowler", "0xTim"])
@@ -79,6 +81,8 @@ struct ItemDetailTests {
         #expect(reviews.last?.body == "Couple of edge cases to fix")
         #expect(reviews.last?.submittedAt == iso.date(from: "2026-11-03T02:01:46Z"))
         #expect(reviews.last?.url == URL(string: "https://github.com/vapor/postgres-nio/pull/686#pullrequestreview-5746136834"))
+        #expect(reviews.allSatisfy { !$0.authorIsBot })
+        #expect(reviews.map(\.inlineCommentCount) == [0, 2])
 
         let timeline = try detail.timeline.get()
         #expect(timeline.count == 14)
@@ -108,6 +112,26 @@ struct ItemDetailTests {
         #expect(files.totalCount == 9)
         #expect(files.files.count == 9)
         #expect(files.files.first == ChangedFile(path: "Sources/ConnectionPoolModule/ConnectionPool.swift", additions: 9, deletions: 0))
+    }
+
+    @Test("checks that share a name, even a link, keep apart: each gets its own id")
+    func duplicateCheckNames() async throws {
+        let context = #"{"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"SUCCESS","detailsUrl":null,"url":null}"#
+        let failing = #"{"__typename":"CheckRun","name":"build","status":"COMPLETED","conclusion":"FAILURE","detailsUrl":null,"url":null}"#
+        let status = #"{"__typename":"StatusContext","context":"build","state":"SUCCESS","targetUrl":null}"#
+        let body = """
+        {"data":{"repository":{"issueOrPullRequest":{"__typename":"PullRequest","changedFiles":0,"files":{"totalCount":0,"nodes":[]},
+        "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[\(context),\(failing),\(status)]}}}}]}}}}}
+        """
+        let (detail, _) = try await detail(item(.pullRequest, 686), [
+            (Self.status, .json(Data(body.utf8))),
+            (Self.conversation, .json(try Fixtures.data("graphql_item_detail_pull_request.json"))),
+        ])
+
+        let checks = try detail.checks.get()
+        #expect(checks.map(\.name) == ["build", "build", "build"])
+        #expect(checks.map(\.state) == [.passed, .failed, .passed])
+        #expect(Set(checks.map(\.id)).count == 3)
     }
 
     @Test("an issue needs one query: comments, timeline and the pull requests that close it")

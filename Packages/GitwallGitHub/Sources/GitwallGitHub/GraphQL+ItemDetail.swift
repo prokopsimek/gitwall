@@ -35,7 +35,9 @@ extension GraphQLQueries {
               ... on PullRequest {
                 body headRefName baseRefName
                 comments(last: \(detailComments)) { nodes { id url body createdAt author { \(actor) } } }
-                reviews(last: \(detailReviews)) { nodes { id url body state submittedAt createdAt author { \(actor) } } }
+                reviews(last: \(detailReviews)) {
+                  nodes { id url body state submittedAt createdAt author { \(actor) } comments { totalCount } }
+                }
                 timelineItems(last: \(detailEvents), itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW, PULL_REQUEST_COMMIT, LABELED_EVENT, \
         UNLABELED_EVENT, READY_FOR_REVIEW_EVENT, REVIEW_REQUESTED_EVENT, ASSIGNED_EVENT, HEAD_REF_FORCE_PUSHED_EVENT]) {
                   nodes { __typename ...Events }
@@ -131,6 +133,7 @@ struct DetailNode: Decodable {
         let author: Actor?
     }
     struct Review: Decodable {
+        struct Count: Decodable { let totalCount: Int? }
         let id: String?
         let url: URL?
         let body: String?
@@ -138,6 +141,8 @@ struct DetailNode: Decodable {
         let submittedAt: Date?
         let createdAt: Date?
         let author: Actor?
+        /// The inline comments that came with the review.
+        let comments: Count?
     }
     struct Linked: Decodable {
         struct Repository: Decodable { let nameWithOwner: String }
@@ -226,18 +231,22 @@ enum DetailMapping {
         return UserRef(login: login, avatarURL: actor?.avatarUrl)
     }
 
+    /// GitHub Apps (codecov, dependabot) are `Bot` actors; their GraphQL login has no `[bot]` suffix.
+    static func isBot(_ actor: DetailNode.Actor?) -> Bool { actor?.__typename == "Bot" }
+
     static func comments(_ connection: Connection<DetailNode.Comment>?) -> [DetailComment] {
         (connection?.items ?? []).enumerated().map { index, node in
-            DetailComment(id: node.id ?? "comment-\(index)", author: user(node.author), body: node.body ?? "",
-                          createdAt: node.createdAt, url: node.url)
+            DetailComment(id: node.id ?? "comment-\(index)", author: user(node.author), authorIsBot: isBot(node.author),
+                          body: node.body ?? "", createdAt: node.createdAt, url: node.url)
         }
     }
 
     static func reviews(_ connection: Connection<DetailNode.Review>?) -> [DetailReview] {
         (connection?.items ?? []).enumerated().compactMap { index, node in
             guard let date = node.submittedAt ?? node.createdAt else { return nil }
-            return DetailReview(id: node.id ?? "review-\(index)", author: user(node.author), verdict: verdict(node.state),
-                                body: node.body ?? "", submittedAt: date, url: node.url)
+            return DetailReview(id: node.id ?? "review-\(index)", author: user(node.author), authorIsBot: isBot(node.author),
+                                verdict: verdict(node.state), body: node.body ?? "",
+                                inlineCommentCount: node.comments?.totalCount ?? 0, submittedAt: date, url: node.url)
         }
     }
 
@@ -300,15 +309,17 @@ enum DetailMapping {
         }
     }
 
+    /// Names repeat (matrix jobs, a status and a check run of one name), so each check's id is its place in the rollup.
     static func checks(_ commits: Connection<DetailNode.LastCommit>?) -> [DetailCheck] {
         let contexts = commits?.items.last?.commit?.statusCheckRollup?.contexts?.items ?? []
-        return contexts.compactMap { context in
+        return contexts.enumerated().compactMap { index, context in
             if context.__typename == "StatusContext" {
                 guard let name = context.context else { return nil }
-                return DetailCheck(name: name, state: statusState(context.state), url: context.targetUrl)
+                return DetailCheck(id: "\(index):\(name)", name: name, state: statusState(context.state), url: context.targetUrl)
             }
             guard let name = context.name else { return nil }
-            return DetailCheck(name: name, state: checkRunState(status: context.status, conclusion: context.conclusion),
+            return DetailCheck(id: "\(index):\(name)", name: name,
+                               state: checkRunState(status: context.status, conclusion: context.conclusion),
                                url: context.detailsUrl ?? context.url)
         }
     }
