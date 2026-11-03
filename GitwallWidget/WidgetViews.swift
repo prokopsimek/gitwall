@@ -54,48 +54,22 @@ struct GitwallWidgetView: View {
 
     private var family: WidgetFamily { explicitFamily ?? environmentFamily }
 
-    /// Compact rows are ~34 pt with the divider; these counts fit the standard widget heights with margins.
-    private var rowLimit: Int {
-        switch family {
-        case .systemSmall: 1
-        case .systemMedium: 3
-        case .systemLarge: 7
-        case .systemExtraLarge: 14
-        default: 3
-        }
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            header
-            if entry.isSample, family != .systemSmall {
-                Link(destination: DeepLink.settings(tab: "accounts").url) {
-                    Text("Sample data · connect an account")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            if entry.problem == nil, !entry.isSample, entry.isDefaultPreset, entry.presetCount > 1, family != .systemSmall {
-                Text("Right-click → Edit Widget to pick a preset")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            if let problem = entry.problem {
-                problemView(problem)
-            } else if family == .systemSmall {
-                smallBody
-            } else if entry.items.isEmpty {
-                Spacer()
-                Text("Nothing to show").font(.callout).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                Spacer()
-            } else {
-                rows
-            }
-            Spacer(minLength: 0)
+        TileView(
+            icon: entry.preset?.icon ?? "arrow.triangle.pull",
+            title: entry.preset?.name ?? "Gitwall",
+            count: entry.problem == nil ? entry.items.count : nil,
+            items: entry.items,
+            size: TileSize(family),
+            now: entry.date,
+            avatar: { AvatarCache.image(for: $0.author.avatarURL, in: entry.container) },
+            wrap: { ItemLink(url: DeepLink.item(id: $0.id).url) },
+            replacement: entry.problem.map(problemView)
+        ) {
+            headerTrailing
+        } notice: {
+            notice
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .clipped()
         .containerBackground(.fill.tertiary, for: .widget)
         .widgetURL(headerURL)
     }
@@ -104,85 +78,38 @@ struct GitwallWidgetView: View {
         entry.preset.map { DeepLink.view(id: $0.id).url } ?? DeepLink.refresh.url
     }
 
-    private var header: some View {
-        HStack(spacing: 6) {
-            Image(systemName: entry.preset?.icon ?? "arrow.triangle.pull")
-                .foregroundStyle(.tint)
-            Text(entry.preset?.name ?? "Gitwall")
-                .font(.headline)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            if entry.problem == nil, family != .systemSmall {
-                Text("\(entry.items.count)")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(.quaternary, in: Capsule())
+    @ViewBuilder
+    private var headerTrailing: some View {
+        if entry.attention {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
+        }
+        if family != .systemSmall {
+            if let fetchedAt = entry.fetchedAt {
+                Text(ItemPresentation.compactAge(since: fetchedAt, now: entry.date))
+                    .font(.caption2)
+                    .foregroundStyle(entry.isStale ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+                    .lineLimit(1)
             }
-            Spacer(minLength: 0)
-            if entry.attention {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
+            Link(destination: DeepLink.refresh.url) {
+                Image(systemName: "arrow.clockwise").font(.caption).foregroundStyle(.secondary)
             }
-            if family != .systemSmall {
-                if let fetchedAt = entry.fetchedAt {
-                    Text(ItemPresentation.compactAge(since: fetchedAt, now: entry.date))
-                        .font(.caption2)
-                        .foregroundStyle(entry.isStale ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
-                        .lineLimit(1)
-                }
-                Link(destination: DeepLink.refresh.url) {
-                    Image(systemName: "arrow.clockwise").font(.caption).foregroundStyle(.secondary)
-                }
-                .accessibilityLabel("Refresh")
-            }
+            .accessibilityLabel("Refresh")
         }
     }
 
-    private var smallBody: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("\(entry.items.count)")
-                .font(.system(size: 40, weight: .bold, design: .rounded))
-                .monospacedDigit()
-            Text(entry.items.count == 1 ? "open item" : "open items")
-                .font(.caption).foregroundStyle(.secondary)
-            if let first = entry.items.first {
-                Link(destination: DeepLink.item(id: first.id).url) {
-                    Text(first.title)
-                        .font(.caption)
-                        .lineLimit(2)
-                        .foregroundStyle(.primary)
-                }
+    @ViewBuilder
+    private var notice: some View {
+        if entry.isSample, family != .systemSmall {
+            Link(destination: DeepLink.settings(tab: "accounts").url) {
+                Text("Sample data · connect an account")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
-    }
-
-    private var rows: some View {
-        let items = Array(entry.items.prefix(rowLimit))
-        let columns = family == .systemExtraLarge ? 2 : 1
-        let perColumn = Int((Double(items.count) / Double(columns)).rounded(.up))
-        return HStack(alignment: .top, spacing: 16) {
-            ForEach(0..<columns, id: \.self) { column in
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(items.dropFirst(column * perColumn).prefix(perColumn)) { item in
-                        Link(destination: DeepLink.item(id: item.id).url) {
-                            WorkItemRow(
-                                item: item,
-                                avatar: AvatarCache.image(for: item.author.avatarURL, in: entry.container),
-                                style: .compact,
-                                now: entry.date
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                        if item.id != items.last?.id { Divider() }
-                    }
-                    if column == columns - 1, entry.items.count > items.count {
-                        Text("+\(entry.items.count - items.count) more")
-                            .font(.caption2).foregroundStyle(.tertiary)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        if entry.problem == nil, !entry.isSample, entry.isDefaultPreset, entry.presetCount > 1, family != .systemSmall {
+            Text("Right-click → Edit Widget to pick a preset")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 
@@ -213,6 +140,29 @@ struct GitwallWidgetView: View {
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
         Spacer()
+    }
+}
+
+extension TileSize {
+    /// The tile of the same size as a widget of this family.
+    init(_ family: WidgetFamily) {
+        switch family {
+        case .systemSmall: self = .small
+        case .systemMedium: self = .medium
+        case .systemLarge: self = .large
+        case .systemExtraLarge: self = .extraLarge
+        default: self = .medium
+        }
+    }
+}
+
+/// An item in a widget opens through a `gitwall://` link.
+private struct ItemLink: ViewModifier {
+    let url: URL
+
+    func body(content: Content) -> some View {
+        Link(destination: url) { content }
+            .buttonStyle(.plain)
     }
 }
 
