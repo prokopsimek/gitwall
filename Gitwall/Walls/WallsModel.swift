@@ -5,23 +5,30 @@ import Observation
 
 /// State of the Walls window and everything its menus and keys do. Walls live in `AppConfig.walls`; every edit goes
 /// through ``apply(_:actionName:)``, which registers the undo. The decisions (layout, navigation, rotation timing)
-/// are GitwallCore's; this only keeps the window's selection and preferences.
+/// are GitwallCore's; this only keeps the window's selection and preferences. The selection drives the window's
+/// ``detail``: Detail shows the selected item, ↑↓ move it, and the selected tile's rows are Detail's list.
 @MainActor
 @Observable
 final class WallsModel {
     let environment: AppEnvironment
+    /// Detail next to the wall, following ``selectedItemID``.
+    let detail: DetailModel
     /// The window's own undo manager, which Edit › Undo and ⌘Z reach (`WallsWindowController` hands it over).
     @ObservationIgnored var undoManager: UndoManager?
-    /// What clicking a row, Return and Space do with an item. The one place that decides it: today it opens the
-    /// item in the browser (`WallsWindowController` sets it).
+    /// What clicking a row does with an item: shows it in Detail. Space and Return reach Detail through the Item
+    /// menu's Show Detail; ⌘↩ and a double click open the browser.
     @ObservationIgnored var onActivate: (WorkItem) -> Void = { _ in }
     @ObservationIgnored private let defaults: UserDefaults
 
     var selectedWallID: UUID? {
         didSet { defaults.set(selectedWallID?.uuidString, forKey: Keys.lastWall) }
     }
-    var selectedTileID: UUID?
-    var selectedItemID: String?
+    var selectedTileID: UUID? {
+        didSet { if selectedTileID != oldValue { syncDetail() } }
+    }
+    var selectedItemID: String? {
+        didSet { if selectedItemID != oldValue { syncDetail() } }
+    }
     var isEditing = false
     /// The tab whose name is being typed (``beginRename(_:)``), and what is typed so far.
     private(set) var renamingWallID: UUID?
@@ -46,12 +53,25 @@ final class WallsModel {
     init(environment: AppEnvironment, defaults: UserDefaults = .standard) {
         self.environment = environment
         self.defaults = defaults
+        detail = DetailModel(environment: environment)
         selectedWallID = defaults.string(forKey: Keys.lastWall).flatMap(UUID.init(uuidString:))
         zoom = defaults.object(forKey: Keys.zoom) as? Double ?? 1
         rotates = defaults.bool(forKey: Keys.rotates)
         rotation = WallRotation(storedInterval: defaults.object(forKey: Keys.rotationInterval) as? Double)
         // Undoing an edit of a wall a paste has replaced would write the old content over the pasted one.
         environment.onWallsReplacedByPaste = { [weak self] in self?.undoManager?.removeAllActions() }
+        onActivate = { [weak self] item in self?.detail.show(item.id) }
+    }
+
+    /// Detail shows the selected item, never one of another tile, and ↑↓ go through the selected tile's rows.
+    private func syncDetail() {
+        detail.visibleItemIDs = selectedTile.map { visibleItems(for: $0).map(\.id) } ?? []
+        detail.select(selectedItemID)
+    }
+
+    /// The preset of the tile that holds the selection, which "Why it's here" explains the item by.
+    var detailPreset: Preset? {
+        selectedTile.flatMap(preset(for:))
     }
 
     // MARK: What is on screen
@@ -98,7 +118,8 @@ final class WallsModel {
             hasSelectedItem: selectedItem != nil,
             isEditing: isEditing,
             presetCount: environment.config.presets.count,
-            zoom: zoom
+            zoom: zoom,
+            isDetailPresented: detail.isPresented
         )
     }
 
@@ -145,14 +166,6 @@ final class WallsModel {
 
     func activate(_ item: WorkItem) {
         onActivate(item)
-    }
-
-    func activateSelection() {
-        if let item = selectedItem { activate(item) }
-    }
-
-    func openSelectionInBrowser() {
-        if let item = selectedItem { environment.open(item) }
     }
 
     // MARK: Zoom

@@ -112,8 +112,8 @@ and travel as JSON together with their presets, see [Sharing presets](#sharing-p
 
 ![Menu bar popover](docs/screenshots/07-menubar.jpg)
 
-**Detail next to the list.** Click an item in the main window and Detail opens on the right, with what a decision
-needs on the first screen:
+**Detail next to the list.** Click an item in the main window or on a wall and Detail opens on the right, with what a
+decision needs on the first screen:
 
 - **Why it's here**: the terms of the preset's query the item matched (*Matches label:bug in “Bugs”*), and facts
   such as *Review requested from you*, *Checks are failing* or *Merge conflict*.
@@ -132,7 +132,7 @@ item when you open it, so the sync costs nothing more; see
 [ADR 0015](docs/adr/0015-detail-is-read-only-and-fetched-on-demand.md). GitLab items show what the last sync knows and
 a link, for now. The menu bar popover and the widgets still open the browser.
 
-| Keys | In the main window |
+| Keys | In the main window (the Walls window below) |
 |---|---|
 | Click, ↑ ↓ | Select an item; Detail follows after a short pause |
 | Space or ↩ | Show Detail |
@@ -411,7 +411,9 @@ rotation and the selected wall stay on your Mac. See [ADR 0014](docs/adr/0014-wa
 
 ### The Walls window
 
-Every command is in the **Wall** and **View** menus too.
+Every command is in the **Wall**, **View** and **Item** menus too. Detail of the selected item opens on the right,
+explained by the preset of the tile that holds it; a dot marks items new since the last sync or changed since you
+saw them.
 
 | Keys | Does |
 |---|---|
@@ -419,8 +421,11 @@ Every command is in the **Wall** and **View** menus too.
 | ⌘⇧] / ⌘⇧[ or ⌃⇥ / ⌃⇧⇥ | Next / previous wall |
 | ⇥ / ⇧⇥ | Next / previous tile |
 | ↓ / ↑ | Next / previous item in the tile |
-| ↩ or Space, a click | Open the item |
+| ↩ or Space, a click | Show Detail of the item |
+| Esc | Close Detail (while editing, finish editing) |
+| ⌥⌘I | Show or hide the Detail panel |
 | ⌘↩, a double click | Open the item in the browser |
+| ⌘C | Copy the item's link |
 | ⌘E | Edit the wall: drag tiles, add them from the presets above, remove them |
 | 1–4 (while editing) | Size of the selected tile: small, medium, large, extra large |
 | Delete (while editing) | Remove the selected tile |

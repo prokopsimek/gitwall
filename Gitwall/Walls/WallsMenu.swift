@@ -3,7 +3,8 @@ import GitwallCore
 
 /// What the Walls window answers in the menu bar. The items have no target, so they reach the window controller
 /// through the responder chain and stay disabled while another window is in front. The window takes its plain keys
-/// (Tab, arrows, Return, Space, 1–4, Delete) itself; the menu shows them so they can be found.
+/// (Tab, arrows, Return, Space, 1–4, Delete, Escape) itself; the menu shows them so they can be found. Item actions
+/// (Show Detail, Close Detail, Open in Browser) are the Item menu's (`ItemWindowController`), not the Wall menu's.
 @MainActor
 @objc protocol WallsMenuActions {
     func wallsNextWall(_ sender: Any?)
@@ -12,8 +13,6 @@ import GitwallCore
     func wallsPreviousTile(_ sender: Any?)
     func wallsNextItem(_ sender: Any?)
     func wallsPreviousItem(_ sender: Any?)
-    func wallsOpenItem(_ sender: Any?)
-    func wallsOpenItemInBrowser(_ sender: Any?)
     func wallsToggleEditing(_ sender: Any?)
     /// Escape while editing. No menu item shows it; Edit Wall turns editing off as well.
     func wallsFinishEditing(_ sender: Any?)
@@ -81,9 +80,6 @@ final class WallsMenu: NSObject, NSMenuDelegate {
         add(menu, "Previous Tile", #selector(WallsMenuActions.wallsPreviousTile(_:)), Self.backTab, [.shift])
         add(menu, "Next Item", #selector(WallsMenuActions.wallsNextItem(_:)), Self.key(NSDownArrowFunctionKey), [])
         add(menu, "Previous Item", #selector(WallsMenuActions.wallsPreviousItem(_:)), Self.key(NSUpArrowFunctionKey), [])
-        add(menu, "Open Item", #selector(WallsMenuActions.wallsOpenItem(_:)), "\r", [])
-        hidden(menu, "Open Item", #selector(WallsMenuActions.wallsOpenItem(_:)), " ", [])
-        add(menu, "Open in Browser", #selector(WallsMenuActions.wallsOpenItemInBrowser(_:)), "\r")
         menu.addItem(.separator())
         add(menu, "Edit Wall", #selector(WallsMenuActions.wallsToggleEditing(_:)), "e")
         let sizes = NSMenu(title: "Tile Size")
@@ -139,8 +135,9 @@ final class WallsMenu: NSObject, NSMenuDelegate {
         case .previousTile: #selector(WallsMenuActions.wallsPreviousTile(_:))
         case .nextItem: #selector(WallsMenuActions.wallsNextItem(_:))
         case .previousItem: #selector(WallsMenuActions.wallsPreviousItem(_:))
-        case .openItem: #selector(WallsMenuActions.wallsOpenItem(_:))
-        case .openItemInBrowser: #selector(WallsMenuActions.wallsOpenItemInBrowser(_:))
+        case .showDetail: #selector(ItemWindowController.showItemDetail(_:))
+        case .closeDetail: #selector(ItemWindowController.closeItemDetail(_:))
+        case .openItemInBrowser: #selector(ItemWindowController.openItemInBrowser(_:))
         case .toggleEditing: #selector(WallsMenuActions.wallsToggleEditing(_:))
         case .finishEditing: #selector(WallsMenuActions.wallsFinishEditing(_:))
         case .setTileSize: #selector(WallsMenuActions.wallsSetTileSize(_:))

@@ -3,10 +3,11 @@ import GitwallCore
 import SwiftUI
 
 /// Window › Walls (⌘2): presets side by side as tiles, one tab per wall, made to sit full screen on a second monitor.
-/// Answers the Wall menu and the Walls items of the View menu (`WallsMenuActions`) through the responder chain, hands
-/// the window's undo manager to the model and switches walls by itself when rotation is on.
+/// Answers the Wall menu and the Walls items of the View menu (`WallsMenuActions`) through the responder chain, and
+/// as an ``ItemWindowController`` the Item menu for the Detail next to the wall. Hands the window's undo manager to
+/// the model and switches walls by itself when rotation is on.
 @MainActor
-final class WallsWindowController: NSWindowController, NSWindowDelegate {
+final class WallsWindowController: ItemWindowController {
     let model: WallsModel
     private var rotationTask: Task<Void, Never>?
     private var inputMonitor: Any?
@@ -14,7 +15,8 @@ final class WallsWindowController: NSWindowController, NSWindowDelegate {
     private var lastInput: Date?
 
     init(environment: AppEnvironment) {
-        model = WallsModel(environment: environment)
+        let model = WallsModel(environment: environment)
+        self.model = model
         let hosting = NSHostingController(rootView: WallsView(model: model))
         let window = NSWindow(contentViewController: hosting)
         window.title = "Walls"
@@ -27,11 +29,8 @@ final class WallsWindowController: NSWindowController, NSWindowDelegate {
         window.setContentSize(NSSize(width: 1100, height: 720))
         window.center()
         window.setFrameAutosaveName("GitwallWalls")
-        super.init(window: window)
-        window.delegate = self
+        super.init(window: window, environment: environment, detail: model.detail)
         model.undoManager = window.undoManager
-        // Clicking an item, Return and Space go through this one hook. It opens the item in the browser for now.
-        model.onActivate = { [weak environment] item in environment?.open(item) }
         // Someone using the window holds the rotation for two minutes (`WallRotation.pauseAfterInput`). The same
         // monitor answers the window's keys, see `handleKey`.
         inputMonitor = NSEvent.addLocalMonitorForEvents(
@@ -60,17 +59,22 @@ final class WallsWindowController: NSWindowController, NSWindowDelegate {
 
     /// Tab, the arrows, Return, Space, 1–4, Delete and Escape are not menu shortcuts AppKit delivers (the menu only
     /// takes the arrows), and SwiftUI would use Tab to move focus. So the window takes its keys (`WallsKeys`) before
-    /// anything else does, and only when the menu item that shows the key is enabled.
+    /// anything else does, and only when the command is enabled (`WallsCommand.isEnabled`); a disabled one leaves the
+    /// key to the window, as Escape to a tab being renamed.
     private func handleKey(_ event: NSEvent) -> Bool {
         let modifiers = KeyModifiers(event.modifierFlags)
-        guard let key = WallsKeys.action(keyCode: event.keyCode, modifiers: modifiers, character: event.charactersIgnoringModifiers ?? "")
-        else { return false }
+        guard let key = WallsKeys.action(
+            keyCode: event.keyCode, modifiers: modifiers, character: event.charactersIgnoringModifiers ?? "", in: currentState
+        ) else { return false }
         let action = WallsMenu.selector(for: key.command)
         let item = NSMenuItem(title: "", action: action, keyEquivalent: "")
         item.tag = key.tag
-        guard validateMenuItem(item) else { return false }
         NSApp.sendAction(action, to: self, from: item)
         return true
+    }
+
+    private var currentState: WallsState {
+        model.state(isKeyWindow: window != nil && NSApp.keyWindow === window, isTyping: isEditingText)
     }
 
     // MARK: Rotation
@@ -100,6 +104,31 @@ final class WallsWindowController: NSWindowController, NSWindowDelegate {
         model.showWall(offset: 1)
     }
 
+    // MARK: Item menu
+
+    /// ⌥⌘I with nothing selected starts at the first item, so the wall and Detail show the same one.
+    override func toggleItemDetail(_ sender: Any?) {
+        if !detail.isPresented, model.selectedItem == nil { model.selectItem(offset: 1) }
+        super.toggleItemDetail(sender)
+    }
+
+    /// The Wall and View menus and the Item menu's Show Detail, Close Detail and Open in Browser follow
+    /// `WallsCommand.isEnabled`: keys without a modifier act only while this window is the key window and no name is
+    /// being typed, so they never fire behind the popover or a sheet. Nothing works while the window shows why it is
+    /// empty. The rest of the Item menu is ``ItemWindowController``'s.
+    override func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        let itemMenuAllows = super.validateMenuItem(item)
+        guard let action = item.action, let command = WallsMenu.command(for: action) else { return itemMenuAllows }
+        switch command {
+        case .toggleEditing: item.state = model.isEditing ? .on : .off
+        case .setTileSize: item.state = model.selectedTile?.size.number == item.tag ? .on : .off
+        case .toggleRotation: item.state = model.rotates ? .on : .off
+        case .setRotationInterval: item.state = Int(model.rotation.interval) == item.tag ? .on : .off
+        default: break
+        }
+        return WallsCommand.isEnabled(command, in: currentState)
+    }
+
     #if DEBUG
     /// `--debug-demo-walls <window|edit|empty|fullscreen>`: a fixed window size, and the state to capture.
     func prepareScreenshot(_ mode: String) {
@@ -121,15 +150,13 @@ final class WallsWindowController: NSWindowController, NSWindowDelegate {
 
 // MARK: - Menu actions
 
-extension WallsWindowController: WallsMenuActions, NSMenuItemValidation {
+extension WallsWindowController: WallsMenuActions {
     func wallsNextWall(_ sender: Any?) { model.showWall(offset: 1) }
     func wallsPreviousWall(_ sender: Any?) { model.showWall(offset: -1) }
     func wallsNextTile(_ sender: Any?) { model.selectTile(offset: 1) }
     func wallsPreviousTile(_ sender: Any?) { model.selectTile(offset: -1) }
     func wallsNextItem(_ sender: Any?) { model.selectItem(offset: 1) }
     func wallsPreviousItem(_ sender: Any?) { model.selectItem(offset: -1) }
-    func wallsOpenItem(_ sender: Any?) { model.activateSelection() }
-    func wallsOpenItemInBrowser(_ sender: Any?) { model.openSelectionInBrowser() }
     func wallsToggleEditing(_ sender: Any?) { model.isEditing.toggle() }
     func wallsFinishEditing(_ sender: Any?) { model.isEditing = false }
 
@@ -176,22 +203,6 @@ extension WallsWindowController: WallsMenuActions, NSMenuItemValidation {
     func wallsSetRotationInterval(_ sender: NSMenuItem) {
         model.rotation = WallRotation(storedInterval: TimeInterval(sender.tag))
         scheduleRotation()
-    }
-
-    /// The rules are `WallsCommand.isEnabled`'s: keys without a modifier act only while this window is the key
-    /// window and no name is being typed, so they never fire behind the popover or a sheet. Nothing works while the
-    /// window shows why it is empty.
-    func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        guard let action = item.action, let command = WallsMenu.command(for: action) else { return true }
-        switch command {
-        case .toggleEditing: item.state = model.isEditing ? .on : .off
-        case .setTileSize: item.state = model.selectedTile?.size.number == item.tag ? .on : .off
-        case .toggleRotation: item.state = model.rotates ? .on : .off
-        case .setRotationInterval: item.state = Int(model.rotation.interval) == item.tag ? .on : .off
-        default: break
-        }
-        let state = model.state(isKeyWindow: window != nil && NSApp.keyWindow === window, isTyping: window?.firstResponder is NSText)
-        return WallsCommand.isEnabled(command, in: state)
     }
 }
 

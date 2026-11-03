@@ -66,10 +66,14 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 - The Walls window takes its keys (Tab, arrows, Return, Space, 1–4, Delete, Escape) in its own event monitor
   (`WallsWindowController.handleKey`): AppKit does not deliver plain printable keys as menu shortcuts, and SwiftUI would
   spend Tab on focus. Which key means what (`WallsKeys`) and when a command is enabled (`WallsCommand.isEnabled`) are
-  GitwallCore's; a key only acts when its menu item is enabled. A key without ⌘, ⌥ or ⌃ acts only while the Walls
+  GitwallCore's; a key only acts when its command is enabled, and a disabled one leaves the key to the window. A key without ⌘, ⌥ or ⌃ acts only while the Walls
   window is the key window and no name is typed, so the popover or a sheet in front keeps its arrows and Return.
-- Clicking an item on a wall, Return and Space go through one hook, `WallsModel.activate` (set in
-  `WallsWindowController`); ⌘↩ and a double click always open the browser.
+- The Walls window is an `ItemWindowController` with Detail as its inspector. `WallsModel` owns the window's
+  `DetailModel` and drives it from its selection (`syncDetail`): Detail follows ↑↓, its list is the selected tile's
+  rows, and "Why it's here" uses that tile's preset (`detailPreset`). A click on an item goes through
+  `WallsModel.activate`, which shows Detail; Return, Space and Escape are `WallsCommand.showDetail` and `.closeDetail`
+  sent as the Item menu's actions (Escape finishes editing first), and ⌘↩ and a double click open the browser. Item
+  actions live only in the Item menu; the Wall menu keeps wall and tile actions.
 - Wall edits go through `WallsModel.apply`, which registers the inverse `WallChange` with the window's own undo manager.
   Undo finds a wall by its id, so a paste that only adds walls leaves the history alone. A paste that replaces a wall
   clears it (`AppEnvironment.onWallsReplacedByPaste`): undoing an earlier edit would write the old wall over the pasted

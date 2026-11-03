@@ -25,8 +25,9 @@ class ItemWindowController: NSWindowController, NSWindowDelegate, NSMenuItemVali
 
     private var account: Account? { item.flatMap { environment.config.account(id: $0.accountID) } }
 
-    /// Space, ↩ and Esc are typing keys in a text field; the menu leaves them alone while one is being edited.
-    private var isEditingText: Bool { window?.firstResponder is NSText }
+    /// Space, ↩ and Esc are typing keys in a text field; the menu leaves them alone while one is being edited. Text that
+    /// can only be selected, as in Detail, is not typing.
+    var isEditingText: Bool { (window?.firstResponder as? NSText)?.isEditable == true }
 
     // MARK: Item menu
 

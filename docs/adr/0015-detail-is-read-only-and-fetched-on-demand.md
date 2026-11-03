@@ -111,6 +111,6 @@ either lists what it got or says the token may not read the checks, and the rest
 - Two requests, about 2 rate-limit points, per pull request opened in Detail; one for an issue. Nothing more per sync.
 - Detail needs a token that can read the item, which every account already has; no new scope.
 - `seen.json` is new in the App Group. The widget never reads it, and sample data never writes it.
-- Clicking an item in the main window no longer opens the browser; a double click and ⌘↩ do. The popover and the
-  widgets still open the browser, which is quicker than bringing a window forward.
+- Clicking an item in the main window or on a wall no longer opens the browser; a double click and ⌘↩ do. The popover
+  and the widgets still open the browser, which is quicker than bringing a window forward.
 - GitLab gets the snapshot part of Detail only, until its provider implements `itemDetail`.
