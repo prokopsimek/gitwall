@@ -55,12 +55,14 @@ enum MarkdownSegments {
             markdown = []
         }
 
-        // An indented code block starts after a blank line; its lines, like a fence's, are kept as typed.
+        // An indented code block starts after a blank line outside a list (inside one, indentation continues the item);
+        // its lines, like a fence's, are kept as typed.
         var followsBlank = true
         var inIndentedCode = false
+        var inList = false
 
         for rawLine in source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
-            if fence == nil, !inComment, followsBlank || inIndentedCode, isIndented(rawLine) {
+            if fence == nil, !inComment, !inList, followsBlank || inIndentedCode, isIndented(rawLine) {
                 inIndentedCode = true
                 followsBlank = false
                 if depth > 0 { details.append(rawLine) } else { markdown.append(rawLine) }
@@ -73,7 +75,10 @@ enum MarkdownSegments {
             }
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             followsBlank = trimmed.isEmpty
-            if !trimmed.isEmpty { inIndentedCode = false }
+            if !trimmed.isEmpty {
+                inIndentedCode = false
+                if isListItem(line) { inList = true } else if !isIndented(line) { inList = false }
+            }
             if let open = fence {
                 if trimmed.hasPrefix(open) { fence = nil }
             } else if let marker = fenceMarker(trimmed) {
@@ -120,6 +125,11 @@ enum MarkdownSegments {
 
     private static func occurrences(of needle: String, in haystack: String) -> Int {
         haystack.components(separatedBy: needle).count - 1
+    }
+
+    /// `- `, `* `, `+ `, `1. ` or `1) ` at most three spaces in.
+    private static func isListItem(_ line: String) -> Bool {
+        line.range(of: #"^ {0,3}([-*+]|\d{1,9}[.)])( |$)"#, options: .regularExpression) != nil
     }
 
     /// Four spaces or a tab: code, when it follows a blank line or more code.

@@ -152,6 +152,13 @@ struct MarkdownBlocksTests {
         #expect(parse("Intro\n\n    <!-- kept -->\n    <details>\n\nAfter") == ["p Intro", "code[] <!-- kept -->\n<details>", "p After"])
     }
 
+    @Test("indentation inside a list continues the item, so its details still fold and comments still hide")
+    func indentedListContinuation() {
+        let blocks = parse("- item\n\n    <details><summary>Log</summary>\n\n    hidden\n\n    </details>\n\n    more <!-- note --> text")
+        #expect(blocks.contains { $0.hasPrefix("details Log {") })
+        #expect(!blocks.contains { $0.contains("<details") || $0.contains("note") })
+    }
+
     @Test("other HTML shows as its plain text; a line break tag breaks the line")
     func otherHTML() {
         #expect(parse("Line<br>two and <sub>small</sub> text") == ["p Line\ntwo and small text"])
