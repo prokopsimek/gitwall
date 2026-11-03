@@ -21,5 +21,7 @@ Domain terms as Gitwall uses them. How they are implemented lives in the code an
   it already has, never sent to GitHub or GitLab. See
   [ADR 0008](docs/adr/0008-preset-queries-use-github-search-syntax-locally.md) and
   [ADR 0009](docs/adr/0009-preset-queries-accept-and-or-and-parentheses.md).
-- **Seen** – when you last opened an item in Detail. Gitwall keeps it on your Mac; *what's new* and the dot in lists
-  count from it, so they mean "since I last looked here", not GitHub's notifications.
+- **Seen** – when you last saw an item in Detail: the moment its detail was fetched, once it has loaded while the item
+  is still on screen (an item Gitwall cannot fetch counts after a second on screen). Gitwall keeps it on your Mac;
+  *what's new* and the dot in lists count from it, so they mean "since I last looked here", not GitHub's
+  notifications.

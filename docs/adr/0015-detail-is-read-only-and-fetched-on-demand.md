@@ -43,11 +43,13 @@ the provider instead: *Review changes* to `/files`, a failing check to its log, 
   [ADR 0012](0012-priority-comes-from-a-projects-field-then-labels.md): GitHub refuses a whole query when one field
   is refused. Inside a query, an error whose path runs through one field fails only that part. A refusal
   (`FORBIDDEN`, `INSUFFICIENT_SCOPES`) is a missing permission and Detail links to the token setup; anything else is
-  a passing failure with *Try Again*.
+  a passing failure. Both offer *Try Again*, which fetches past the cache: a fine-grained token's permissions change
+  on GitHub without the token changing.
 - **Cost.** Each query cost 1 point of GitHub's hourly 5 000 when measured (see below), and only when someone opens
-  an item. Arrowing through a list asks only once the selection rests for 150 ms. `DetailFetcher` keeps the last
-  100 details, each valid while the item's `updatedAt` is unchanged, and shares a fetch already in flight. A detail
-  with a passing failure is not kept, so opening it again tries again.
+  an item. Arrowing through a list asks only once the selection rests for 150 ms. `DetailFetcher` shares a fetch
+  already in flight; `DetailCache`, owned by the app's one `ItemDetailService`, keeps the last 100 details, each
+  valid while the item's `updatedAt` is unchanged. A detail with a passing failure is not kept, so opening it again
+  tries again. A missing permission is kept until the account's credential is replaced or the account removed.
 - **Changes while it is open.** When a sync gives the item on screen a new `updatedAt`, Detail fetches it again and
   marks what arrived meanwhile.
 - **GitLab** has no Detail yet: `ProviderCapabilities.fetchesItemDetail` is false, and Detail shows what the snapshot
@@ -55,11 +57,17 @@ the provider instead: *Review changes* to `/files`, a failing check to its log, 
 
 ### Our own "seen" instead of GitHub's notifications
 
-"What's new" and the dot in lists compare against the moment you last opened the item in Detail, which Gitwall keeps
-itself: `seen.json` in the App Group (`SeenStore`), item id → time. An entry stays while its item is in the snapshot
+"What's new" and the dot in lists compare against the moment you last saw the item in Detail, which Gitwall keeps
+itself: `seen.json` in the App Group (`SeenStore`), item id → time. Seen is the time the detail was fetched, recorded
+once it has loaded with its timeline while the item is still the one on screen; clicking through a list or a failed
+fetch marks nothing. An item without a fetch (sample data, GitLab, no credential) counts after a second on screen. An entry stays while its item is in the snapshot
 or was opened in the last 30 days. What's new lists the timeline events by other people after that moment; the first
 open of an item lists its last three events. The dot appears only on items you have opened before, when they changed
 since.
+
+"Latest word" and *Reply to …* leave bots out (a `Bot` author, or a login ending in `[bot]`): a Codecov report is
+not the other side's answer. Every submitted review of someone else counts, a bare approval or change request and
+inline-only reviews too, shown by what they were.
 
 GitHub's own read state lives in notifications. GitHub documents their API for classic tokens only (scope
 `notifications` or `repo`); fine-grained tokens, which the README recommends for github.com, cannot read them at

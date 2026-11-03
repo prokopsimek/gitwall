@@ -110,15 +110,16 @@ the preset you pick for it.
 **Detail next to the list.** Click an item in the main window and Detail opens on the right, with what a decision
 needs on the first screen:
 
-- **Why it's here**: the preset, the terms of its query the item matched, and facts such as *Review requested from
-  you*, *Checks are failing* or *Merge conflict*.
+- **Why it's here**: the terms of the preset's query the item matched (*Matches label:bug in “Bugs”*), and facts
+  such as *Review requested from you*, *Checks are failing* or *Merge conflict*.
 - **Next step**, one button with the exact link: *Review changes* opens the Files tab, *Reply to …* the comment
   itself, *Open failing check* that check's log, *Ready to merge* the pull request.
-- **Latest word** of the other side, or *You replied last · 2h ago* when it is your turn to wait.
+- **Latest word** of the other side, or *You replied last · 2h ago* when it is your turn to wait. A review counts
+  without a text too (*Requested changes with 2 inline comments*); bots such as Codecov or Dependabot never do.
 - **Status** of a pull request: reviewers and their verdicts, failing checks by name (the passed ones folded as
   *12 passed*), conflicts, size and the branch with a copy button.
-- **What's new** since you last opened it here, with what arrives while you look marked as it comes in. The list
-  marks items that changed since you opened them.
+- **What's new** since you last saw it here, with what arrives while you look marked as it comes in. An item counts
+  as seen once its detail has loaded while it is on screen. The list marks items that changed since you saw them.
 
 The description (Markdown, `<details>` folded), the conversation, the files and linked items are folded below.
 Detail only reads: there is no approve or merge button, every action opens the item on GitHub. It asks GitHub for one
@@ -133,10 +134,12 @@ a link, for now. The menu bar popover and the widgets still open the browser.
 | Esc | Close Detail |
 | ⌥⌘I | Show or hide the Detail panel |
 | Double-click, ⌘↩ | Open on GitHub or GitLab |
-| ⌘C | Copy the link |
+| ⌘C | Copy the link (Edit › Copy, while the list has the focus) |
 | ⇧⌘C | Copy the reference, `owner/repo#123` |
 | ⌥⌘C | Copy the branch name of a pull request |
-| Item › Copy “gh pr checkout” Command | `gh pr checkout 123 -R owner/repo`, for GitHub pull requests |
+| Item › Copy Link | Copy the link, also while you type in the search field |
+| Item › Copy “gh pr checkout” Command | `gh pr checkout 123 -R owner/repo`, for GitHub pull requests (with the host on GitHub Enterprise) |
+| ⌘F | Search the list; Esc goes back to the list |
 
 And also:
 
