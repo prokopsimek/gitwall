@@ -88,7 +88,10 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   through the responder chain), attach `.itemDetailInspector(model, environment:, preset:)` to the list and call
   `model.show(item.id)` on a click. A click in such a list selects and shows Detail, a double click and ⌘↩ open the
   browser; the popover and the widget still open the browser. Space, ↩ and Esc stay typing keys while a text field
-  is edited (`validateMenuItem`); ⌘C is Edit › Copy, never an Item menu key. `DetailModel` marks an item seen only
+  is edited (`validateMenuItem`); ⌘C is Edit › Copy, never an Item menu key. Esc never reaches the
+  Item menu's Close Detail as a key equivalent, so `itemDetailInspector` closes Detail with `.onExitCommand`; ⌘F gives
+  the search field the keyboard through AppKit (`MainWindowController.focusSearch`), which `@FocusState` from a menu
+  command did not. `DetailModel` marks an item seen only
   after its detail loaded while it is still shown (`ItemDetailService.markSeen`, `persist: !usesSampleContent`;
   sample items keep their times in memory), opens only http(s) links, and clears a selection the new preset does
   not list (`presetDidChange`). Replacing a credential or removing an account calls `details.forget(accountID:)`.

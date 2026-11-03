@@ -3,15 +3,17 @@ import GitwallUI
 import SwiftUI
 
 struct MainWindowView: View {
+    /// Also how Edit › Find… finds the field (`MainWindowController.focusSearch`).
+    static let searchPrompt = "Search title, repository, #number, author"
+
     @Bindable var environment: AppEnvironment
     @Bindable var state: MainWindowState
     let detail: DetailModel
     @State private var query = ""
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     /// The list has the focus when the window opens, so ↑↓, Space and ⌘C work at once; ⌘F moves it to the search
-    /// field and Esc there gives it back.
+    /// field (`MainWindowController.focusSearch`) and Esc there gives it back.
     @FocusState private var isListFocused: Bool
-    @FocusState private var isSearchFocused: Bool
     /// The list takes the focus once, when it first has items; AppKit would otherwise give it to the search field.
     @State private var listHadFirstFocus = false
 
@@ -30,7 +32,6 @@ struct MainWindowView: View {
             // Once the list is in the window.
             Task { isListFocused = true }
         }
-        .onChange(of: state.searchFocusRequests) { isSearchFocused = true }
         .onChange(of: environment.selectedPreset?.id) {
             detail.presetDidChange(visibleItemIDs: visibleItems.map(\.id))
         }
@@ -109,9 +110,8 @@ struct MainWindowView: View {
             Spacer()
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search title, repository, #number, author", text: $query)
+                TextField(Self.searchPrompt, text: $query)
                     .textFieldStyle(.plain)
-                    .focused($isSearchFocused)
                     .onExitCommand { isListFocused = true }
                 if !query.isEmpty {
                     Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }

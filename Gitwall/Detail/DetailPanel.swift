@@ -6,11 +6,14 @@ extension View {
     /// Detail as an inspector on the trailing edge. Any window with a list of items attaches it with this, calls
     /// `model.show(item.id)` on a click and makes its controller an ``ItemWindowController`` for the Item menu.
     /// `preset` is the one the list shows, for "Why it's here".
+    /// Esc closes it from anywhere in the window that does not take Esc itself (a search field, a name being typed).
+    /// AppKit never hands Esc to the Item menu's Close Detail (keyboard walkthrough 2026-11-03).
     func itemDetailInspector(_ model: DetailModel, environment: AppEnvironment, preset: Preset?) -> some View {
         inspector(isPresented: Bindable(model).isPresented) {
             DetailPanel(model: model, environment: environment, preset: preset)
                 .inspectorColumnWidth(min: 320, ideal: 380, max: 620)
         }
+        .onExitCommand { model.close() }
     }
 }
 

@@ -6,8 +6,6 @@ import SwiftUI
 @Observable
 final class MainWindowState {
     var showingWidgetHelp = false
-    /// Bumped by Edit › Find… (⌘F); the view moves the focus to the search field.
-    var searchFocusRequests = 0
 }
 
 /// The main window: presets in a sidebar, items in the middle, Detail of the selected item on the right. Opened from
@@ -54,7 +52,19 @@ final class MainWindowController: ItemWindowController {
         state.showingWidgetHelp = true
     }
 
+    /// Edit › Find… (⌘F). Asked through `@FocusState` from the menu the field never took the keyboard (keyboard
+    /// walkthrough 2026-11-03), so the window gives it to the field's AppKit text field directly.
     @objc func focusSearch(_ sender: Any?) {
-        state.searchFocusRequests += 1
+        guard let window, let field = window.contentView.flatMap(Self.searchField(in:)) else { return }
+        window.makeFirstResponder(field)
+    }
+
+    /// The search field, by its prompt; the main window has no other text field with it.
+    private static func searchField(in view: NSView) -> NSTextField? {
+        if let field = view as? NSTextField, field.isEditable,
+           (field.placeholderString ?? field.placeholderAttributedString?.string) == MainWindowView.searchPrompt {
+            return field
+        }
+        return view.subviews.lazy.compactMap(searchField(in:)).first
     }
 }
