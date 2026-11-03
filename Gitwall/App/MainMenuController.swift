@@ -39,6 +39,9 @@ final class MainMenuController: NSObject {
         edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(.separator())
+        // The main window's search field; answered by MainWindowController through the responder chain.
+        edit.addItem(withTitle: "Find…", action: #selector(MainWindowController.focusSearch(_:)), keyEquivalent: "f")
         main.addItem(submenu(edit, title: "Edit"))
 
         // View menu

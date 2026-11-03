@@ -6,6 +6,8 @@ import SwiftUI
 @Observable
 final class MainWindowState {
     var showingWidgetHelp = false
+    /// Bumped by Edit › Find… (⌘F); the view moves the focus to the search field.
+    var searchFocusRequests = 0
 }
 
 /// The main window: presets in a sidebar, items in the middle, Detail of the selected item on the right. Opened from
@@ -50,5 +52,9 @@ final class MainWindowController: ItemWindowController {
 
     func showWidgetHelp() {
         state.showingWidgetHelp = true
+    }
+
+    @objc func focusSearch(_ sender: Any?) {
+        state.searchFocusRequests += 1
     }
 }

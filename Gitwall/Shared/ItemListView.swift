@@ -11,7 +11,11 @@ struct ItemListView: View {
     /// With Detail (main window): a click selects and shows Detail, a double click opens the item, ↑↓ move the
     /// selection. Without it (popover): a click opens the item, as before.
     var detail: DetailModel? = nil
+    /// The window's focus for the list, when it moves the focus itself (⌘F, Esc); otherwise the list keeps its own.
+    var focus: FocusState<Bool>.Binding? = nil
     @FocusState private var isFocused: Bool
+
+    private var listFocus: FocusState<Bool>.Binding { focus ?? $isFocused }
 
     var body: some View {
         if let detail {
@@ -34,7 +38,7 @@ struct ItemListView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(items) { item in
                         SelectableItemRow(item: item, environment: environment, style: style, detail: detail) {
-                            isFocused = true
+                            listFocus.wrappedValue = true
                         }
                         .id(item.id)
                         Divider().padding(.leading, 42)
@@ -43,7 +47,7 @@ struct ItemListView: View {
             }
             .focusable()
             .focusEffectDisabled()
-            .focused($isFocused)
+            .focused(listFocus)
             .onMoveCommand { direction in
                 switch direction {
                 case .up: detail.move(by: -1)
@@ -56,6 +60,8 @@ struct ItemListView: View {
                 withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(id) }
             }
             .onChange(of: items.map(\.id), initial: true) { _, ids in detail.visibleItemIDs = ids }
+            // The list gives way to an empty state: nothing is visible for ↑↓ or Show Detail.
+            .onDisappear { detail.visibleItemIDs = [] }
         }
     }
 }

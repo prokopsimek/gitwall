@@ -8,6 +8,12 @@ struct MainWindowView: View {
     let detail: DetailModel
     @State private var query = ""
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    /// The list has the focus when the window opens, so ↑↓, Space and ⌘C work at once; ⌘F moves it to the search
+    /// field and Esc there gives it back.
+    @FocusState private var isListFocused: Bool
+    @FocusState private var isSearchFocused: Bool
+    /// The list takes the focus once, when it first has items; AppKit would otherwise give it to the search field.
+    @State private var listHadFirstFocus = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -16,6 +22,17 @@ struct MainWindowView: View {
         } detail: {
             itemColumn
                 .itemDetailInspector(detail, environment: environment, preset: environment.selectedPreset)
+        }
+        .defaultFocus($isListFocused, true)
+        .onChange(of: visibleItems.isEmpty, initial: true) { _, isEmpty in
+            guard !isEmpty, !listHadFirstFocus else { return }
+            listHadFirstFocus = true
+            // Once the list is in the window.
+            Task { isListFocused = true }
+        }
+        .onChange(of: state.searchFocusRequests) { isSearchFocused = true }
+        .onChange(of: environment.selectedPreset?.id) {
+            detail.presetDidChange(visibleItemIDs: visibleItems.map(\.id))
         }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $state.showingWidgetHelp) {
@@ -94,6 +111,8 @@ struct MainWindowView: View {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Search title, repository, #number, author", text: $query)
                     .textFieldStyle(.plain)
+                    .focused($isSearchFocused)
+                    .onExitCommand { isListFocused = true }
                 if !query.isEmpty {
                     Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
                         .buttonStyle(.borderless)
@@ -134,6 +153,12 @@ struct MainWindowView: View {
         .padding(.vertical, 12)
     }
 
+    /// The items of the selected preset that the search leaves.
+    private var visibleItems: [WorkItem] {
+        guard case .items(let items) = environment.listState(for: environment.selectedPreset) else { return [] }
+        return ItemSearch.filter(items, query: query)
+    }
+
     @ViewBuilder
     private var content: some View {
         switch environment.listState(for: environment.selectedPreset) {
@@ -143,7 +168,7 @@ struct MainWindowView: View {
                 EmptyStateView(title: "No matches", symbol: "magnifyingglass",
                                message: "Nothing in “\(environment.selectedPreset?.name ?? "")” matches “\(query)”.")
             } else {
-                ItemListView(items: visible, environment: environment, style: .regular, detail: detail)
+                ItemListView(items: visible, environment: environment, style: .regular, detail: detail, focus: $isListFocused)
             }
         case .empty(let kind):
             EmptyStateView(kind: kind, environment: environment)

@@ -17,7 +17,8 @@ enum ItemMenu {
         menu.addItem(.separator())
         add(menu, "Open in Browser", #selector(ItemWindowController.openItemInBrowser(_:)), "\r", [.command])
         menu.addItem(.separator())
-        add(menu, "Copy Link", #selector(ItemWindowController.copyItemLink(_:)), "c", [.command])
+        // No ⌘C: that is Edit › Copy, which copies the link too while the list has the focus (see ItemWindowController).
+        add(menu, "Copy Link", #selector(ItemWindowController.copyItemLink(_:)), "", [])
         add(menu, "Copy Reference", #selector(ItemWindowController.copyItemReference(_:)), "c", [.command, .shift])
         add(menu, "Copy Branch Name", #selector(ItemWindowController.copyItemBranch(_:)), "c", [.command, .option])
         add(menu, "Copy “gh pr checkout” Command", #selector(ItemWindowController.copyItemCheckoutCommand(_:)), "", [])
