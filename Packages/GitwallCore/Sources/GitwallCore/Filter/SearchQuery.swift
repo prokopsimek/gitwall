@@ -307,20 +307,7 @@ public struct SearchQuery: Equatable, Sendable {
 
     func matches(_ item: WorkItem, me: UserRef?) -> Bool {
         guard let root else { return true }
-        return matches(item, root, me: me)
-    }
-
-    private func matches(_ item: WorkItem, _ expression: Expression, me: UserRef?) -> Bool {
-        switch expression {
-        case .term(let term):
-            // Values inside one term are OR; a negated term must match none of them.
-            let matched = term.values.contains { matches(item, term: term, value: $0, me: me) }
-            return term.isNegated ? !matched : matched
-        case .all(let operands):
-            return operands.allSatisfy { matches(item, $0, me: me) }
-        case .any(let operands):
-            return operands.contains { matches(item, $0, me: me) }
-        }
+        return walk(root, item, me: me, explains: false) != nil
     }
 
     /// The terms `item` satisfied, as text in the order written, or nil when the query does not match. Of an OR only
@@ -328,15 +315,21 @@ public struct SearchQuery: Equatable, Sendable {
     /// the value that matched.
     func explanation(for item: WorkItem, me: UserRef?) -> [String]? {
         guard let root else { return [] }
-        return explanation(for: item, root, me: me)
+        return walk(root, item, me: me, explains: true)
     }
 
-    private func explanation(for item: WorkItem, _ expression: Expression, me: UserRef?) -> [String]? {
+    /// The one walk over the expression that both matching and explaining use: nil when `expression` does not hold,
+    /// otherwise the terms that made it hold. With `explains` false the terms are never formatted, so matching every
+    /// item of a snapshot allocates nothing.
+    private func walk(_ expression: Expression, _ item: WorkItem, me: UserRef?, explains: Bool) -> [String]? {
         switch expression {
         case .term(let term):
-            let matched = term.values.filter { matches(item, term: term, value: $0, me: me) }
-            if term.isNegated { return matched.isEmpty ? [] : nil }
-            guard let value = matched.first else { return nil }
+            // Values inside one term are OR; a negated term must match none of them.
+            guard let value = term.values.first(where: { matches(item, term: term, value: $0, me: me) }) else {
+                return term.isNegated ? [] : nil
+            }
+            if term.isNegated { return nil }
+            guard explains else { return [] }
             guard let qualifier = term.qualifier else {
                 return [value.contains(where: \.isWhitespace) ? "\"\(value)\"" : value]
             }
@@ -344,13 +337,13 @@ public struct SearchQuery: Equatable, Sendable {
         case .all(let operands):
             var terms: [String] = []
             for operand in operands {
-                guard let explained = explanation(for: item, operand, me: me) else { return nil }
+                guard let explained = walk(operand, item, me: me, explains: explains) else { return nil }
                 terms += explained
             }
             return terms
         case .any(let operands):
             for operand in operands {
-                if let explained = explanation(for: item, operand, me: me) { return explained }
+                if let explained = walk(operand, item, me: me, explains: explains) { return explained }
             }
             return nil
         }
