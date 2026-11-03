@@ -78,6 +78,9 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   Undo finds a wall by its id, so a paste that only adds walls leaves the history alone. A paste that replaces a wall
   clears it (`AppEnvironment.onWallsReplacedByPaste`): undoing an earlier edit would write the old wall over the pasted
   one.
+- Full screen the grid fills the screen beside Detail (`WallLayout.fit`). `WallsWindowController` sets
+  `WallsModel.isFullScreen` as the window enters and leaves full screen; ⌘+ and ⌘− then change `fullScreenZoom`, which
+  is relative to the fit, and the window's own `zoom` stays as it was.
 - The name typed into a tab lives in `WallsModel.renameDraft`. Switching walls commits it first, so ⌘⇧] or a click on
   another tab in the middle of a rename keeps the name.
 - Activation policy: the app is `regular` in Info.plist and drops to `accessory` when the user hides the

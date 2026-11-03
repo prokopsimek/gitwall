@@ -33,8 +33,15 @@ final class WallsModel {
     /// The tab whose name is being typed (``beginRename(_:)``), and what is typed so far.
     private(set) var renamingWallID: UUID?
     var renameDraft = ""
+    /// The window's zoom (⌘+, ⌘−, ⌘0).
     var zoom: Double {
         didSet { defaults.set(zoom, forKey: Keys.zoom) }
+    }
+    /// Full screen, the wall fills the screen (`WallLayout.fit`), and ⌘+ and ⌘− zoom relative to that fit, apart from
+    /// the window's zoom. The window controller sets it as the window enters and leaves full screen.
+    var isFullScreen = false
+    var fullScreenZoom: Double {
+        didSet { defaults.set(fullScreenZoom, forKey: Keys.fullScreenZoom) }
     }
     var rotates: Bool {
         didSet { defaults.set(rotates, forKey: Keys.rotates) }
@@ -46,6 +53,7 @@ final class WallsModel {
     private enum Keys {
         static let lastWall = "GitwallWalls.lastWall"
         static let zoom = "GitwallWalls.zoom"
+        static let fullScreenZoom = "GitwallWalls.fullScreenZoom"
         static let rotates = "GitwallWalls.rotates"
         static let rotationInterval = "GitwallWalls.rotationInterval"
     }
@@ -56,6 +64,7 @@ final class WallsModel {
         detail = DetailModel(environment: environment)
         selectedWallID = defaults.string(forKey: Keys.lastWall).flatMap(UUID.init(uuidString:))
         zoom = defaults.object(forKey: Keys.zoom) as? Double ?? 1
+        fullScreenZoom = defaults.object(forKey: Keys.fullScreenZoom) as? Double ?? 1
         rotates = defaults.bool(forKey: Keys.rotates)
         rotation = WallRotation(storedInterval: defaults.object(forKey: Keys.rotationInterval) as? Double)
         // Undoing an edit of a wall a paste has replaced would write the old content over the pasted one.
@@ -118,7 +127,7 @@ final class WallsModel {
             hasSelectedItem: selectedItem != nil,
             isEditing: isEditing,
             presetCount: environment.config.presets.count,
-            zoom: zoom,
+            zoom: isFullScreen ? fullScreenZoom : zoom,
             isDetailPresented: detail.isPresented
         )
     }
@@ -170,8 +179,12 @@ final class WallsModel {
 
     // MARK: Zoom
 
+    /// ⌘+ and ⌘− (`step` 1 and -1) and ⌘0 (0): the window's zoom, or full screen the zoom relative to the fit, which
+    /// ⌘0 returns to.
     func zoom(step: Int) {
-        zoom = step == 0 ? 1 : WallLayout.zoom(zoom, step: step)
+        let current = isFullScreen ? fullScreenZoom : zoom
+        let next = step == 0 ? 1 : WallLayout.zoom(current, step: step)
+        if isFullScreen { fullScreenZoom = next } else { zoom = next }
     }
 
     // MARK: Editing walls

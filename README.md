@@ -431,7 +431,7 @@ saw them.
 | Delete (while editing) | Remove the selected tile |
 | ⌘Z / ⇧⌘Z | Undo / redo a change to a wall |
 | ⌘+ / ⌘− / ⌘0 | Zoom in / out / actual size, remembered for the window |
-| ⌃⌘F | Full screen, on whichever display the window is |
+| ⌃⌘F | Full screen, on whichever display the window is. The tiles grow to fill the screen, beside Detail when it is open; ⌘+ and ⌘− zoom from there and ⌘0 (View › Fit to Screen) fits the wall again |
 
 A double click on a tab renames it; its context menu also duplicates, copies and deletes the wall. A click on a tile's
 title opens that preset in the main window. **View › Rotate Walls** switches walls by itself every 30 seconds to

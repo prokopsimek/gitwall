@@ -9,7 +9,7 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 
 | Package | Owns |
 |---|---|
-| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`, `PresetTransfer` (preset JSON for copy and paste), `Wall`/`Tile`/`TileSize`, `WallLayout`, `GitwallFile` (presets and walls as one JSON file), `SyncStatus`, `FilterCache`, `WallsCommand`/`WallsKeys` (what the Walls window's menus and keys do, and when). |
+| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`, `PresetTransfer` (preset JSON for copy and paste), `Wall`/`Tile`/`TileSize`, `WallLayout` (with the full-screen `fit`), `GitwallFile` (presets and walls as one JSON file), `SyncStatus`, `FilterCache`, `WallsCommand`/`WallsKeys` (what the Walls window's menus and keys do, and when). |
 | `GitwallUI` | Row views, status icons, time formatting shared by popover, window and widget; `TileView`, the tile drawn by both the widgets and the Walls window. |
 | `GitwallAuth` | Keychain `TokenStore`, `StoredToken`, OAuth flows (`GitHubDeviceFlow`, `GitLabPKCEFlow`), `PKCE`, `TokenRefresher`, `RefreshingTokenReader`, token expiry parsing, `OAuthClients` (public client IDs). |
 | `GitwallGitHub` | `GitHubProvider`: GraphQL for lists, REST for identity and discovery, Link pagination. |

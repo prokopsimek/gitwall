@@ -15,10 +15,30 @@ public struct GridRect: Hashable, Sendable {
     }
 }
 
+/// How a full screen wall is drawn: the scale of the grid and the columns its tiles are packed into.
+public struct WallFit: Hashable, Sendable {
+    public var scale: Double
+    public var columns: Int
+
+    public init(scale: Double, columns: Int) {
+        self.scale = scale
+        self.columns = columns
+    }
+}
+
 /// Places the tiles of a wall on a grid. The window only turns cells into points.
 public enum WallLayout {
     /// The narrowest a column gets before the grid drops one. A cell is then about a small widget.
     public static let minimumColumnWidth = 180.0
+    /// The height of a grid row before zoom, about a small widget.
+    public static let cellHeight = 170.0
+    /// The gap between rows and between columns before zoom.
+    public static let spacing = 16.0
+
+    /// Points that `cells` cells of `cell` points take, with the gaps between them.
+    public static func span(_ cells: Int, cell: Double) -> Double {
+        Double(cells) * cell + Double(max(cells - 1, 0)) * spacing
+    }
 
     /// Columns for a grid `width` points wide: as many 180-point columns as fit, and never fewer than four, so an
     /// extra large tile always fits next to nothing else rather than being narrowed.
@@ -71,5 +91,47 @@ public enum WallLayout {
     /// Rows the packed tiles take, for the height of the grid.
     public static func rowCount(_ rects: [GridRect]) -> Int {
         rects.map { $0.row + $0.height }.max() ?? 0
+    }
+
+    /// Full screen: the scale and the columns at which the tiles fill an area `width` × `height` points large. Every
+    /// column count from the widest tile up is packed, and the largest scale at which the packed tiles fit both the
+    /// width, with columns at least ``minimumColumnWidth`` wide, and the height wins; on a tie, the fewer columns. A
+    /// wall too big to fit at its normal size keeps that size and the columns of a window (``columns(forWidth:)``),
+    /// so it fills the width and scrolls.
+    ///
+    /// `zoom` (⌘+ and ⌘−) scales relative to the fit. The tiles are then packed into as many columns as the scaled
+    /// width holds, never fewer than the widest tile takes, and the columns they leave empty are dropped, so the
+    /// tiles still reach across the screen.
+    public static func fit(_ sizes: [TileSize], width: Double, height: Double, zoom: Double = 1) -> WallFit {
+        guard let fit = bestFit(sizes, width: width, height: height) else {
+            return WallFit(scale: zoom, columns: columns(forWidth: width / zoom))
+        }
+        guard zoom != 1 else { return fit }
+        let scale = fit.scale * zoom
+        let widest = sizes.map(\.columns).max() ?? 1
+        let fitting = max(widest, Int((width / scale + spacing) / (minimumColumnWidth + spacing)))
+        let used = pack(sizes, columns: fitting).map { $0.column + $0.width }.max() ?? fitting
+        return WallFit(scale: scale, columns: used)
+    }
+
+    /// The largest scale of at least 1 at which the packed tiles fit, or nil when there is none.
+    private static func bestFit(_ sizes: [TileSize], width: Double, height: Double) -> WallFit? {
+        guard let widest = sizes.map(\.columns).max() else { return nil }
+        // Past this many columns, a column is narrower than the minimum even at the normal size.
+        let most = min(sizes.map(\.columns).reduce(0, +), Int((width + spacing) / (minimumColumnWidth + spacing)))
+        guard most >= widest else { return nil }
+        var best: WallFit?
+        for columns in widest...most {
+            let rects = pack(sizes, columns: columns)
+            // Tiles that leave columns empty are packed exactly as with fewer columns, which was already tried.
+            guard rects.map({ $0.column + $0.width }).max() == columns else { continue }
+            let scale = min(
+                width / span(columns, cell: minimumColumnWidth),
+                height / span(rowCount(rects), cell: cellHeight)
+            )
+            if scale > best?.scale ?? 0 { best = WallFit(scale: scale, columns: columns) }
+        }
+        guard let best, best.scale >= 1 else { return nil }
+        return best
     }
 }
