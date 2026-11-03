@@ -65,8 +65,8 @@ struct DetailFetcherTests {
         func token(for accountID: UUID) async throws -> String? { tokens[accountID] }
     }
 
-    private func fetcher(_ provider: DetailProvider, tokens: [UUID: String]? = nil, cacheLimit: Int = 100) -> DetailFetcher {
-        DetailFetcher(providers: [.github: provider], tokens: Tokens(tokens: tokens ?? [S.account.id: "t0ken"]), cacheLimit: cacheLimit)
+    private func fetcher(_ provider: DetailProvider, tokens: [UUID: String]? = nil) -> DetailFetcher {
+        DetailFetcher(providers: [.github: provider], tokens: Tokens(tokens: tokens ?? [S.account.id: "t0ken"]))
     }
 
     @Test("fetches with the account's token and hands the detail back")
@@ -80,38 +80,9 @@ struct DetailFetcherTests {
         #expect(await provider.calls.tokens == ["t0ken"])
     }
 
-    @Test("the same item, unchanged, comes from the cache")
-    func cached() async throws {
+    @Test("each request after the last one finished fetches again; caching is DetailCache's job")
+    func noCache() async throws {
         let provider = DetailProvider()
-        let fetcher = fetcher(provider)
-        let item = S.pull()
-
-        _ = await fetcher.detail(for: item, account: S.account)
-        _ = await fetcher.detail(for: item, account: S.account)
-
-        #expect(await provider.calls.items.count == 1)
-        #expect(await fetcher.cached(item) == S.detail(for: item))
-    }
-
-    @Test("a newer updatedAt fetches again, and so does a forced refresh")
-    func stale() async throws {
-        let provider = DetailProvider()
-        let fetcher = fetcher(provider)
-        var item = S.pull()
-
-        _ = await fetcher.detail(for: item, account: S.account)
-        item.updatedAt = S.now
-        #expect(await fetcher.cached(item) == nil)
-        let load = await fetcher.detail(for: item, account: S.account)
-        _ = await fetcher.detail(for: item, account: S.account, forceRefresh: true)
-
-        #expect(load == .loaded(S.detail(for: item)))
-        #expect(await provider.calls.items.count == 3)
-    }
-
-    @Test("a part that failed in passing is not cached, so the next open tries again")
-    func failuresAreNotCached() async throws {
-        let provider = DetailProvider(failing: true)
         let fetcher = fetcher(provider)
         let item = S.pull()
 
@@ -119,33 +90,6 @@ struct DetailFetcherTests {
         _ = await fetcher.detail(for: item, account: S.account)
 
         #expect(await provider.calls.items.count == 2)
-    }
-
-    @Test("a missing permission is cached: asking again would give the same answer")
-    func missingPermissionIsCached() async throws {
-        struct Refusing: GitProvider {
-            let kind: ProviderKind = .github
-            let calls = Calls()
-            var capabilities: ProviderCapabilities { DetailProvider().capabilities }
-            func verify(baseURL: URL, token: String) async throws -> UserRef { S.me }
-            func discoverRepositories(baseURL: URL, token: String, query: String?) async throws -> [RepoRef] { [] }
-            func discoverContainers(baseURL: URL, token: String) async throws -> [ContainerRef] { [] }
-            func fetchItems(account: Account, token: String, kinds: Set<ItemKind>) async throws -> [WorkItem] { [] }
-            func itemDetail(account: Account, token: String, item: WorkItem) async -> ItemDetail? {
-                await calls.record(item, token: token)
-                var detail = S.detail(for: item)
-                detail.checks = .failure(.missingPermission)
-                return detail
-            }
-        }
-        let provider = Refusing()
-        let fetcher = DetailFetcher(providers: [.github: provider], tokens: Tokens(tokens: [S.account.id: "t"]))
-        let item = S.pull()
-
-        _ = await fetcher.detail(for: item, account: S.account)
-        _ = await fetcher.detail(for: item, account: S.account)
-
-        #expect(await provider.calls.items.count == 1)
     }
 
     @Test("two requests for the same item while it loads share one fetch")
@@ -183,18 +127,5 @@ struct DetailFetcherTests {
 
         #expect(load == .unsupported)
         #expect(await provider.calls.items.isEmpty)
-    }
-
-    @Test("the cache keeps the most recent fetches only")
-    func cacheLimit() async throws {
-        let provider = DetailProvider()
-        let fetcher = fetcher(provider, cacheLimit: 2)
-        let items = [S.pull(1), S.pull(2), S.pull(3)]
-
-        for item in items { _ = await fetcher.detail(for: item, account: S.account) }
-
-        #expect(await fetcher.cached(items[0]) == nil)
-        #expect(await fetcher.cached(items[1]) != nil)
-        #expect(await fetcher.cached(items[2]) != nil)
     }
 }

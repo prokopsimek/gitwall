@@ -6,8 +6,9 @@ import OSLog
 
 private let log = Logger(subsystem: "cz.prokopsimek.gitwall", category: "detail")
 
-/// App-wide part of Detail, shared by every window that shows it: the fetches and their cache, and when each item was
-/// last opened (`seen.json`, see ``SeenStore``). Per-window state is in ``DetailModel``.
+/// App-wide part of Detail, shared by every window that shows it: the fetches and the one cache of what they
+/// returned, and when each item was last opened (`seen.json`, see ``SeenStore``). Per-window state is in
+/// ``DetailModel``.
 @MainActor
 @Observable
 final class ItemDetailService {
@@ -16,10 +17,10 @@ final class ItemDetailService {
 
     @ObservationIgnored private let fetcher: DetailFetcher
     @ObservationIgnored private let seenStore: SeenStore?
-    /// A main-actor copy of the recent details, so a cached item shows without waiting a frame for the actor.
-    @ObservationIgnored private var recent: [String: ItemDetail] = [:]
-    @ObservationIgnored private var recentOrder: [String] = []
-    private static let recentLimit = 100
+    /// On the main actor, so an item fetched before shows without waiting for the fetcher.
+    @ObservationIgnored private var cache = DetailCache()
+    /// Bumped by ``forget(accountID:)``, so a fetch that started with the old credential is not kept.
+    @ObservationIgnored private var generations: [UUID: Int] = [:]
 
     /// `container` is nil in `--debug-demo`, which keeps everything in memory.
     init(providers: [ProviderKind: any GitProvider], tokens: any TokenStore, container: URL?) {
@@ -51,21 +52,23 @@ final class ItemDetailService {
         }
     }
 
-    func cachedDetail(for item: WorkItem) -> ItemDetail? {
-        guard let detail = recent[item.id], detail.itemUpdatedAt == item.updatedAt else { return nil }
-        return detail
-    }
+    func cachedDetail(for item: WorkItem) -> ItemDetail? { cache.detail(for: item) }
 
+    /// The cached detail while the item keeps its state, else a fetch. `forceRefresh` (Try Again) always fetches.
     func load(_ item: WorkItem, account: Account, forceRefresh: Bool) async -> DetailLoad {
-        let load = await fetcher.detail(for: item, account: account, forceRefresh: forceRefresh)
-        if case .loaded(let detail) = load { remember(detail) }
+        if !forceRefresh, let cached = cache.detail(for: item) { return .loaded(cached) }
+        let generation = generations[account.id, default: 0]
+        let load = await fetcher.detail(for: item, account: account)
+        if case .loaded(let detail) = load, generations[account.id, default: 0] == generation {
+            cache.store(detail, accountID: account.id)
+        }
         return load
     }
 
-    private func remember(_ detail: ItemDetail) {
-        recent[detail.itemID] = detail
-        recentOrder.removeAll { $0 == detail.itemID }
-        recentOrder.append(detail.itemID)
-        while recentOrder.count > Self.recentLimit { recent[recentOrder.removeFirst()] = nil }
+    /// The account's credential changed or it was removed: what was fetched with the old one, a missing permission
+    /// too, is fetched again.
+    func forget(accountID: UUID) {
+        cache.forget(accountID: accountID)
+        generations[accountID, default: 0] += 1
     }
 }
