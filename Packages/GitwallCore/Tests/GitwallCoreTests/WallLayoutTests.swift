@@ -79,13 +79,18 @@ struct WallLayoutTests {
     /// failing CI and open bugs (small).
     private let myDay: [TileSize] = [.large, .medium, .small, .small, .medium]
 
-    @Test("full screen takes the largest scale at which the packed tiles fit the width and the height")
-    func fitLargestScale() {
-        // On an LG UltraFine (3360 × 1890 points, less the margins and the tab bar), five columns win: the tiles fill
-        // the width in two rows. Four columns would fill the height in three rows, at a slightly smaller scale.
+    @Test("full screen takes the columns at which the tiles cover the most of the screen, then the largest scale")
+    func fitCoverage() {
+        // On an LG UltraFine (3360 × 1890 points, less the margins and the tab bar), five columns give the largest
+        // scale but leave a third of the height empty. Four columns, 3 % smaller, fill the whole screen; two and three
+        // fill it too, at smaller scales.
         let fit = WallLayout.fit(myDay, width: 3320, height: 1810)
-        #expect(fit == WallFit(scale: 3320 / WallLayout.span(5, cell: WallLayout.minimumColumnWidth), columns: 5))
+        #expect(fit == WallFit(scale: 1810 / WallLayout.span(3, cell: WallLayout.cellHeight), columns: 4))
+        #expect(fit.scale < 3320 / WallLayout.span(5, cell: WallLayout.minimumColumnWidth))
+    }
 
+    @Test("a wall that cannot fill the height takes the largest scale at which it fits the width")
+    func fitLargestScale() {
         let one = WallLayout.fit([.medium], width: 1000, height: 500)
         #expect(one == WallFit(scale: 1000 / 376, columns: 2))
     }
@@ -131,9 +136,9 @@ struct WallLayoutTests {
         let fit = WallLayout.fit(myDay, width: 3320, height: 1810)
         #expect(WallLayout.fit(myDay, width: 3320, height: 1810, zoom: 1) == fit)
 
-        // Twice the fit is 482 points wide before scaling: two columns, as wide as the large tile.
+        // Twice the fit is 497 points wide before scaling: two columns, as wide as the large tile.
         #expect(WallLayout.fit(myDay, width: 3320, height: 1810, zoom: 2) == WallFit(scale: fit.scale * 2, columns: 2))
-        // Three quarters of it is 1285 points wide: six columns.
+        // Three quarters of it is 1326 points wide: six columns.
         #expect(WallLayout.fit(myDay, width: 3320, height: 1810, zoom: 0.75) == WallFit(scale: fit.scale * 0.75, columns: 6))
         // A little closer, the wall that fits in four columns would get a fifth column it leaves empty.
         let team: [TileSize] = [.extraLarge, .large, .large]

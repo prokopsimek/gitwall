@@ -94,10 +94,10 @@ public enum WallLayout {
     }
 
     /// Full screen: the scale and the columns at which the tiles fill an area `width` × `height` points large. Every
-    /// column count from the widest tile up is packed, and the largest scale at which the packed tiles fit both the
-    /// width, with columns at least ``minimumColumnWidth`` wide, and the height wins; on a tie, the fewer columns. A
-    /// wall too big to fit at its normal size keeps that size and the columns of a window (``columns(forWidth:)``),
-    /// so it fills the width and scrolls.
+    /// column count from the widest tile up is packed and scaled as large as it fits both the width, with columns at
+    /// least ``minimumColumnWidth`` wide, and the height. The count whose tiles cover the most of the area wins, then
+    /// the larger scale, then the fewer columns. A wall too big to fit at its normal size keeps that size and the
+    /// columns of a window (``columns(forWidth:)``), so it fills the width and scrolls.
     ///
     /// `zoom` (⌘+ and ⌘−) scales relative to the fit. The tiles are then packed into as many columns as the scaled
     /// width holds, never fewer than the widest tile takes, and the columns they leave empty are dropped, so the
@@ -114,24 +114,29 @@ public enum WallLayout {
         return WallFit(scale: scale, columns: used)
     }
 
-    /// The largest scale of at least 1 at which the packed tiles fit, or nil when there is none.
+    /// The column count of at least scale 1 whose tiles cover the most of the area, or nil when there is none.
     private static func bestFit(_ sizes: [TileSize], width: Double, height: Double) -> WallFit? {
         guard let widest = sizes.map(\.columns).max() else { return nil }
         // Past this many columns, a column is narrower than the minimum even at the normal size.
         let most = min(sizes.map(\.columns).reduce(0, +), Int((width + spacing) / (minimumColumnWidth + spacing)))
         guard most >= widest else { return nil }
-        var best: WallFit?
+        var best: (fit: WallFit, covered: Double)?
         for columns in widest...most {
             let rects = pack(sizes, columns: columns)
             // Tiles that leave columns empty are packed exactly as with fewer columns, which was already tried.
             guard rects.map({ $0.column + $0.width }).max() == columns else { continue }
-            let scale = min(
-                width / span(columns, cell: minimumColumnWidth),
-                height / span(rowCount(rects), cell: cellHeight)
-            )
-            if scale > best?.scale ?? 0 { best = WallFit(scale: scale, columns: columns) }
+            let gridHeight = span(rowCount(rects), cell: cellHeight)
+            let scale = min(width / span(columns, cell: minimumColumnWidth), height / gridHeight)
+            guard scale >= 1 else { continue }
+            // The columns widen to the whole width, so the scaled grid covers the width times its scaled height.
+            let covered = (width * scale * gridHeight) / (width * height)
+            let tolerance = 1e-9
+            if let current = best {
+                guard covered > current.covered + tolerance
+                    || (covered > current.covered - tolerance && scale > current.fit.scale + tolerance) else { continue }
+            }
+            best = (WallFit(scale: scale, columns: columns), covered)
         }
-        guard let best, best.scale >= 1 else { return nil }
-        return best
+        return best?.fit
     }
 }
