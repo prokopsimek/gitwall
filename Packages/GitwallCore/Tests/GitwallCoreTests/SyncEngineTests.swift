@@ -21,7 +21,7 @@ struct SyncEngineTests {
         var capabilities: ProviderCapabilities {
             ProviderCapabilities(pullRequestTerm: "Pull request", pullRequestAbbreviation: "PR",
                                  supportsOrganizationSources: true, supportsGroupSources: false,
-                                 resolvesTeamReviewRequests: false)
+                                 resolvesTeamReviewRequests: false, hostName: "GitHub")
         }
         func verify(baseURL: URL, token: String) async throws -> UserRef { UserRef(login: "me") }
         func discoverRepositories(baseURL: URL, token: String, query: String?) async throws -> [RepoRef] { [] }

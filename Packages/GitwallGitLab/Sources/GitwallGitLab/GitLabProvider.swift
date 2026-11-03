@@ -18,7 +18,8 @@ public struct GitLabProvider: GitProvider {
         pullRequestAbbreviation: "MR",
         supportsOrganizationSources: false,
         supportsGroupSources: true,
-        resolvesTeamReviewRequests: false
+        resolvesTeamReviewRequests: false,
+        hostName: "GitLab"
     )
 
     static let maxDiscoveryPages = 5

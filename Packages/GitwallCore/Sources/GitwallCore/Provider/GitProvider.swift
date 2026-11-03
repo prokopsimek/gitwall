@@ -40,19 +40,28 @@ public struct ProviderCapabilities: Hashable, Sendable {
     public var supportsGroupSources: Bool
     /// Whether review requests addressed to a team the user belongs to are recognised.
     public var resolvesTeamReviewRequests: Bool
+    /// "GitHub" or "GitLab", for "Open on …".
+    public var hostName: String
+    /// Whether ``GitProvider/itemDetail(account:token:item:)`` fetches anything. Without it Detail shows what the
+    /// snapshot holds and a link.
+    public var fetchesItemDetail: Bool
 
     public init(
         pullRequestTerm: String,
         pullRequestAbbreviation: String,
         supportsOrganizationSources: Bool,
         supportsGroupSources: Bool,
-        resolvesTeamReviewRequests: Bool
+        resolvesTeamReviewRequests: Bool,
+        hostName: String,
+        fetchesItemDetail: Bool = false
     ) {
         self.pullRequestTerm = pullRequestTerm
         self.pullRequestAbbreviation = pullRequestAbbreviation
         self.supportsOrganizationSources = supportsOrganizationSources
         self.supportsGroupSources = supportsGroupSources
         self.resolvesTeamReviewRequests = resolvesTeamReviewRequests
+        self.hostName = hostName
+        self.fetchesItemDetail = fetchesItemDetail
     }
 }
 
@@ -106,6 +115,12 @@ public protocol GitProvider: Sendable {
     /// priorities are optional, and a token that may not read the boards must not cost the user the list itself.
     /// See `docs/adr/0012-priority-comes-from-a-projects-field-then-labels.md`.
     func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup
+
+    /// Body, conversation, checks, files and timeline of one item, for Detail. Never throws: each part carries its own
+    /// failure, so a part the token may not read leaves the others. Nil when the provider has no Detail, which
+    /// ``ProviderCapabilities/fetchesItemDetail`` says up front. Read-only, like everything Gitwall asks.
+    /// See `docs/adr/0015-detail-is-read-only-and-fetched-on-demand.md`.
+    func itemDetail(account: Account, token: String, item: WorkItem) async -> ItemDetail?
 }
 
 extension GitProvider {
@@ -115,6 +130,9 @@ extension GitProvider {
     public func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup {
         .unsupported
     }
+
+    /// Providers without Detail (GitLab for now): the snapshot is all Detail shows.
+    public func itemDetail(account: Account, token: String, item: WorkItem) async -> ItemDetail? { nil }
 }
 
 /// What ``GitProvider/projectPriorities(account:token:items:)`` could read.
