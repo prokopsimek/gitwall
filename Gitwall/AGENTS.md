@@ -97,7 +97,9 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   command did not. `DetailModel` marks an item seen only
   after its detail loaded while it is still shown (`ItemDetailService.markSeen`, `persist: !usesSampleContent`;
   sample items keep their times in memory), opens only http(s) links, and clears a selection the new preset does
-  not list (`presetDidChange`). Replacing a credential or removing an account calls `details.forget(accountID:)`.
+  not list (`presetDidChange`). Navigation that leaves nothing selected (another wall, tile or preset, rotation) closes
+  Detail instead of showing "No Item Selected" (`DetailVisibility`). Replacing a credential or removing an account
+  calls `details.forget(accountID:)`.
   See `docs/adr/0015`.
 
 ## Debug launch arguments (Debug builds only)

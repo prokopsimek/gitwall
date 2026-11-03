@@ -68,6 +68,43 @@ struct WallsDetailTests {
         #expect(model.detail.visibleItemIDs.isEmpty)
     }
 
+    @Test("Tab, a click on a tile and another wall leave nothing selected and close Detail; ↑↓ keep it open")
+    func navigationClosesDetail() throws {
+        let model = model()
+        model.selectItem(offset: 1)
+        model.detail.present()
+        model.selectItem(offset: 1)
+        #expect(model.detail.isPresented, "Detail follows the arrows")
+
+        model.selectTile(offset: 1)
+        #expect(!model.detail.isPresented)
+
+        model.selectItem(offset: 1)
+        model.detail.present()
+        let other = try #require(model.currentWall?.tiles.first { $0.id != model.selectedTileID })
+        model.selectTile(other)
+        #expect(!model.detail.isPresented)
+
+        model.selectItem(offset: 1)
+        model.detail.present()
+        model.showWall(offset: 1)
+        #expect(!model.detail.isPresented, "⌃⇥, ⇧⌘] and rotation all switch walls this way")
+        #expect(model.detail.selectedItemID == nil)
+    }
+
+    @Test("Detail opened on an empty wall closes when another wall comes up")
+    func emptyDetailClosesOnAnotherWall() throws {
+        let model = model()
+        model.environment.setWalls(model.walls + [Wall(name: "Empty")])
+        model.selectWall(try #require(model.walls.last).id)
+        model.detail.present()
+        #expect(model.detail.isPresented)
+        #expect(model.detail.selectedItemID == nil)
+
+        model.showWall(offset: 1)
+        #expect(!model.detail.isPresented)
+    }
+
     @Test("Why it's here explains the item by the preset of the tile that holds it")
     func explainedByTheTile() throws {
         let model = model()

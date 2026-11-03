@@ -87,7 +87,7 @@ struct DetailModelTests {
         #expect(environment.details.lastSeen(pull.id) == nil)
     }
 
-    @Test("another preset without the selected item clears the selection; one with it keeps it")
+    @Test("another preset without the selected item clears the selection and closes Detail; one with it keeps both")
     func presetChange() throws {
         let environment = sampleEnvironment()
         let model = DetailModel(environment: environment)
@@ -98,10 +98,12 @@ struct DetailModelTests {
         model.presetDidChange(visibleItemIDs: [ids[1], ids[2]])
         #expect(model.selectedItemID == ids[1])
         #expect(model.visibleItemIDs == [ids[1], ids[2]])
+        #expect(model.isPresented)
 
         model.presetDidChange(visibleItemIDs: [ids[0]])
         #expect(model.selectedItemID == nil)
         #expect(model.selectedRemote == nil)
+        #expect(!model.isPresented, "Detail closes rather than show no item")
     }
 
     @Test("an item outside the list on screen is not explained by the preset")

@@ -14,7 +14,7 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 | `GitwallAuth` | Keychain `TokenStore`, `StoredToken`, OAuth flows (`GitHubDeviceFlow`, `GitLabPKCEFlow`), `PKCE`, `TokenRefresher`, `RefreshingTokenReader`, token expiry parsing, `OAuthClients` (public client IDs). |
 | `GitwallGitHub` | `GitHubProvider`: GraphQL for lists, REST for identity and discovery, Link pagination. |
 | `GitwallGitLab` | `GitLabProvider`: one GraphQL request per project or group (complexity limit), REST discovery. Sends the token as a bearer credential, which covers both personal access tokens and OAuth. |
-| `GitwallCore` · Detail | `ItemDetail`, `DetailFetcher` (on-demand fetch, shared while in flight), `DetailCache` (the one cache, kept by the app), `NextStep`, `LatestWord`, `WhatsNew`, `SeenStore` (`seen.json`), `FilterEngine.explain` (`MatchReason`). |
+| `GitwallCore` · Detail | `ItemDetail`, `DetailFetcher` (on-demand fetch, shared while in flight), `DetailCache` (the one cache, kept by the app), `NextStep`, `LatestWord`, `WhatsNew`, `SeenStore` (`seen.json`), `FilterEngine.explain` (`MatchReason`), `DetailVisibility` (navigation that leaves nothing selected closes Detail). |
 | `GitwallUI` · Detail | `DetailView` and its wording (`DetailPresentation`), `MarkdownView` and the native Markdown parser (`MarkdownBlock`). |
 | `GitwallGitHub` · Detail | Item detail in two read-only GraphQL queries (`GraphQL+ItemDetail.swift`, `GitHubProvider+ItemDetail.swift`). |
 

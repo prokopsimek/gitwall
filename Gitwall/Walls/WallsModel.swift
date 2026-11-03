@@ -134,13 +134,15 @@ final class WallsModel {
 
     // MARK: Moving around
 
-    /// A name being typed is kept before the other wall comes up.
+    /// A name being typed is kept before the other wall comes up. Nothing is selected on it, so Detail closes, also
+    /// when it was open on an empty wall.
     func selectWall(_ id: Wall.ID) {
         guard id != currentWall?.id else { return }
         commitRename()
         selectedWallID = id
         selectedTileID = nil
         selectedItemID = nil
+        syncDetail()
     }
 
     /// Next (1) or previous (-1) wall, wrapping around.
