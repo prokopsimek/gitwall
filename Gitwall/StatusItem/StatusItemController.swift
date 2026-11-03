@@ -68,11 +68,15 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     }
 
     /// Demo mode: an opaque content background. A window-only capture renders the popover's translucent
-    /// material as dark grey whatever sits behind it, which makes the screenshot unreadable.
+    /// material as dark grey whatever sits behind it, which makes the screenshot unreadable. The colour is resolved in
+    /// the popover's own light appearance; resolved in the app's, it came out dark grey under black text whenever the
+    /// Mac was in Dark Mode.
     private func addDemoBackdrop() {
         guard let view = popover.contentViewController?.view else { return }
         view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        }
     }
 
     private func showMenu() {
