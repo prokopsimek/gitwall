@@ -5,9 +5,11 @@ import AppKit
 @MainActor
 final class MainMenuController: NSObject {
     private let environment: AppEnvironment
+    private let wallsMenu: WallsMenu
 
     init(environment: AppEnvironment) {
         self.environment = environment
+        wallsMenu = WallsMenu(environment: environment)
         super.init()
         NSApp.mainMenu = buildMenu()
     }
@@ -39,6 +41,8 @@ final class MainMenuController: NSObject {
         edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Paste Configuration…", action: #selector(pasteConfiguration), keyEquivalent: "V").target = self
         main.addItem(submenu(edit, title: "Edit"))
 
         // View menu
@@ -46,7 +50,9 @@ final class MainMenuController: NSObject {
         view.addItem(withTitle: "Refresh Now", action: #selector(refresh), keyEquivalent: "r").target = self
         let sidebar = view.addItem(withTitle: "Toggle Sidebar", action: NSSelectorFromString("toggleSidebar:"), keyEquivalent: "s")
         sidebar.keyEquivalentModifierMask = [.command, .control]
+        wallsMenu.viewItems().forEach(view.addItem)
         main.addItem(submenu(view, title: "View"))
+        main.addItem(submenu(wallsMenu.wallMenu(), title: "Wall"))
 
         // Window menu
         let window = NSMenu(title: "Window")
@@ -54,6 +60,7 @@ final class MainMenuController: NSObject {
         window.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
         window.addItem(.separator())
         window.addItem(withTitle: "Gitwall", action: #selector(openMainWindow), keyEquivalent: "1").target = self
+        window.addItem(withTitle: "Walls", action: #selector(openWalls), keyEquivalent: "2").target = self
         window.addItem(.separator())
         window.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
         main.addItem(submenu(window, title: "Window"))
@@ -85,6 +92,8 @@ final class MainMenuController: NSObject {
     @objc private func openSettings() { environment.openSettings(environment.needsOnboarding ? .accounts : .presets) }
     @objc private func refresh() { Task { await environment.refresh() } }
     @objc private func openMainWindow() { environment.openMainWindow() }
+    @objc private func openWalls() { environment.openWalls() }
+    @objc private func pasteConfiguration() { ConfigurationPaste.run(environment: environment) }
     @objc private func showWidgetHelp() { environment.showWidgetHelp() }
     @objc private func showSampleData() {
         environment.enterSampleData()

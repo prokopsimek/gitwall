@@ -21,8 +21,12 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 final class AppEnvironment {
     // MARK: State
 
-    private(set) var config: AppConfig = .empty
-    private(set) var snapshot: Snapshot?
+    private(set) var config: AppConfig = .empty {
+        didSet { itemsCache.removeAll() }
+    }
+    private(set) var snapshot: Snapshot? {
+        didSet { itemsCache.removeAll() }
+    }
     private(set) var previousSnapshot: Snapshot?
     private(set) var isRefreshing = false
     /// Set when a refresh was requested while one was running; the running one loops once more.
@@ -56,6 +60,7 @@ final class AppEnvironment {
     /// The account is the one to preselect in the Repositories tab, when the caller has one in mind.
     @ObservationIgnored var onOpenSettings: ((SettingsTab, UUID?) -> Void)?
     @ObservationIgnored var onOpenMainWindow: ((UUID?) -> Void)?
+    @ObservationIgnored var onOpenWalls: (() -> Void)?
     @ObservationIgnored var onShowWidgetHelp: (() -> Void)?
     @ObservationIgnored var onShowSampleItem: ((WorkItem) -> Void)?
     @ObservationIgnored private var refreshLoop: Task<Void, Never>?
@@ -64,6 +69,7 @@ final class AppEnvironment {
     @ObservationIgnored private let defaults: UserDefaults
     /// Review requests that have "arrived" through Refresh while showing sample data. See `refreshSampleData`.
     @ObservationIgnored private var sampleArrivals = 0
+    @ObservationIgnored private let itemsCache = ItemsCache()
 
     /// `sandbox` points the config, snapshot and tokens at a throwaway directory so a test run cannot touch
     /// the real installation's accounts (`--debug-fresh`). `providers` lets a test put a stub transport under a
@@ -341,9 +347,12 @@ final class AppEnvironment {
         config.preset(id: selectedPresetID ?? UUID()) ?? config.presets.first
     }
 
-    func items(for preset: Preset, now: Date = Date()) -> [WorkItem] {
+    /// Remembered per preset until the snapshot or the configuration changes (`ItemsCache`).
+    func items(for preset: Preset) -> [WorkItem] {
         guard let snapshot else { return [] }
-        return FilterEngine.items(matching: preset, in: snapshot.items, accounts: config.accounts, now: now)
+        return itemsCache.items(for: preset) {
+            FilterEngine.items(matching: preset, in: snapshot.items, accounts: config.accounts, now: Date())
+        }
     }
 
     func count(for preset: Preset) -> Int {
@@ -549,6 +558,42 @@ final class AppEnvironment {
         try? persist(updated, refresh: false)
     }
 
+    // MARK: Walls and the Gitwall file (docs/adr/0014)
+
+    func setWalls(_ walls: [Wall]) {
+        var updated = config
+        updated.walls = walls
+        try? persist(updated, refresh: false)
+    }
+
+    /// Reads presets and walls from the pasteboard without writing anything; ``pasteConfiguration(_:)`` writes them.
+    /// Takes a version 1 preset file as well, exactly as ``presetsOnPasteboard(_:)`` does.
+    func configurationOnPasteboard(_ pasteboard: NSPasteboard = .general) -> Result<GitwallFile, GitwallFileError> {
+        GitwallFile.decode(pasteboard.string(forType: .string) ?? "", presetsInApp: Set(config.presets.map(\.id))) { name in
+            NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
+        }
+    }
+
+    /// What ``pasteConfiguration(_:)`` would do, for the confirmation.
+    func pastePreview(_ file: GitwallFile) -> GitwallFileMerge {
+        GitwallFile.merge(file, presets: config.presets, walls: config.walls)
+    }
+
+    func pasteConfiguration(_ file: GitwallFile) {
+        let merge = pastePreview(file)
+        var updated = config
+        updated.presets = merge.presets.presets
+        updated.walls = merge.walls
+        try? persist(updated, refresh: false)
+    }
+
+    /// Puts `wall` and the presets it shows on the pasteboard. Returns what the JSON could not carry, or nil.
+    func copyWallAsJSON(_ wall: Wall, to pasteboard: NSPasteboard = .general) -> String? {
+        pasteboard.clearContents()
+        pasteboard.setString(GitwallFile.encode(wall: wall, presets: config.presets), forType: .string)
+        return GitwallFile.copyWarning(for: wall, presets: config.presets)
+    }
+
     // MARK: Settings
 
     func updateSettings(_ settings: AppSettings) {
@@ -629,6 +674,10 @@ final class AppEnvironment {
 
     func openMainWindow(presetID: UUID? = nil) {
         onOpenMainWindow?(presetID)
+    }
+
+    func openWalls() {
+        onOpenWalls?()
     }
 
     func showWidgetHelp() {

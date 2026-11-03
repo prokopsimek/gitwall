@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let environment = AppEnvironment(demo: AppDelegate.isDemoLaunch, sandbox: AppDelegate.sandboxDirectory)
     private var statusItem: StatusItemController?
     private var mainWindow: MainWindowController?
+    private var wallsWindow: WallsWindowController?
     private var onboardingWindow: OnboardingWindowController?
     private var settingsWindow: SettingsWindowController?
     private var mainMenu: MainMenuController?
@@ -45,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         environment.onOpenSettings = { [weak self] tab, accountID in self?.showSettings(tab, accountID: accountID) }
         environment.onOpenMainWindow = { [weak self] presetID in self?.showMainWindow(presetID: presetID) }
+        environment.onOpenWalls = { [weak self] in self?.showWalls() }
         environment.onShowWidgetHelp = { [weak self] in self?.showWidgetHelp() }
         environment.onShowSampleItem = { [weak self] item in self?.showSampleItem(item) }
         statusItem = StatusItemController(environment: environment)
@@ -112,6 +114,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if args.contains("--debug-demo-widgets"), let snapshot = environment.snapshot {
             DemoRenderer.presentWidgetWindows(config: environment.config, snapshot: snapshot)
         }
+        // `--debug-demo-walls [window|edit|empty|fullscreen]` opens only the Walls window, in that state.
+        if let index = args.firstIndex(of: "--debug-demo-walls") {
+            let mode = args.indices.contains(index + 1) ? args[index + 1] : "window"
+            if mode == "empty" { environment.setWalls([]) }
+            showWalls()
+            wallsWindow?.prepareScreenshot(mode)
+            return
+        }
         #endif
         showMainWindow(presetID: environment.selectedPresetID)
         if let window = mainWindow?.window {
@@ -160,6 +170,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             mainWindow = MainWindowController(environment: environment)
         }
         mainWindow?.show(presetID: presetID)
+    }
+
+    func showWalls() {
+        if wallsWindow == nil {
+            wallsWindow = WallsWindowController(environment: environment)
+        }
+        wallsWindow?.show()
     }
 
     func showOnboarding(step: OnboardingStep = .welcome) {

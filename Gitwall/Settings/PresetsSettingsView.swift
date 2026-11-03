@@ -68,14 +68,14 @@ struct PresetsSettingsView: View {
                         Button("Copy All as JSON") { copy(environment.config.presets) }
                             .disabled(environment.config.presets.isEmpty)
                         Divider()
-                        Button("Paste Presets…") { readPaste() }
+                        Button("Paste Presets…") { paste() }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)
                     .fixedSize()
-                    .help("Copy presets as JSON, or paste presets from the clipboard")
+                    .help("Copy presets as JSON, or paste presets and walls from the clipboard")
                     .accessibilityLabel("Copy and paste presets")
                     Spacer()
                     Button {
@@ -110,17 +110,8 @@ struct PresetsSettingsView: View {
             transferAlert?.title ?? "",
             isPresented: Binding(get: { transferAlert != nil }, set: { if !$0 { transferAlert = nil } }),
             presenting: transferAlert
-        ) { alert in
-            if case .confirmPaste(let incoming, _) = alert {
-                Button("Paste") {
-                    environment.pastePresets(incoming)
-                    pasteCount += 1
-                    selection = incoming.first?.id
-                }
-                Button("Cancel", role: .cancel) {}
-            } else {
-                Button("OK") {}
-            }
+        ) { _ in
+            Button("OK") {}
         } message: { alert in
             alert.message
         }
@@ -136,30 +127,21 @@ struct PresetsSettingsView: View {
         }
     }
 
-    /// Nothing is written until the user confirms what the paste changes.
-    private func readPaste() {
-        switch environment.presetsOnPasteboard() {
-        case .failure(let error):
-            transferAlert = .pasteFailed(error.message)
-        case .success(let incoming):
-            let preview = environment.pastePreview(incoming)
-            transferAlert = preview.hasChanges ? .confirmPaste(incoming, summary: preview.summary) : .upToDate
-        }
+    /// Takes a whole Gitwall file, walls included (docs/adr/0014). Nothing is written until the user confirms what
+    /// the paste changes.
+    private func paste() {
+        guard let file = ConfigurationPaste.run(environment: environment) else { return }
+        pasteCount += 1
+        if let first = file.presets.first { selection = first.id }
     }
 }
 
-/// Copy and paste of presets as JSON, see docs/adr/0013.
+/// Copy of presets as JSON, see docs/adr/0013. Pasting goes through `ConfigurationPaste`.
 private enum TransferAlert {
-    case confirmPaste([Preset], summary: String)
-    case upToDate
-    case pasteFailed(String)
     case copiedWithOmissions(String)
 
     var title: LocalizedStringKey {
         switch self {
-        case .confirmPaste: "Paste presets?"
-        case .upToDate: "Nothing to paste"
-        case .pasteFailed: "Presets could not be pasted"
         case .copiedWithOmissions: "Copied, with some settings left out"
         }
     }
@@ -167,11 +149,7 @@ private enum TransferAlert {
     /// Plain `Text`: an alert shows nothing else as its message.
     var message: Text {
         switch self {
-        case .confirmPaste(_, let summary):
-            Text("\(summary). A replaced preset keeps its accounts and repositories, notifications and menu bar count; its other filters give way to the pasted query.")
-        case .upToDate:
-            Text("The presets on the clipboard are already set up exactly like this.")
-        case .pasteFailed(let message), .copiedWithOmissions(let message):
+        case .copiedWithOmissions(let message):
             Text(verbatim: message)
         }
     }

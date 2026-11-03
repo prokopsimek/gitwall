@@ -53,6 +53,18 @@ struct WallLayoutTests {
         #expect(WallLayout.rowCount([]) == 0)
     }
 
+    @Test("zoom steps through fixed levels and stops at the smallest and the largest")
+    func zoom() {
+        #expect(WallLayout.zoom(1, step: 1) == 1.25)
+        #expect(WallLayout.zoom(1, step: -1) == 0.75)
+        #expect(WallLayout.zoom(3, step: 1) == 3)
+        #expect(WallLayout.zoom(0.75, step: -1) == 0.75)
+        // A value between two levels goes to the next one in that direction.
+        #expect(WallLayout.zoom(1.1, step: 1) == 1.25)
+        #expect(WallLayout.zoom(1.1, step: -1) == 1)
+        #expect(WallLayout.zoomLevels.contains(1))
+    }
+
     @Test("a column is at least 180 points wide, and there are never fewer than four")
     func columns() {
         #expect(WallLayout.columns(forWidth: 400) == 4)

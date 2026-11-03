@@ -58,6 +58,16 @@ public enum WallLayout {
         }
     }
 
+    /// Zoom In and Zoom Out step through these, so a wall on a large monitor can be read from across the room.
+    public static let zoomLevels: [Double] = [0.75, 1, 1.25, 1.5, 2, 2.5, 3]
+
+    /// The next level up (`step` > 0) or down from `current`, staying at the ends.
+    public static func zoom(_ current: Double, step: Int) -> Double {
+        if step > 0 { return zoomLevels.first { $0 > current } ?? zoomLevels.last ?? current }
+        if step < 0 { return zoomLevels.last { $0 < current } ?? zoomLevels.first ?? current }
+        return current
+    }
+
     /// Rows the packed tiles take, for the height of the grid.
     public static func rowCount(_ rects: [GridRect]) -> Int {
         rects.map { $0.row + $0.height }.max() ?? 0
