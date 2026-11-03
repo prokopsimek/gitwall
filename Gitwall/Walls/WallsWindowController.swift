@@ -128,11 +128,11 @@ final class WallsWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Only a wall someone can see moves on, and never while it is being edited or renamed.
+    /// An open window moves on, also behind other windows or in Stage Manager's strip, so the wall is where the
+    /// rotation says when someone looks; never while it is being edited or renamed.
     private func rotate() {
         lastAdvance = Date()
-        guard let window, window.isVisible, window.occlusionState.contains(.visible),
-              !model.isEditing, model.renamingWallID == nil else { return }
+        guard window?.isVisible == true, !model.isEditing, model.renamingWallID == nil else { return }
         model.showWall(offset: 1)
     }
 
