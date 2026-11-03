@@ -39,7 +39,23 @@ public enum DemoData {
                                   labelsNone: ["dependencies"], ciStates: [.failure, .running], updatedWithinDays: 7)),
     ]
 
-    public static let config = AppConfig(accounts: [github, gitlab], presets: presets)
+    /// Two walls with fixed ids, so the Walls window looks the same in every screenshot.
+    public static let walls: [Wall] = [
+        Wall(id: fixedID(0x20), name: "My day", tiles: [
+            Tile(id: fixedID(0x30), presetID: fixedID(0x11), size: .large),
+            Tile(id: fixedID(0x31), presetID: fixedID(0x10), size: .medium),
+            Tile(id: fixedID(0x32), presetID: fixedID(0x13), size: .small),
+            Tile(id: fixedID(0x33), presetID: fixedID(0x15), size: .small),
+            Tile(id: fixedID(0x34), presetID: fixedID(0x16), size: .medium),
+        ]),
+        Wall(id: fixedID(0x21), name: "Team", tiles: [
+            Tile(id: fixedID(0x35), presetID: fixedID(0x12), size: .extraLarge),
+            Tile(id: fixedID(0x36), presetID: fixedID(0x14), size: .large),
+            Tile(id: fixedID(0x37), presetID: fixedID(0x15), size: .large),
+        ]),
+    ]
+
+    public static let config = AppConfig(accounts: [github, gitlab], presets: presets, walls: walls)
 
     /// How many review requests can arrive while someone presses Refresh in sample mode.
     public static var arrivalCount: Int { arrivals(now: Date()).count }

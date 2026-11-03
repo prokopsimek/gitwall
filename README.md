@@ -103,6 +103,11 @@ the preset you pick for it.
 
 ![The four widget sizes](docs/screenshots/02-widgets.jpg)
 
+**Walls for a second monitor.** Window › Walls (⌘2) shows several presets side by side as tiles in the four widget
+sizes, one tab per wall. Arrange them in the window (⌘E), zoom them for a large monitor and put the window full screen
+on any display; the corner says how fresh the data is, in red when the last sync failed. Walls can rotate by themselves
+and travel as JSON together with their presets, see [Sharing presets](#sharing-presets).
+
 **Right there in your menu bar**, with the number of reviews waiting for you next to the icon.
 
 ![Menu bar popover](docs/screenshots/07-menubar.jpg)
@@ -324,6 +329,66 @@ A bare list `[ … ]` of presets works too. With the wrapper, `version` must be 
 The format is versioned and will not change under the same version; see
 [ADR 0013](docs/adr/0013-presets-travel-as-json-with-stable-ids.md).
 
+### Walls in the same file
+
+Walls travel with the presets they show, in one file with `"version": 2`, so a whole setup pastes in one step. **Edit ›
+Paste Configuration…** (⇧⌘V) and **Paste Presets…** take it; **Copy Wall as JSON** (the context menu of a wall's tab,
+or the Wall menu) writes a wall together with every preset its tiles use, so it pastes into another Gitwall as it is.
+**Edit › Copy Configuration as JSON** writes every preset and every wall, the whole setup of one Mac for another.
+
+```json
+{
+  "version": 2,
+  "presets": [
+    { "id": "6F0C2D6A-1B7E-4C55-9E0A-2D8E4B1F7A10", "name": "Waiting for me · agents", "query": "involves:franta-dxh" }
+  ],
+  "walls": [
+    {
+      "id": "3C1F6A70-5D2B-4E8A-9B47-0F2C6D8E1A35",
+      "name": "Waiting for me",
+      "tiles": [
+        { "preset": "6F0C2D6A-1B7E-4C55-9E0A-2D8E4B1F7A10", "size": "large" }
+      ]
+    }
+  ]
+}
+```
+
+| Key | Required | Value |
+|---|---|---|
+| `presets` | no | Presets as above. At least one of `presets` and `walls` holds something. |
+| `walls` | no | Each with an `id` (a UUID), a `name` and `tiles`. |
+| tile `preset` | yes | The id of a preset in the same file or already in Gitwall. |
+| tile `size` | no | `small` (1 row), `medium` (3, default), `large` (7) or `extraLarge` (14, two columns), like the widgets. Gitwall always writes it. |
+
+The same rules hold as for presets: everything is checked first and the error names the wall, the tile and the
+reason; a wall whose id Gitwall has is replaced whole, a new one is added, and nothing is deleted. A preset that a tile
+shows can be deleted; the tile then says so and waits to be removed. Version 1 files paste exactly as before. Zoom,
+rotation and the selected wall stay on your Mac. See [ADR 0014](docs/adr/0014-walls-travel-with-presets-in-one-file.md).
+
+### The Walls window
+
+Every command is in the **Wall** and **View** menus too.
+
+| Keys | Does |
+|---|---|
+| ⌘2 | Open the Walls window |
+| ⌘⇧] / ⌘⇧[ or ⌃⇥ / ⌃⇧⇥ | Next / previous wall |
+| ⇥ / ⇧⇥ | Next / previous tile |
+| ↓ / ↑ | Next / previous item in the tile |
+| ↩ or Space, a click | Open the item |
+| ⌘↩, a double click | Open the item in the browser |
+| ⌘E | Edit the wall: drag tiles, add them from the presets above, remove them |
+| 1–4 (while editing) | Size of the selected tile: small, medium, large, extra large |
+| Delete (while editing) | Remove the selected tile |
+| ⌘Z / ⇧⌘Z | Undo / redo a change to a wall |
+| ⌘+ / ⌘− / ⌘0 | Zoom in / out / actual size, remembered for the window |
+| ⌃⌘F | Full screen, on whichever display the window is |
+
+A double click on a tab renames it; its context menu also duplicates, copies and deletes the wall. A click on a tile's
+title opens that preset in the main window. **View › Rotate Walls** switches walls by itself every 30 seconds to
+5 minutes (View › Rotation Interval) and waits two minutes after you use the keyboard or the mouse in the window.
+
 ## Development
 
 You need Xcode 26 and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
@@ -385,7 +450,7 @@ same `FilterEngine` the app uses, so both always agree.
 | Argument | Use it for |
 |---|---|
 | `--debug-fresh` | A throwaway container and in-memory Keychain: try onboarding or sign-in without touching your real accounts |
-| `--debug-demo` | Fictional accounts and items, no network; add `--debug-demo-widgets` to see all widget sizes |
+| `--debug-demo` | Fictional accounts and items, no network; add `--debug-demo-widgets` to see all widget sizes, or `--debug-demo-walls [window\|edit\|empty\|fullscreen]` for the Walls window alone |
 | `--debug-onboarding-step <step>` | Jump straight to one walkthrough screen |
 | `--debug-github-token <pat> --debug-repos a/b` | Create a GitHub account without clicking |
 

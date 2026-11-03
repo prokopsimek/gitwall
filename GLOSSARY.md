@@ -2,6 +2,9 @@
 
 Domain terms as Gitwall uses them. How they are implemented lives in the code and in [docs/adr](docs/adr).
 
+- **Gitwall file** – portable JSON holding presets and walls together (version 2 of the *Preset file*), so a whole
+  setup pastes into Gitwall in one step and pastes again after a change without duplicates. See
+  [ADR 0014](docs/adr/0014-walls-travel-with-presets-in-one-file.md).
 - **Preset** – a named view of pull requests and issues: a query, a sort order and an icon, optionally narrowed to
   some accounts and repositories. The popover, the main window and every widget show one preset at a time. The
   interface may call it a *view*.
@@ -15,3 +18,8 @@ Domain terms as Gitwall uses them. How they are implemented lives in the code an
   it already has, never sent to GitHub or GitLab. See
   [ADR 0008](docs/adr/0008-preset-queries-use-github-search-syntax-locally.md) and
   [ADR 0009](docs/adr/0009-preset-queries-accept-and-or-and-parentheses.md).
+- **Tile** – one preset shown on a wall at one *tile size*. It points at the preset, so editing the preset changes every
+  tile that shows it; a tile whose preset was deleted stays until someone removes it.
+- **Tile size** – small, medium, large or extra large, the sizes of the desktop widgets, showing 1, 3, 7 or 14 items.
+- **Wall** – a named set of tiles, one tab of the Walls window, for keeping several presets in view at once, in a window
+  or full screen on a second monitor.
