@@ -9,6 +9,7 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | Shared state | `App/AppEnvironment.swift` (`@MainActor @Observable`) |
 | Menu bar | `StatusItem/` (left click popover, right click menu) |
 | Main window | `MainWindow/` |
+| Walls window | `Walls/` (window, tiles, Wall menu, keys, rotation, configuration copy and paste) |
 | Settings | `Settings/` (tabs: Accounts, Repositories, Presets, General, About) |
 | First run | `Onboarding/` |
 | Services | `Services/` (avatars, notifications, OAuth coordinator) |
@@ -38,9 +39,13 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 - Two `ForEach` over the same models in one `Form` section give two rows one identity, and the second draws the
   first one's row. Put the second inside a container of its own, as the preset editor does for idle accounts.
 - The preset editor works on its own copy of the preset (`@State`). Whatever changes a preset from outside the editor
-  while it is on screen, as *Paste Presets…* does, must give the editor a new identity (`PresetsSettingsView.pasteCount`),
-  or the editor keeps the old values and its next edit writes them back. Copy and paste of presets only move text
-  between the pasteboard and `PresetTransfer` (GitwallCore, `docs/adr/0013`).
+  while it is on screen must give the editor a new identity, or the editor keeps the old values and its next edit
+  writes them back. Every paste (⇧⌘V, the empty Walls window, Settings) goes through
+  `AppEnvironment.pasteConfiguration`, which bumps `pasteCount`; the editor takes it into its `.id`. Copy and paste
+  only move text between the pasteboard and `GitwallFile`/`PresetTransfer` (GitwallCore, `docs/adr/0013`, `0014`).
+- `AppEnvironment.items(for:)` answers from `FilterCache` (GitwallCore): one answer per saved preset, for the minute,
+  emptied when the snapshot or anything but the walls changes. A preset that differs from the saved one, as the
+  editor's copy does, is filtered every time. A write that changes only walls reloads no widget.
 - `OAuthCoordinator` owns only the window-bound parts (device code display, `ASWebAuthenticationSession`).
   The protocol work is in GitwallAuth.
 - `AppEnvironment.start` registers the app as a login item when `AppConfig.shouldRegisterAtLogin` says so, and
@@ -58,6 +63,19 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 - Sample data behaves like a working installation: Refresh brings in another review request and routes
   notifications, Settings › Repositories lists `DemoData.discovery`, and items explain themselves instead of
   opening a fictional URL. A real account added while it is on ends it first, so nothing is left in memory only.
+- The Walls window takes its keys (Tab, arrows, Return, Space, 1–4, Delete, Escape) in its own event monitor
+  (`WallsWindowController.handleKey`): AppKit does not deliver plain printable keys as menu shortcuts, and SwiftUI would
+  spend Tab on focus. Which key means what (`WallsKeys`) and when a command is enabled (`WallsCommand.isEnabled`) are
+  GitwallCore's; a key only acts when its menu item is enabled. A key without ⌘, ⌥ or ⌃ acts only while the Walls
+  window is the key window and no name is typed, so the popover or a sheet in front keeps its arrows and Return.
+- Clicking an item on a wall, Return and Space go through one hook, `WallsModel.activate` (set in
+  `WallsWindowController`); ⌘↩ and a double click always open the browser.
+- Wall edits go through `WallsModel.apply`, which registers the inverse `WallChange` with the window's own undo manager.
+  Undo finds a wall by its id, so a paste that only adds walls leaves the history alone. A paste that replaces a wall
+  clears it (`AppEnvironment.onWallsReplacedByPaste`): undoing an earlier edit would write the old wall over the pasted
+  one.
+- The name typed into a tab lives in `WallsModel.renameDraft`. Switching walls commits it first, so ⌘⇧] or a click on
+  another tab in the middle of a rename keeps the name.
 - Activation policy: the app is `regular` in Info.plist and drops to `accessory` when the user hides the
   Dock icon. Going the other way at runtime leaves a generic Dock icon, hence the order in
   `applicationWillFinishLaunching`.
@@ -83,4 +101,5 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | `--debug-demo --debug-demo-idle-account <n>` | The sample account at that index as if it had just been removed and added again: no repositories, no items, its three presets at the end of the list (`--debug-demo-preset 7` shows the first of them). For the hints that send the user to Settings › Repositories. |
 | `--debug-detail <owner/repo#123>` | Selects that item in the main window and opens Detail, for screenshots. |
 | `--debug-detail-expand <folds>` | Opens Detail's folded sections (`description`, `conversation`, `files`, `linked`, `metadata`, comma separated) and scrolls to the first. |
+| `--debug-demo --debug-demo-walls [window\|edit\|empty\|fullscreen]` | Only the Walls window at 1280×800 with the sample walls: as it opens (first item selected), in edit mode, with no walls, or full screen. |
 | `--debug-onboarding-step <step>` | Opens the walkthrough at one step (`welcome`, `account`, `repositories`, `presets`, `notifications`, `startup`, `widget`), so a screen can be checked without clicking through. Pairs well with `--debug-demo`. |

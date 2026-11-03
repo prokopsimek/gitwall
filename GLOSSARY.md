@@ -6,6 +6,9 @@ Domain terms as Gitwall uses them. How they are implemented lives in the code an
   other side, the state of a pull request and what is new, with the description, conversation and files folded below.
   It only reads; every action opens the item on GitHub or GitLab. See
   [ADR 0015](docs/adr/0015-detail-is-read-only-and-fetched-on-demand.md).
+- **Gitwall file** – portable JSON holding presets and walls together (version 2 of the *Preset file*), so a whole
+  setup pastes into Gitwall in one step and pastes again after a change without duplicates. See
+  [ADR 0014](docs/adr/0014-walls-travel-with-presets-in-one-file.md).
 - **Next step** – the one thing Detail suggests doing about an item, with the exact place to do it: review the changes,
   reply to someone, open a failing check, merge, or just open it.
 - **Preset** – a named view of pull requests and issues: a query, a sort order and an icon, optionally narrowed to
@@ -25,3 +28,8 @@ Domain terms as Gitwall uses them. How they are implemented lives in the code an
   is still on screen (an item Gitwall cannot fetch counts after a second on screen). Gitwall keeps it on your Mac;
   *what's new* and the dot in lists count from it, so they mean "since I last looked here", not GitHub's
   notifications.
+- **Tile** – one preset shown on a wall at one *tile size*. It points at the preset, so editing the preset changes every
+  tile that shows it; a tile whose preset was deleted stays until someone removes it.
+- **Tile size** – small, medium, large or extra large, the sizes of the desktop widgets, showing 1, 3, 7 or 14 items.
+- **Wall** – a named set of tiles, one tab of the Walls window, for keeping several presets in view at once, in a window
+  or full screen on a second monitor.

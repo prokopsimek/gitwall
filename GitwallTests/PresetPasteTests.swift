@@ -5,8 +5,10 @@ import GitwallCore
 @testable import Gitwall
 import Testing
 
-/// Copy and paste of presets as JSON (docs/adr/0013). The rules live in `PresetTransfer`; this checks that the app
-/// writes what the merge says and reads what it copied. A pasteboard of its own keeps the user's clipboard alone.
+/// Copy and paste of presets as JSON (docs/adr/0013). Pasting goes through the one configuration paste of
+/// docs/adr/0014, which takes version 1 files as they are. The rules live in `PresetTransfer` and `GitwallFile`; this
+/// checks that the app writes what the merge says and reads what it copied. A pasteboard of its own keeps the user's
+/// clipboard alone.
 @Suite("Preset paste")
 @MainActor
 struct PresetPasteTests {
@@ -41,8 +43,9 @@ struct PresetPasteTests {
             Preset(id: replaced.id, name: "New name", icon: "eye", filter: ItemFilter(query: "review-requested:@me")),
             Preset(name: "Pasted", filter: ItemFilter(query: "label:bug")),
         ]
-        #expect(environment.pastePreview(incoming).summary == "1 new, 1 replaced")
-        environment.pastePresets(incoming)
+        let file = GitwallFile(presets: incoming)
+        #expect(environment.pastePreview(file).summary == "1 new preset, 1 preset replaced")
+        environment.pasteConfiguration(file)
 
         let stored = try #require(try environment.configStore?.load())
         #expect(stored.presets.map(\.id) == before + [incoming[1].id])
@@ -61,9 +64,9 @@ struct PresetPasteTests {
 
         try withPasteboard { pasteboard in
             #expect(environment.copyPresetsAsJSON([preset], to: pasteboard) == nil)
-            let incoming = try environment.presetsOnPasteboard(pasteboard).get()
-            #expect(incoming.map(\.id) == [preset.id])
-            #expect(!environment.pastePreview(incoming).hasChanges)
+            let file = try environment.configurationOnPasteboard(pasteboard).get()
+            #expect(file.presets.map(\.id) == [preset.id])
+            #expect(!environment.pastePreview(file).hasChanges)
         }
     }
 
@@ -73,8 +76,33 @@ struct PresetPasteTests {
         withPasteboard { pasteboard in
             pasteboard.clearContents()
             pasteboard.setString(#"[{"id": "\#(UUID())", "name": "A", "query": "", "icon": "no.such.symbol"}]"#, forType: .string)
-            let result = environment.presetsOnPasteboard(pasteboard)
-            #expect(result == .failure(.invalidPreset(position: 1, name: "A", problem: .unknownIcon("no.such.symbol"))))
+            let result = environment.configurationOnPasteboard(pasteboard)
+            #expect(result == .failure(.presetFile(.invalidPreset(position: 1, name: "A", problem: .unknownIcon("no.such.symbol")))))
         }
+    }
+
+    @Test("a version 1 file and a bare list, as older versions copy them, paste their presets")
+    func versionOneFile() throws {
+        let environment = environment()
+        let bugs = Preset(name: "Bugs", kinds: [.issue], filter: ItemFilter(query: "label:bug"), sort: .priority)
+        let mine = UUID()
+
+        try withPasteboard { pasteboard in
+            pasteboard.clearContents()
+            pasteboard.setString(PresetTransfer.encode([bugs]), forType: .string)
+            let file = try environment.configurationOnPasteboard(pasteboard).get()
+            #expect(file.presets.map(\.id) == [bugs.id])
+            #expect(file.walls.isEmpty)
+            environment.pasteConfiguration(file)
+
+            pasteboard.clearContents()
+            pasteboard.setString(#"[{"id": "\#(mine)", "name": "Mine", "query": "author:@me"}]"#, forType: .string)
+            environment.pasteConfiguration(try environment.configurationOnPasteboard(pasteboard).get())
+        }
+
+        let stored = try #require(try environment.configStore?.load())
+        #expect(stored.presets.map(\.id).suffix(2) == [bugs.id, mine])
+        #expect(stored.preset(id: bugs.id)?.filter.query == "label:bug")
+        #expect(stored.walls.isEmpty)
     }
 }

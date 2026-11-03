@@ -41,17 +41,35 @@ public struct AppConfig: Codable, Hashable, Sendable {
     public var accounts: [Account]
     public var presets: [Preset]
     public var settings: AppSettings
+    /// The tabs of the Walls window. Tiles point at presets by id and are never removed with their preset.
+    public var walls: [Wall]
 
     public init(
         schemaVersion: Int = AppConfig.currentSchemaVersion,
         accounts: [Account] = [],
         presets: [Preset] = [],
-        settings: AppSettings = AppSettings()
+        settings: AppSettings = AppSettings(),
+        walls: [Wall] = []
     ) {
         self.schemaVersion = schemaVersion
         self.accounts = accounts
         self.presets = presets
         self.settings = settings
+        self.walls = walls
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, accounts, presets, settings, walls
+    }
+
+    /// `walls` is optional, so a `config.json` written before walls existed keeps loading.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        accounts = try container.decode([Account].self, forKey: .accounts)
+        presets = try container.decode([Preset].self, forKey: .presets)
+        settings = try container.decode(AppSettings.self, forKey: .settings)
+        walls = try container.decodeIfPresent([Wall].self, forKey: .walls) ?? []
     }
 
     public static let empty = AppConfig()
@@ -62,6 +80,10 @@ public struct AppConfig: Codable, Hashable, Sendable {
 
     public func preset(id: UUID) -> Preset? {
         presets.first { $0.id == id }
+    }
+
+    public func wall(id: UUID) -> Wall? {
+        walls.first { $0.id == id }
     }
 
     /// A menu bar app shows nothing while it is not running, so a fresh installation switches Launch at login

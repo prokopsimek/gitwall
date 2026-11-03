@@ -49,7 +49,7 @@ make release         # Developer ID archive, notarize, staple, zip; prints the `
 ```
 
 Debug launch arguments (see `Gitwall/AGENTS.md`): `--debug-fresh`, `--debug-reset`, `--debug-github-token`,
-`--debug-repos`, `--debug-demo`, `--debug-demo-preset`, `--debug-demo-widgets`, `--debug-demo-idle-account`,
+`--debug-repos`, `--debug-demo`, `--debug-demo-preset`, `--debug-demo-widgets`, `--debug-demo-walls`, `--debug-demo-idle-account`,
 `--debug-onboarding-step`.
 
 Unified log: `/usr/bin/log stream --predicate 'subsystem == "cz.prokopsimek.gitwall"' --info`
