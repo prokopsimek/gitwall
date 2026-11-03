@@ -24,6 +24,14 @@ struct DemoDetailTests {
         #expect(DemoData.detail(for: foreign) == nil)
     }
 
+    @Test("a sample item with comments has some in its detail, so Detail never says No comments yet next to a count")
+    func commentsMatchTheCount() throws {
+        for item in DemoData.snapshot(now: now, arrivals: DemoData.arrivalCount).items where item.commentCount > 0 {
+            let comments = try #require(DemoData.detail(for: item)).comments
+            #expect(!((try? comments.get()) ?? []).isEmpty, "\(item.repoFullName)#\(item.number)")
+        }
+    }
+
     @Test("the infra pull request shows a failing check, a review requested from me and an agent's plan")
     func richPullRequest() throws {
         let item = try item("northwind/infra", 97)

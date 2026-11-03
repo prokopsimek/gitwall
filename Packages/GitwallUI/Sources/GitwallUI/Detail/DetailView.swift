@@ -161,9 +161,9 @@ public struct DetailView: View {
     private func latestWordBody(_ word: LatestWord) -> some View {
         switch word {
         case .none:
-            Text("No comments yet.").foregroundStyle(.secondary)
+            Text(DetailPresentation.quietConversation((try? content.detail?.comments.get()) ?? [])).foregroundStyle(.secondary)
         case .youRepliedLast(let date):
-            Label("You replied last · \(ItemPresentation.compactAge(since: date, now: content.now)) ago",
+            Label("You replied last · \(DetailPresentation.ago(date, now: content.now))",
                   systemImage: "arrowshape.turn.up.left")
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("detail-you-replied-last")
@@ -189,7 +189,7 @@ public struct DetailView: View {
 
     @ViewBuilder
     private var whatsNew: some View {
-        let title = content.lastSeenAt.map { "What's new since \(ItemPresentation.compactAge(since: $0, now: content.now)) ago" }
+        let title = content.lastSeenAt.map { "What's new since \(DetailPresentation.ago($0, now: content.now))" }
             ?? "Recent activity"
         switch content.remote {
         case nil:

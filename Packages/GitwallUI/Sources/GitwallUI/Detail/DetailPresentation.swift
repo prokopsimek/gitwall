@@ -136,6 +136,17 @@ public enum DetailPresentation {
         }
     }
 
+    /// "5m ago", or "just now" under a minute, where the compact age alone would say "now".
+    public static func ago(_ date: Date, now: Date) -> String {
+        let age = ItemPresentation.compactAge(since: date, now: now)
+        return age == "now" ? "just now" : "\(age) ago"
+    }
+
+    /// The latest word when nobody else has spoken: a conversation of bots alone says so.
+    public static func quietConversation(_ comments: [DetailComment]) -> String {
+        comments.contains { LatestWord.isBot($0.author, flagged: $0.authorIsBot) } ? "Only bots have commented." : "No comments yet."
+    }
+
     /// What a review without a summary was: a bare approval or change request, or only inline comments.
     public static func silentReview(_ verdict: ReviewVerdict, inlineCommentCount: Int) -> String {
         let inline = switch inlineCommentCount {

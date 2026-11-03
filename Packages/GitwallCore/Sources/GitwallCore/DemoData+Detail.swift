@@ -21,14 +21,21 @@ extension DemoData {
         agent: UserRef(login: "northwind-agent", displayName: "Northwind Agent")
     )
 
+    /// A description and, for an item with comments, my reply as its last one, so Detail never says "No comments yet"
+    /// next to a comment count; the conversation fold offers the earlier ones on the host, as for a long thread.
     private static func summary(_ item: WorkItem) -> ItemDetail {
         let body = item.kind == .pullRequest
             ? "## Summary\n\n\(item.title).\n\n- [x] Tests added\n- [ ] Docs updated"
             : "\(item.title).\n\nPart of the sample data: in a real account the whole description and conversation appear here."
+        let reply = DetailComment(
+            id: "\(item.id)-reply", author: me, body: "Thanks, I'll take a look today.",
+            createdAt: item.updatedAt, url: URL(string: "\(item.url.absoluteString)#issuecomment-1")
+        )
         return ItemDetail(
             itemID: item.id, itemUpdatedAt: item.updatedAt, fetchedAt: item.updatedAt,
             body: .success(body),
             branches: .success(item.kind == .pullRequest ? Branches(head: "\(item.author.login)/change-\(item.number)", base: "main") : nil),
+            comments: .success(item.commentCount > 0 ? [reply] : []),
             timeline: .success([
                 TimelineEvent(id: "\(item.id)-opened", kind: item.kind == .pullRequest ? .readyForReview : .commented,
                               actor: item.author, createdAt: item.createdAt),

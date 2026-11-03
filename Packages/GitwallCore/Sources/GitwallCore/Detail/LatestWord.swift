@@ -36,12 +36,14 @@ public enum LatestWord: Hashable, Sendable {
     /// Comments with a text and every submitted review count, a review without a summary too: a bare change request,
     /// an approval or inline comments are an answer. Pending reviews are drafts nobody else has seen, blank comments
     /// say nothing, and bots (a bot account, or a login ending in `[bot]`) never decide whose turn it is.
+    /// A bot account, or a login ending in `[bot]`.
+    public static func isBot(_ user: UserRef, flagged: Bool) -> Bool {
+        flagged || user.login.trimmingCharacters(in: .whitespaces).lowercased().hasSuffix("[bot]")
+    }
+
     public static func find(comments: [DetailComment], reviews: [DetailReview], me: UserRef?) -> LatestWord {
         func isMe(_ user: UserRef) -> Bool { me.map { LoginMatch.same($0.login, user.login) } ?? false }
         func hasText(_ body: String) -> Bool { !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        func isBot(_ user: UserRef, flagged: Bool) -> Bool {
-            flagged || user.login.trimmingCharacters(in: .whitespaces).lowercased().hasSuffix("[bot]")
-        }
 
         var words = comments.filter { hasText($0.body) && !isBot($0.author, flagged: $0.authorIsBot) }.map {
             Utterance(author: $0.author, body: $0.body, date: $0.createdAt, url: $0.url, verdict: nil)

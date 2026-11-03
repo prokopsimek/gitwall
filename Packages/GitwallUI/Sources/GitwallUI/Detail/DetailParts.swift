@@ -106,7 +106,7 @@ struct DetailHeader: View {
                 .frame(width: 16, height: 16)
                 .clipShape(Circle())
                 Text(item.author.login).fontWeight(.medium)
-                Text("· opened \(ItemPresentation.compactAge(since: item.createdAt, now: content.now)) ago · updated \(ItemPresentation.compactAge(since: item.updatedAt, now: content.now)) ago")
+                Text("· opened \(DetailPresentation.ago(item.createdAt, now: content.now)) · updated \(DetailPresentation.ago(item.updatedAt, now: content.now))")
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

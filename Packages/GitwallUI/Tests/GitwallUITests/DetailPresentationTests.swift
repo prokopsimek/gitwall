@@ -99,6 +99,23 @@ struct DetailPresentationTests {
         #expect(terms.presetLine == "Matches is:pr author:@me in “Mine”")
     }
 
+    @Test("ages read as a phrase; under a minute is just now, never now ago")
+    func ages() {
+        #expect(DetailPresentation.ago(now.addingTimeInterval(-20), now: now) == "just now")
+        #expect(DetailPresentation.ago(now.addingTimeInterval(-5 * 60), now: now) == "5m ago")
+        #expect(DetailPresentation.ago(now.addingTimeInterval(-2 * 3600), now: now) == "2h ago")
+        #expect(DetailPresentation.ago(now.addingTimeInterval(60), now: now) == "just now", "a clock ahead is not in the future")
+    }
+
+    @Test("an empty latest word says whether only bots spoke")
+    func quietConversation() {
+        let bot = DetailComment(id: "1", author: UserRef(login: "codecov"), authorIsBot: true, body: "Coverage 91%",
+                                createdAt: now, url: nil)
+        let app = DetailComment(id: "2", author: UserRef(login: "renovate[bot]"), body: "Update", createdAt: now, url: nil)
+        #expect(DetailPresentation.quietConversation([]) == "No comments yet.")
+        #expect(DetailPresentation.quietConversation([bot, app]) == "Only bots have commented.")
+    }
+
     @Test("links open only on the web: http and https with a host")
     func openableLinks() throws {
         for link in ["https://github.com/acme/app/pull/7", "http://example.com/a", "HTTPS://example.com"] {
