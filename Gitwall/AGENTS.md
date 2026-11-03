@@ -9,6 +9,7 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | Shared state | `App/AppEnvironment.swift` (`@MainActor @Observable`) |
 | Menu bar | `StatusItem/` (left click popover, right click menu) |
 | Main window | `MainWindow/` |
+| Walls window | `Walls/` (window, tiles, Wall menu, keys, rotation, configuration paste, `ItemsCache`) |
 | Settings | `Settings/` (tabs: Accounts, Repositories, Presets, General, About) |
 | First run | `Onboarding/` |
 | Services | `Services/` (avatars, notifications, OAuth coordinator) |
@@ -57,6 +58,13 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 - Sample data behaves like a working installation: Refresh brings in another review request and routes
   notifications, Settings › Repositories lists `DemoData.discovery`, and items explain themselves instead of
   opening a fictional URL. A real account added while it is on ends it first, so nothing is left in memory only.
+- The Walls window takes its plain keys (Tab, arrows, Return, Space, 1–4, Delete) in its own event monitor
+  (`WallsWindowController.handleKey`): AppKit does not deliver plain printable keys as menu shortcuts, and SwiftUI would
+  spend Tab on focus. The Wall menu shows the same keys, and a key only acts when its menu item is enabled.
+- Clicking an item on a wall, Return and Space go through one hook, `WallsModel.activate` (set in
+  `WallsWindowController`); ⌘↩ and a double click always open the browser.
+- Wall edits go through `WallsModel.apply`, which registers the inverse `WallChange` with the window's own undo manager.
+  Undo finds a wall by its id, so a paste in between does not get in the way.
 - Activation policy: the app is `regular` in Info.plist and drops to `accessory` when the user hides the
   Dock icon. Going the other way at runtime leaves a generic Dock icon, hence the order in
   `applicationWillFinishLaunching`.
@@ -70,4 +78,5 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | `--debug-github-token <pat> [--debug-repos a/b,c/d]` | Creates a GitHub account without clicking. |
 | `--debug-demo [--debug-demo-preset <n>] [--debug-demo-widgets]` | Fictional data from `GitwallCore.DemoData` for App Store screenshots; widgets appear as borderless windows. |
 | `--debug-demo --debug-demo-idle-account <n>` | The sample account at that index as if it had just been removed and added again: no repositories, no items, its three presets at the end of the list (`--debug-demo-preset 7` shows the first of them). For the hints that send the user to Settings › Repositories. |
+| `--debug-demo --debug-demo-walls [window\|edit\|empty\|fullscreen]` | Only the Walls window at 1280×800 with the sample walls: as it opens (first item selected), in edit mode, with no walls, or full screen. |
 | `--debug-onboarding-step <step>` | Opens the walkthrough at one step (`welcome`, `account`, `repositories`, `presets`, `notifications`, `startup`, `widget`), so a screen can be checked without clicking through. Pairs well with `--debug-demo`. |
