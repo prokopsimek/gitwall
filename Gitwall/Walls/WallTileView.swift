@@ -56,7 +56,8 @@ struct WallTileView: View {
             size: tile.size,
             now: Date(),
             avatar: { environment.avatar(for: $0.author.avatarURL).map(Image.init(nsImage:)) },
-            isNew: { environment.newItemIDs.contains($0.id) },
+            // New since the last sync, or changed since it was last seen in Detail; the widget passes neither.
+            isNew: { environment.newItemIDs.contains($0.id) || environment.details.hasChanged($0) },
             wrap: { item in
                 WallItemRow(
                     item: item,
@@ -143,8 +144,8 @@ private struct TileDragAndDrop: ViewModifier {
     }
 }
 
-/// A row of a tile in the window: a click selects and activates it (`WallsModel.activate`), a double click opens
-/// it in the browser, and the context menu copies it.
+/// A row of a tile in the window: a click selects it and shows it in Detail (`WallsModel.activate`), a double click
+/// opens it in the browser, and the context menu copies it.
 private struct WallItemRow: ViewModifier {
     let item: WorkItem
     let isSelected: Bool

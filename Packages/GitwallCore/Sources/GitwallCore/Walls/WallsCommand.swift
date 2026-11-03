@@ -1,12 +1,13 @@
 import Foundation
 
 /// What the Walls window can do from its menus and keys. The app maps each to a menu action; when a command is
-/// available is decided here (``isEnabled(_:in:)``), for the menu and the keys alike.
+/// available is decided here (``isEnabled(_:in:)``), for the menu and the keys alike. The item commands
+/// (``showDetail``, ``closeDetail``, ``openItemInBrowser``) are the Item menu's, which the main window shares.
 public enum WallsCommand: String, CaseIterable, Sendable {
     case nextWall, previousWall
     case nextTile, previousTile
     case nextItem, previousItem
-    case openItem, openItemInBrowser
+    case showDetail, closeDetail, openItemInBrowser
     case toggleEditing, finishEditing
     case setTileSize, addTile, removeTile
     case newWall, newWallFromPresets, renameWall, duplicateWall, copyWallAsJSON, deleteWall
@@ -18,7 +19,8 @@ public enum WallsCommand: String, CaseIterable, Sendable {
     /// being typed.
     public var usesPlainKey: Bool {
         switch self {
-        case .nextTile, .previousTile, .nextItem, .previousItem, .openItem, .setTileSize, .removeTile, .finishEditing:
+        case .nextTile, .previousTile, .nextItem, .previousItem, .showDetail, .closeDetail, .setTileSize, .removeTile,
+             .finishEditing:
             true
         default:
             false
@@ -36,8 +38,10 @@ public enum WallsCommand: String, CaseIterable, Sendable {
             return state.tileCount > 0
         case .nextItem, .previousItem:
             return !state.isEditing && state.tileCount > 0
-        case .openItem, .openItemInBrowser:
+        case .showDetail, .openItemInBrowser:
             return !state.isEditing && state.hasSelectedItem
+        case .closeDetail:
+            return !state.isEditing && state.isDetailPresented
         case .toggleEditing, .addTile, .renameWall, .duplicateWall, .copyWallAsJSON, .deleteWall:
             return hasWall
         case .finishEditing:
@@ -74,10 +78,13 @@ public struct WallsState: Equatable, Sendable {
     public var isEditing: Bool
     public var presetCount: Int
     public var zoom: Double
+    /// Detail is open next to the wall.
+    public var isDetailPresented: Bool
 
     public init(
         isKeyWindow: Bool, isTyping: Bool, hasContent: Bool, wallCount: Int, tileCount: Int,
-        hasSelectedTile: Bool, hasSelectedItem: Bool, isEditing: Bool, presetCount: Int, zoom: Double
+        hasSelectedTile: Bool, hasSelectedItem: Bool, isEditing: Bool, presetCount: Int, zoom: Double,
+        isDetailPresented: Bool = false
     ) {
         self.isKeyWindow = isKeyWindow
         self.isTyping = isTyping
@@ -89,6 +96,7 @@ public struct WallsState: Equatable, Sendable {
         self.isEditing = isEditing
         self.presetCount = presetCount
         self.zoom = zoom
+        self.isDetailPresented = isDetailPresented
     }
 }
 
@@ -137,7 +145,7 @@ public enum WallsKeys {
         case (KeyCode.tab, [.control, .shift]): return Action(.previousWall)
         case (KeyCode.down, []): return Action(.nextItem)
         case (KeyCode.up, []): return Action(.previousItem)
-        case (KeyCode.returnKey, []), (KeyCode.enter, []), (KeyCode.space, []): return Action(.openItem)
+        case (KeyCode.returnKey, []), (KeyCode.enter, []), (KeyCode.space, []): return Action(.showDetail)
         case (KeyCode.returnKey, .command), (KeyCode.enter, .command): return Action(.openItemInBrowser)
         case (KeyCode.delete, []), (KeyCode.forwardDelete, []): return Action(.removeTile)
         case (KeyCode.escape, []): return Action(.finishEditing)
@@ -150,5 +158,13 @@ public enum WallsKeys {
         default:
             return nil
         }
+    }
+
+    /// What the key does in `state`, or nil to leave it to the rest of the window: a disabled command never takes its
+    /// key. Escape finishes editing first and otherwise closes Detail.
+    public static func action(keyCode: UInt16, modifiers: KeyModifiers, character: String, in state: WallsState) -> Action? {
+        guard let action = action(keyCode: keyCode, modifiers: modifiers, character: character) else { return nil }
+        let candidates = action.command == .finishEditing ? [action, Action(.closeDetail)] : [action]
+        return candidates.first { WallsCommand.isEnabled($0.command, in: state) }
     }
 }

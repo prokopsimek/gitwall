@@ -10,7 +10,9 @@ public struct GitHubProvider: GitProvider {
         pullRequestAbbreviation: "PR",
         supportsOrganizationSources: true,
         supportsGroupSources: false,
-        resolvesTeamReviewRequests: true
+        resolvesTeamReviewRequests: true,
+        hostName: "GitHub",
+        fetchesItemDetail: true
     )
 
     static let maxRepositoryPages = 5

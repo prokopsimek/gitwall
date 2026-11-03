@@ -40,12 +40,15 @@ public struct WorkItemRow: View {
     let style: Style
     let now: Date
     let isNew: Bool
+    let isChanged: Bool
 
-    public init(item: WorkItem, avatar: Image?, style: Style = .regular, isNew: Bool = false, now: Date = Date()) {
+    /// `isChanged` marks an item that moved since it was last opened in Detail; the widget never sets it.
+    public init(item: WorkItem, avatar: Image?, style: Style = .regular, isNew: Bool = false, isChanged: Bool = false, now: Date = Date()) {
         self.item = item
         self.avatar = avatar
         self.style = style
         self.isNew = isNew
+        self.isChanged = isChanged
         self.now = now
     }
 
@@ -57,6 +60,10 @@ public struct WorkItemRow: View {
                     if isNew {
                         Circle().fill(Color.accentColor).frame(width: 6, height: 6)
                             .accessibilityLabel("New")
+                    } else if isChanged {
+                        Circle().strokeBorder(Color.accentColor, lineWidth: 1.5).frame(width: 7, height: 7)
+                            .help("Changed since you last opened it")
+                            .accessibilityLabel("Changed since you last opened it")
                     }
                     if let priority = ItemPresentation.priorityBadge(for: item) {
                         priorityView(priority)

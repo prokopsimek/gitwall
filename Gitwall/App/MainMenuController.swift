@@ -42,6 +42,9 @@ final class MainMenuController: NSObject {
         edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         edit.addItem(.separator())
+        // The main window's search field; answered by MainWindowController through the responder chain.
+        edit.addItem(withTitle: "Find…", action: #selector(MainWindowController.focusSearch(_:)), keyEquivalent: "f")
+        edit.addItem(.separator())
         edit.addItem(withTitle: "Copy Configuration as JSON", action: #selector(copyConfiguration), keyEquivalent: "").target = self
         edit.addItem(withTitle: "Paste Configuration…", action: #selector(pasteConfiguration), keyEquivalent: "V").target = self
         main.addItem(submenu(edit, title: "Edit"))
@@ -54,6 +57,8 @@ final class MainMenuController: NSObject {
         wallsMenu.viewItems().forEach(view.addItem)
         main.addItem(submenu(view, title: "View"))
         main.addItem(submenu(wallsMenu.wallMenu(), title: "Wall"))
+
+        main.addItem(submenu(ItemMenu.build(), title: "Item"))
 
         // Window menu
         let window = NSMenu(title: "Window")

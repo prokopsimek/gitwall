@@ -4,10 +4,11 @@ import Testing
 
 @Suite("Walls commands")
 struct WallsCommandTests {
-    /// The Walls window in front with a wall of tiles, a tile and an item selected, nothing being typed.
+    /// The Walls window in front with a wall of tiles, a tile and an item selected and Detail open, nothing typed.
     private var ready: WallsState {
         WallsState(isKeyWindow: true, isTyping: false, hasContent: true, wallCount: 2, tileCount: 3,
-                   hasSelectedTile: true, hasSelectedItem: true, isEditing: false, presetCount: 4, zoom: 1)
+                   hasSelectedTile: true, hasSelectedItem: true, isEditing: false, presetCount: 4, zoom: 1,
+                   isDetailPresented: true)
     }
 
     private func enabled(_ command: WallsCommand, _ change: (inout WallsState) -> Void = { _ in }) -> Bool {
@@ -21,7 +22,9 @@ struct WallsCommandTests {
     @Test("plain keys act only in the key Walls window and never while a name is typed")
     func plainKeysNeedTheKeyWindow() {
         let plain = WallsCommand.allCases.filter(\.usesPlainKey)
-        #expect(Set(plain) == [.nextTile, .previousTile, .nextItem, .previousItem, .openItem, .setTileSize, .removeTile, .finishEditing])
+        #expect(Set(plain) == [
+            .nextTile, .previousTile, .nextItem, .previousItem, .showDetail, .closeDetail, .setTileSize, .removeTile, .finishEditing,
+        ])
         for command in plain {
             #expect(!enabled(command) { $0.isKeyWindow = false; $0.isEditing = command.needsEditing })
             #expect(!enabled(command) { $0.isTyping = true; $0.isEditing = command.needsEditing })
@@ -44,8 +47,12 @@ struct WallsCommandTests {
         #expect(!enabled(.nextWall) { $0.wallCount = 1 })
         #expect(!enabled(.nextTile) { $0.tileCount = 0 })
         #expect(!enabled(.nextItem) { $0.isEditing = true })
-        #expect(!enabled(.openItem) { $0.hasSelectedItem = false })
+        #expect(!enabled(.showDetail) { $0.hasSelectedItem = false })
+        #expect(!enabled(.showDetail) { $0.isEditing = true })
+        #expect(!enabled(.closeDetail) { $0.isDetailPresented = false })
+        #expect(!enabled(.closeDetail) { $0.isEditing = true })
         #expect(!enabled(.openItemInBrowser) { $0.isEditing = true })
+        #expect(!enabled(.openItemInBrowser) { $0.hasSelectedItem = false })
         #expect(!enabled(.setTileSize))
         #expect(enabled(.setTileSize) { $0.isEditing = true })
         #expect(!enabled(.removeTile) { $0.isEditing = true; $0.hasSelectedTile = false })
@@ -73,8 +80,9 @@ struct WallsCommandTests {
         #expect(command(48, [.control, .shift]) == .init(.previousWall))
         #expect(command(125) == .init(.nextItem))
         #expect(command(126) == .init(.previousItem))
-        #expect(command(36) == .init(.openItem))
-        #expect(command(49) == .init(.openItem))
+        #expect(command(36) == .init(.showDetail))
+        #expect(command(49) == .init(.showDetail))
+        #expect(command(76) == .init(.showDetail))
         #expect(command(36, .command) == .init(.openItemInBrowser))
         #expect(command(51) == .init(.removeTile))
         #expect(command(117) == .init(.removeTile))
@@ -90,6 +98,29 @@ struct WallsCommandTests {
         #expect(command(18, .command) == nil)
         #expect(command(48, .option) == nil)
         #expect(command(0, [], "a") == nil)
+    }
+
+    @Test("Escape finishes editing first, then closes Detail; while a name is typed it is the text field's")
+    func escape() {
+        func escape(_ change: (inout WallsState) -> Void) -> WallsKeys.Action? {
+            var state = ready
+            change(&state)
+            return WallsKeys.action(keyCode: 53, modifiers: [], character: "", in: state)
+        }
+        #expect(escape { $0.isEditing = true } == .init(.finishEditing))
+        #expect(escape { _ in } == .init(.closeDetail))
+        #expect(escape { $0.isDetailPresented = false } == nil)
+        #expect(escape { $0.isTyping = true } == nil)
+        #expect(escape { $0.isKeyWindow = false } == nil)
+    }
+
+    @Test("a key whose command is disabled is left to the rest of the window")
+    func disabledKeys() {
+        var state = ready
+        state.hasSelectedItem = false
+        #expect(WallsKeys.action(keyCode: 49, modifiers: [], character: " ", in: state) == nil)
+        #expect(WallsKeys.action(keyCode: 125, modifiers: [], character: "", in: state) == .init(.nextItem))
+        #expect(WallsKeys.action(keyCode: 0, modifiers: [], character: "a", in: state) == nil)
     }
 
     // MARK: - Selection after a change

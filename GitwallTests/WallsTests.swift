@@ -191,7 +191,7 @@ struct WallsAppTests {
 
         let behindPopover = model.state(isKeyWindow: false, isTyping: false)
         #expect(!WallsCommand.isEnabled(.nextTile, in: behindPopover))
-        #expect(!WallsCommand.isEnabled(.openItem, in: behindPopover))
+        #expect(!WallsCommand.isEnabled(.showDetail, in: behindPopover))
         #expect(WallsCommand.isEnabled(.nextWall, in: behindPopover))
         #expect(WallsCommand.isEnabled(.nextTile, in: model.state(isKeyWindow: true, isTyping: false)))
 

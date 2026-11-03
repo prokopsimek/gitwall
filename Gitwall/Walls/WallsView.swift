@@ -3,7 +3,8 @@ import GitwallCore
 import GitwallUI
 import SwiftUI
 
-/// The Walls window: a tab per wall, the tiles of the selected one, and in a corner how fresh the data is.
+/// The Walls window: a tab per wall, the tiles of the selected one, and in a corner how fresh the data is. Detail of
+/// the selected item opens on the right, explained by the preset of the tile that holds it.
 struct WallsView: View {
     @Bindable var model: WallsModel
 
@@ -11,6 +12,7 @@ struct WallsView: View {
 
     var body: some View {
         content
+            .itemDetailInspector(model.detail, environment: environment, preset: model.detailPreset)
             .frame(minWidth: 560, minHeight: 380)
             .background(Color(nsColor: .underPageBackgroundColor))
             .onExitCommand { model.isEditing = false }

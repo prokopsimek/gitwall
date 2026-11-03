@@ -3,17 +3,37 @@ import GitwallUI
 import SwiftUI
 
 struct MainWindowView: View {
+    /// Also how Edit › Find… finds the field (`MainWindowController.focusSearch`).
+    static let searchPrompt = "Search title, repository, #number, author"
+
     @Bindable var environment: AppEnvironment
     @Bindable var state: MainWindowState
+    let detail: DetailModel
     @State private var query = ""
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    /// The list has the focus when the window opens, so ↑↓, Space and ⌘C work at once; ⌘F moves it to the search
+    /// field (`MainWindowController.focusSearch`) and Esc there gives it back.
+    @FocusState private var isListFocused: Bool
+    /// The list takes the focus once, when it first has items; AppKit would otherwise give it to the search field.
+    @State private var listHadFirstFocus = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
-            detail
+            itemColumn
+                .itemDetailInspector(detail, environment: environment, preset: environment.selectedPreset)
+        }
+        .defaultFocus($isListFocused, true)
+        .onChange(of: visibleItems.isEmpty, initial: true) { _, isEmpty in
+            guard !isEmpty, !listHadFirstFocus else { return }
+            listHadFirstFocus = true
+            // Once the list is in the window.
+            Task { isListFocused = true }
+        }
+        .onChange(of: environment.selectedPreset?.id) {
+            detail.presetDidChange(visibleItemIDs: visibleItems.map(\.id))
         }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $state.showingWidgetHelp) {
@@ -65,9 +85,9 @@ struct MainWindowView: View {
         }
     }
 
-    // MARK: Detail
+    // MARK: Items
 
-    private var detail: some View {
+    private var itemColumn: some View {
         VStack(spacing: 0) {
             header
             Divider()
@@ -90,8 +110,9 @@ struct MainWindowView: View {
             Spacer()
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search title, repository, #number, author", text: $query)
+                TextField(Self.searchPrompt, text: $query)
                     .textFieldStyle(.plain)
+                    .onExitCommand { isListFocused = true }
                 if !query.isEmpty {
                     Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
                         .buttonStyle(.borderless)
@@ -119,10 +140,23 @@ struct MainWindowView: View {
                 Image(systemName: "gearshape")
             }
             .help("Settings (⌘,)")
+            Button {
+                detail.toggle()
+            } label: {
+                Image(systemName: "sidebar.trailing")
+            }
+            .help(detail.isPresented ? "Hide Detail (⌥⌘I)" : "Show Detail (⌥⌘I)")
+            .accessibilityIdentifier("toggle-detail")
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    /// The items of the selected preset that the search leaves.
+    private var visibleItems: [WorkItem] {
+        guard case .items(let items) = environment.listState(for: environment.selectedPreset) else { return [] }
+        return ItemSearch.filter(items, query: query)
     }
 
     @ViewBuilder
@@ -134,7 +168,7 @@ struct MainWindowView: View {
                 EmptyStateView(title: "No matches", symbol: "magnifyingglass",
                                message: "Nothing in “\(environment.selectedPreset?.name ?? "")” matches “\(query)”.")
             } else {
-                ItemListView(items: visible, environment: environment, style: .regular)
+                ItemListView(items: visible, environment: environment, style: .regular, detail: detail, focus: $isListFocused)
             }
         case .empty(let kind):
             EmptyStateView(kind: kind, environment: environment)

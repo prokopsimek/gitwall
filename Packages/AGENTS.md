@@ -14,6 +14,9 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 | `GitwallAuth` | Keychain `TokenStore`, `StoredToken`, OAuth flows (`GitHubDeviceFlow`, `GitLabPKCEFlow`), `PKCE`, `TokenRefresher`, `RefreshingTokenReader`, token expiry parsing, `OAuthClients` (public client IDs). |
 | `GitwallGitHub` | `GitHubProvider`: GraphQL for lists, REST for identity and discovery, Link pagination. |
 | `GitwallGitLab` | `GitLabProvider`: one GraphQL request per project or group (complexity limit), REST discovery. Sends the token as a bearer credential, which covers both personal access tokens and OAuth. |
+| `GitwallCore` · Detail | `ItemDetail`, `DetailFetcher` (on-demand fetch, shared while in flight), `DetailCache` (the one cache, kept by the app), `NextStep`, `LatestWord`, `WhatsNew`, `SeenStore` (`seen.json`), `FilterEngine.explain` (`MatchReason`). |
+| `GitwallUI` · Detail | `DetailView` and its wording (`DetailPresentation`), `MarkdownView` and the native Markdown parser (`MarkdownBlock`). |
+| `GitwallGitHub` · Detail | Item detail in two read-only GraphQL queries (`GraphQL+ItemDetail.swift`, `GitHubProvider+ItemDetail.swift`). |
 
 ## Rules
 
@@ -61,6 +64,14 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   `query`, `icon`, `sort`, `kinds` under `"version": 1`. Unknown keys are errors, everything is validated before
   anything is written, a paste never deletes, and an export round-trips exactly. A new key or a changed meaning needs
   version 2. The JSON spells `SortOrder` and `ItemKind` by their raw values, so renaming a case breaks pasted files.
+- Detail (`GitProvider.itemDetail`) only reads and asks for one item at a time, by repository and number, never inside
+  the sync. GitHub splits it into the conversation and, for pull requests, the checks and files, so one can fail
+  without the other; every part of `ItemDetail` is its own `Result`, and an error whose path runs through one field
+  fails only that part. A refusal is `.missingPermission` (Detail links to the token setup), anything else
+  `.failed` (Detail offers Try Again, and `DetailCache` does not keep it). Bots (`authorIsBot`, or a login ending in
+  `[bot]`) never count as the latest word; check ids must be unique, names repeat. A provider without Detail keeps the
+  default `nil` and says so through `ProviderCapabilities.fetchesItemDetail`. See `docs/adr/0015`.
+- `NextStep` and `FilterEngine.explain` are generic on purpose: no labels, logins or habits of one team.
 - The Gitwall file (`GitwallFile`, `docs/adr/0014`) is version 2 of that contract: `presets` and `walls`, a tile as
   `{"preset": "<uuid>", "size": "large"}`. Version 1 and bare lists go to `PresetTransfer` unchanged, so they paste
   exactly as before. The same rules hold: unknown keys are errors, everything is checked first, a paste never deletes.

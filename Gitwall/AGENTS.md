@@ -14,6 +14,7 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | First run | `Onboarding/` |
 | Services | `Services/` (avatars, notifications, OAuth coordinator) |
 | Shared views | `Shared/` (item rows and empty states used by popover and window) |
+| Detail | `Detail/` (`DetailModel` per window, `ItemDetailService` app-wide, `ItemWindowController` and the Item menu) |
 
 ## Rules
 
@@ -65,10 +66,14 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 - The Walls window takes its keys (Tab, arrows, Return, Space, 1–4, Delete, Escape) in its own event monitor
   (`WallsWindowController.handleKey`): AppKit does not deliver plain printable keys as menu shortcuts, and SwiftUI would
   spend Tab on focus. Which key means what (`WallsKeys`) and when a command is enabled (`WallsCommand.isEnabled`) are
-  GitwallCore's; a key only acts when its menu item is enabled. A key without ⌘, ⌥ or ⌃ acts only while the Walls
+  GitwallCore's; a key only acts when its command is enabled, and a disabled one leaves the key to the window. A key without ⌘, ⌥ or ⌃ acts only while the Walls
   window is the key window and no name is typed, so the popover or a sheet in front keeps its arrows and Return.
-- Clicking an item on a wall, Return and Space go through one hook, `WallsModel.activate` (set in
-  `WallsWindowController`); ⌘↩ and a double click always open the browser.
+- The Walls window is an `ItemWindowController` with Detail as its inspector. `WallsModel` owns the window's
+  `DetailModel` and drives it from its selection (`syncDetail`): Detail follows ↑↓, its list is the selected tile's
+  rows, and "Why it's here" uses that tile's preset (`detailPreset`). A click on an item goes through
+  `WallsModel.activate`, which shows Detail; Return, Space and Escape are `WallsCommand.showDetail` and `.closeDetail`
+  sent as the Item menu's actions (Escape finishes editing first), and ⌘↩ and a double click open the browser. Item
+  actions live only in the Item menu; the Wall menu keeps wall and tile actions.
 - Wall edits go through `WallsModel.apply`, which registers the inverse `WallChange` with the window's own undo manager.
   Undo finds a wall by its id, so a paste that only adds walls leaves the history alone. A paste that replaces a wall
   clears it (`AppEnvironment.onWallsReplacedByPaste`): undoing an earlier edit would write the old wall over the pasted
@@ -79,6 +84,19 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   Dock icon. Going the other way at runtime leaves a generic Dock icon, hence the order in
   `applicationWillFinishLaunching`.
 
+- **Detail in a window**: subclass `ItemWindowController` (it is the window's delegate and answers the Item menu
+  through the responder chain), attach `.itemDetailInspector(model, environment:, preset:)` to the list and call
+  `model.show(item.id)` on a click. A click in such a list selects and shows Detail, a double click and ⌘↩ open the
+  browser; the popover and the widget still open the browser. Space, ↩ and Esc stay typing keys while a text field
+  is edited (`validateMenuItem`); ⌘C is Edit › Copy, never an Item menu key. Esc never reaches the
+  Item menu's Close Detail as a key equivalent, so `itemDetailInspector` closes Detail with `.onExitCommand`; ⌘F gives
+  the search field the keyboard through AppKit (`MainWindowController.focusSearch`), which `@FocusState` from a menu
+  command did not. `DetailModel` marks an item seen only
+  after its detail loaded while it is still shown (`ItemDetailService.markSeen`, `persist: !usesSampleContent`;
+  sample items keep their times in memory), opens only http(s) links, and clears a selection the new preset does
+  not list (`presetDidChange`). Replacing a credential or removing an account calls `details.forget(accountID:)`.
+  See `docs/adr/0015`.
+
 ## Debug launch arguments (Debug builds only)
 
 | Argument | Effect |
@@ -88,5 +106,7 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | `--debug-github-token <pat> [--debug-repos a/b,c/d]` | Creates a GitHub account without clicking. |
 | `--debug-demo [--debug-demo-preset <n>] [--debug-demo-widgets]` | Fictional data from `GitwallCore.DemoData` for App Store screenshots; widgets appear as borderless windows. |
 | `--debug-demo --debug-demo-idle-account <n>` | The sample account at that index as if it had just been removed and added again: no repositories, no items, its three presets at the end of the list (`--debug-demo-preset 7` shows the first of them). For the hints that send the user to Settings › Repositories. |
+| `--debug-detail <owner/repo#123>` | Selects that item in the main window and opens Detail, for screenshots. |
+| `--debug-detail-expand <folds>` | Opens Detail's folded sections (`description`, `conversation`, `files`, `linked`, `metadata`, comma separated) and scrolls to the first. |
 | `--debug-demo --debug-demo-walls [window\|edit\|empty\|fullscreen]` | Only the Walls window at 1280×800 with the sample walls: as it opens (first item selected), in edit mode, with no walls, or full screen. |
 | `--debug-onboarding-step <step>` | Opens the walkthrough at one step (`welcome`, `account`, `repositories`, `presets`, `notifications`, `startup`, `widget`), so a screen can be checked without clicking through. Pairs well with `--debug-demo`. |

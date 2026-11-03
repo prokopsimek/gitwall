@@ -56,6 +56,8 @@ final class AppEnvironment {
     let tokenStore: any TokenStore
     let providers: [ProviderKind: any GitProvider]
     let notifications = NotificationDispatcher()
+    /// Detail's fetches and the "last opened" times, shared by every window that shows Detail.
+    let details: ItemDetailService
 
     @ObservationIgnored var onShowPopover: (() -> Void)?
     /// The account is the one to preselect in the Repositories tab, when the caller has one in mind.
@@ -95,6 +97,7 @@ final class AppEnvironment {
         isSandbox = sandbox != nil
         container = demo ? nil : (sandbox ?? AppGroup.containerURL())
         if let sandbox { try? FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true) }
+        details = ItemDetailService(providers: self.providers, tokens: self.tokenStore, container: container)
         if demo {
             configStore = nil
             snapshotStore = nil
@@ -454,6 +457,7 @@ final class AppEnvironment {
     }
 
     func removeAccount(_ account: Account) {
+        details.forget(accountID: account.id)
         let updated = config.removing(accountID: account.id)
         if let selectedPresetID, updated.preset(id: selectedPresetID) == nil {
             self.selectedPresetID = updated.presets.first?.id
@@ -493,6 +497,7 @@ final class AppEnvironment {
         updatedAccount.me = me
         if let authMethod { updatedAccount.authMethod = authMethod }
         try tokenStore.set(await stamped(credential, provider: provider, baseURL: account.baseURL), for: account.id)
+        details.forget(accountID: account.id)
         updateAccount(updatedAccount)
         reloadTokenExpiries()
         Task { await refresh() }
