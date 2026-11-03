@@ -438,6 +438,7 @@ final class AppEnvironment {
     }
 
     func removeAccount(_ account: Account) {
+        details.forget(accountID: account.id)
         let updated = config.removing(accountID: account.id)
         if let selectedPresetID, updated.preset(id: selectedPresetID) == nil {
             self.selectedPresetID = updated.presets.first?.id
@@ -477,6 +478,7 @@ final class AppEnvironment {
         updatedAccount.me = me
         if let authMethod { updatedAccount.authMethod = authMethod }
         try tokenStore.set(await stamped(credential, provider: provider, baseURL: account.baseURL), for: account.id)
+        details.forget(accountID: account.id)
         updateAccount(updatedAccount)
         reloadTokenExpiries()
         Task { await refresh() }

@@ -1,6 +1,7 @@
 import Foundation
 import GitwallAuth
 import GitwallCore
+import GitwallUI
 @testable import Gitwall
 import Testing
 
@@ -54,17 +55,76 @@ struct DetailModelTests {
         #expect(content.whatsNew.count == WhatsNew.firstOpenCount)
     }
 
-    @Test("opening marks the item seen in memory only while sample data is on")
+    @Test("sample items count as seen after they were shown a while, in memory only")
     func sampleSeenStaysInMemory() async throws {
         let environment = sampleEnvironment()
-        let model = DetailModel(environment: environment)
+        let model = DetailModel(environment: environment, seenDelay: .milliseconds(300))
         let issue = try item(environment, "northwind/storefront", 1287)
 
         model.show(issue.id)
         _ = try await loaded(model)
+        #expect(environment.details.lastSeen(issue.id) == nil, "shown only just now")
 
+        for _ in 0..<40 where environment.details.lastSeen(issue.id) == nil {
+            try await Task.sleep(for: .milliseconds(50))
+        }
         #expect(environment.details.lastSeen(issue.id) != nil)
         #expect(!FileManager.default.fileExists(atPath: sandbox.appendingPathComponent(SeenStore.fileName).path))
+    }
+
+    @Test("a sample item left before the delay is not seen")
+    func sampleLeftEarly() async throws {
+        let environment = sampleEnvironment()
+        let model = DetailModel(environment: environment, seenDelay: .milliseconds(300))
+        let pull = try item(environment, "northwind/infra", 97)
+        let issue = try item(environment, "northwind/storefront", 1287)
+
+        model.show(pull.id)
+        _ = try await loaded(model)
+        model.select(issue.id)
+        try await Task.sleep(for: .milliseconds(500))
+
+        #expect(environment.details.lastSeen(pull.id) == nil)
+    }
+
+    @Test("another preset without the selected item clears the selection; one with it keeps it")
+    func presetChange() throws {
+        let environment = sampleEnvironment()
+        let model = DetailModel(environment: environment)
+        let ids = Array((environment.snapshot?.items ?? []).prefix(3).map(\.id))
+        model.visibleItemIDs = ids
+        model.show(ids[1])
+
+        model.presetDidChange(visibleItemIDs: [ids[1], ids[2]])
+        #expect(model.selectedItemID == ids[1])
+        #expect(model.visibleItemIDs == [ids[1], ids[2]])
+
+        model.presetDidChange(visibleItemIDs: [ids[0]])
+        #expect(model.selectedItemID == nil)
+        #expect(model.selectedRemote == nil)
+    }
+
+    @Test("an item outside the list on screen is not explained by the preset")
+    func noExplanationOutsideTheList() throws {
+        let environment = sampleEnvironment()
+        let model = DetailModel(environment: environment)
+        let pull = try item(environment, "northwind/infra", 97)
+        let preset = Preset(name: "Infra", filter: ItemFilter(query: "repo:northwind/infra"))
+        let other = try #require(environment.snapshot?.items.first { $0.id != pull.id })
+        func terms(_ content: DetailContent) -> [MatchReason] {
+            content.reasons.filter { if case .queryTerm = $0 { true } else { false } }
+        }
+
+        model.visibleItemIDs = [pull.id]
+        let listed = model.content(for: pull, preset: preset)
+        #expect(listed.presetName == "Infra")
+        #expect(terms(listed) == [.queryTerm("repo:northwind/infra")])
+
+        model.visibleItemIDs = [other.id]
+        let elsewhere = model.content(for: pull, preset: preset)
+        #expect(elsewhere.presetName == nil)
+        #expect(terms(elsewhere).isEmpty)
+        #expect(elsewhere.reasons.contains(.reviewRequestedFromMe), "facts about the item still hold")
     }
 
     @Test("arrows move through the visible items and stop at the ends")
