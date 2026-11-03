@@ -55,19 +55,31 @@ enum MarkdownSegments {
             markdown = []
         }
 
+        // An indented code block starts after a blank line; its lines, like a fence's, are kept as typed.
+        var followsBlank = true
+        var inIndentedCode = false
+
         for rawLine in source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+            if fence == nil, !inComment, followsBlank || inIndentedCode, isIndented(rawLine) {
+                inIndentedCode = true
+                followsBlank = false
+                if depth > 0 { details.append(rawLine) } else { markdown.append(rawLine) }
+                continue
+            }
             var line = rawLine
             if fence == nil {
                 line = stripComments(line, inComment: &inComment)
                 if inComment, line.trimmingCharacters(in: .whitespaces).isEmpty, !rawLine.contains("-->") { continue }
             }
             let trimmed = line.trimmingCharacters(in: .whitespaces)
+            followsBlank = trimmed.isEmpty
+            if !trimmed.isEmpty { inIndentedCode = false }
             if let open = fence {
                 if trimmed.hasPrefix(open) { fence = nil }
             } else if let marker = fenceMarker(trimmed) {
                 fence = marker
             } else {
-                let lower = trimmed.lowercased()
+                let lower = removingCodeSpans(trimmed).lowercased()
                 let opens = occurrences(of: "<details", in: lower)
                 let closes = occurrences(of: "</details>", in: lower)
                 if depth == 0, opens > 0 {
@@ -110,25 +122,75 @@ enum MarkdownSegments {
         haystack.components(separatedBy: needle).count - 1
     }
 
-    /// Removes `<!-- … -->`, which may span lines; `inComment` carries an open comment to the next line.
+    /// Four spaces or a tab: code, when it follows a blank line or more code.
+    private static func isIndented(_ line: String) -> Bool {
+        (line.hasPrefix("    ") || line.hasPrefix("\t")) && !line.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// Removes `<!-- … -->`, which may span lines; `inComment` carries an open comment to the next line. A comment
+    /// written inside a code span (`` `<!-- x -->` ``) is code and stays.
     private static func stripComments(_ line: String, inComment: inout Bool) -> String {
-        var rest = Substring(line)
         var kept = ""
-        while !rest.isEmpty {
+        var index = line.startIndex
+        while index < line.endIndex {
             if inComment {
-                guard let end = rest.range(of: "-->") else { return kept }
-                rest = rest[end.upperBound...]
+                guard let end = line.range(of: "-->", range: index..<line.endIndex) else { return kept }
+                index = end.upperBound
                 inComment = false
-            } else if let start = rest.range(of: "<!--") {
-                kept += rest[..<start.lowerBound]
-                rest = rest[start.upperBound...]
+            } else if let span = codeSpan(in: line, at: index) {
+                kept += line[span]
+                index = span.upperBound
+            } else if line[index] == "`" {
+                let run = line[index...].prefix { $0 == "`" }
+                kept += run
+                index = run.endIndex
+            } else if line[index...].hasPrefix("<!--") {
                 inComment = true
+                index = line.index(index, offsetBy: 4)
             } else {
-                kept += rest
-                rest = ""
+                kept.append(line[index])
+                index = line.index(after: index)
             }
         }
         return kept
+    }
+
+    /// The line without its code spans, for counting `<details>` tags that are markup rather than code.
+    private static func removingCodeSpans(_ line: String) -> String {
+        var kept = ""
+        var index = line.startIndex
+        while index < line.endIndex {
+            if let span = codeSpan(in: line, at: index) {
+                index = span.upperBound
+            } else if line[index] == "`" {
+                let run = line[index...].prefix { $0 == "`" }
+                kept += run
+                index = run.endIndex
+            } else {
+                kept.append(line[index])
+                index = line.index(after: index)
+            }
+        }
+        return kept
+    }
+
+    /// The code span opening at `index`: a run of backticks up to the next run of the same length on this line.
+    /// An unclosed run is no span; the callers keep the whole run as text.
+    private static func codeSpan(in line: String, at index: String.Index) -> Range<String.Index>? {
+        guard line[index] == "`" else { return nil }
+        let length = line[index...].prefix { $0 == "`" }.count
+        var cursor = line.index(index, offsetBy: length)
+        while cursor < line.endIndex {
+            guard line[cursor] == "`" else {
+                cursor = line.index(after: cursor)
+                continue
+            }
+            let run = line[cursor...].prefix { $0 == "`" }.count
+            let end = line.index(cursor, offsetBy: run)
+            if run == length { return index..<end }
+            cursor = end
+        }
+        return nil
     }
 
     /// Strips the outer `<details>` and `</details>` and takes the first `<summary>` as the title.

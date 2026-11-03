@@ -137,6 +137,21 @@ struct MarkdownBlocksTests {
         #expect(parse("Visible <!-- hidden -->\n\n<!--\nmulti\nline\n-->\nAfter") == ["p Visible", "p After"])
     }
 
+    @Test("comments and details inside inline code stay as written")
+    func inlineCodeKeepsHTML() {
+        #expect(parse("Write `<!-- note -->` to hide a line") == ["p Write <!-- note --> to hide a line"])
+        #expect(parse("Close it with `</details>` or ``<details>`` and go on") == ["p Close it with </details> or <details> and go on"])
+        #expect(parse("An unclosed ``run then ` <!-- code --> `") == ["p An unclosed ``run then <!-- code -->"])
+        #expect(parse("Wrap it in `<details>`:\n\n<details>\n\nhidden\n\n</details>") == [
+            "p Wrap it in <details>:", "details Details { p hidden }",
+        ])
+    }
+
+    @Test("an indented code block keeps its comments and details tags")
+    func indentedCodeKeepsHTML() {
+        #expect(parse("Intro\n\n    <!-- kept -->\n    <details>\n\nAfter") == ["p Intro", "code[] <!-- kept -->\n<details>", "p After"])
+    }
+
     @Test("other HTML shows as its plain text; a line break tag breaks the line")
     func otherHTML() {
         #expect(parse("Line<br>two and <sub>small</sub> text") == ["p Line\ntwo and small text"])
