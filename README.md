@@ -334,6 +334,7 @@ The format is versioned and will not change under the same version; see
 Walls travel with the presets they show, in one file with `"version": 2`, so a whole setup pastes in one step. **Edit ›
 Paste Configuration…** (⇧⌘V) and **Paste Presets…** take it; **Copy Wall as JSON** (the context menu of a wall's tab,
 or the Wall menu) writes a wall together with every preset its tiles use, so it pastes into another Gitwall as it is.
+**Edit › Copy Configuration as JSON** writes every preset and every wall, the whole setup of one Mac for another.
 
 ```json
 {
@@ -358,7 +359,7 @@ or the Wall menu) writes a wall together with every preset its tiles use, so it 
 | `presets` | no | Presets as above. At least one of `presets` and `walls` holds something. |
 | `walls` | no | Each with an `id` (a UUID), a `name` and `tiles`. |
 | tile `preset` | yes | The id of a preset in the same file or already in Gitwall. |
-| tile `size` | no | `small` (1 row), `medium` (3, default), `large` (7) or `extraLarge` (14, two columns), like the widgets. |
+| tile `size` | no | `small` (1 row), `medium` (3, default), `large` (7) or `extraLarge` (14, two columns), like the widgets. Gitwall always writes it. |
 
 The same rules hold as for presets: everything is checked first and the error names the wall, the tile and the
 reason; a wall whose id Gitwall has is replaced whole, a new one is added, and nothing is deleted. A preset that a tile

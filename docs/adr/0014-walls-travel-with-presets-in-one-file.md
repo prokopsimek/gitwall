@@ -46,7 +46,7 @@ A Gitwall file carries presets and walls together:
 | wall `name` | yes | Not blank. |
 | wall `tiles` | no | Default none. |
 | tile `preset` | yes | The id of a preset in the same file or already in Gitwall. |
-| tile `size` | no | `small`, `medium` (default), `large` or `extraLarge`: 1, 3, 7 or 14 rows, like the widgets. |
+| tile `size` | no | `small`, `medium` (default), `large` or `extraLarge`: 1, 3, 7 or 14 rows, like the widgets. Every export writes it, so a file does not depend on the default. |
 
 Version 1 stays exactly as it was: a file with `"version": 1` or a bare list of presets is handed to the version 1
 reader unchanged, and *Copy as JSON* of presets alone still writes version 1. A version 1 file with `walls` is refused
@@ -54,7 +54,9 @@ with a pointer to version 2 rather than read half.
 
 **Edit › Paste Configuration…** (⇧⌘V), **Settings › Presets › ⋯ › Paste Presets…** and the empty Walls window all take
 the whole file. **Copy Wall as JSON** writes version 2 with the wall and every preset its tiles show, in the app's
-order, so the text pastes into another installation as it is.
+order, so the text pastes into another installation as it is. **Edit › Copy Configuration as JSON** writes every
+preset and every wall with the same encoder; pasted into an empty installation it gives the same presets and walls
+(tile ids are local and not in the file). Tiles of a deleted preset are left out of both, with a warning.
 
 ### Reading and merging
 

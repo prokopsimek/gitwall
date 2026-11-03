@@ -9,7 +9,7 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 
 | Package | Owns |
 |---|---|
-| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`, `PresetTransfer` (preset JSON for copy and paste), `Wall`/`Tile`/`TileSize`, `WallLayout`, `GitwallFile` (presets and walls as one JSON file), `SyncStatus`. |
+| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`, `PresetTransfer` (preset JSON for copy and paste), `Wall`/`Tile`/`TileSize`, `WallLayout`, `GitwallFile` (presets and walls as one JSON file), `SyncStatus`, `FilterCache`, `WallsCommand`/`WallsKeys` (what the Walls window's menus and keys do, and when). |
 | `GitwallUI` | Row views, status icons, time formatting shared by popover, window and widget; `TileView`, the tile drawn by both the widgets and the Walls window. |
 | `GitwallAuth` | Keychain `TokenStore`, `StoredToken`, OAuth flows (`GitHubDeviceFlow`, `GitLabPKCEFlow`), `PKCE`, `TokenRefresher`, `RefreshingTokenReader`, token expiry parsing, `OAuthClients` (public client IDs). |
 | `GitwallGitHub` | `GitHubProvider`: GraphQL for lists, REST for identity and discovery, Link pagination. |
@@ -64,6 +64,7 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 - The Gitwall file (`GitwallFile`, `docs/adr/0014`) is version 2 of that contract: `presets` and `walls`, a tile as
   `{"preset": "<uuid>", "size": "large"}`. Version 1 and bare lists go to `PresetTransfer` unchanged, so they paste
   exactly as before. The same rules hold: unknown keys are errors, everything is checked first, a paste never deletes.
-  Tile ids, zoom and rotation stay out of the file.
+  Tile ids, zoom and rotation stay out of the file. Every export writes each tile's `size`; a missing size reads as
+  `medium`.
 - `TileView` draws the desktop widgets, so a change to it is a change to every widget. Compare the four demo widgets
   before and after (`--debug-fresh --debug-demo --debug-demo-widgets`, pixel by pixel) and keep WidgetKit out of it.
