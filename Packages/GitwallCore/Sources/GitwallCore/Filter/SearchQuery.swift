@@ -323,6 +323,39 @@ public struct SearchQuery: Equatable, Sendable {
         }
     }
 
+    /// The terms `item` satisfied, as text in the order written, or nil when the query does not match. Of an OR only
+    /// the first branch that matched explains; a negated term must hold but explains nothing; of a comma list only
+    /// the value that matched.
+    func explanation(for item: WorkItem, me: UserRef?) -> [String]? {
+        guard let root else { return [] }
+        return explanation(for: item, root, me: me)
+    }
+
+    private func explanation(for item: WorkItem, _ expression: Expression, me: UserRef?) -> [String]? {
+        switch expression {
+        case .term(let term):
+            let matched = term.values.filter { matches(item, term: term, value: $0, me: me) }
+            if term.isNegated { return matched.isEmpty ? [] : nil }
+            guard let value = matched.first else { return nil }
+            guard let qualifier = term.qualifier else {
+                return [value.contains(where: \.isWhitespace) ? "\"\(value)\"" : value]
+            }
+            return ["\(qualifier.rawValue):\(value)"]
+        case .all(let operands):
+            var terms: [String] = []
+            for operand in operands {
+                guard let explained = explanation(for: item, operand, me: me) else { return nil }
+                terms += explained
+            }
+            return terms
+        case .any(let operands):
+            for operand in operands {
+                if let explained = explanation(for: item, operand, me: me) { return explained }
+            }
+            return nil
+        }
+    }
+
     private func matches(_ item: WorkItem, term: Term, value: String, me: UserRef?) -> Bool {
         guard let qualifier = term.qualifier else { return matchesText(item, value) }
         switch qualifier {
