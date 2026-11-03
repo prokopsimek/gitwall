@@ -181,9 +181,27 @@ public enum WallNavigation {
         return items[min(max(index + offset, 0), items.count - 1)]
     }
 
+    /// Which wall to show after `change`, given the walls after it and the selected one: an added or changed wall
+    /// is shown; when the shown wall is removed, the one now in its place, or the one before it at the end.
+    public static func selection(after change: WallChange, in walls: [Wall], selected: Wall.ID?) -> WallSelectionChange {
+        let shown = walls.first { $0.id == selected } ?? walls.first
+        if let after = change.after {
+            return after.id == shown?.id ? .keep : .select(after.id)
+        }
+        guard selected == change.before?.id || shown == nil else { return .keep }
+        return .select(walls.isEmpty ? nil : walls[min(max(change.index, 0), walls.count - 1)].id)
+    }
+
     private static func wrapped(_ index: Int, count: Int) -> Int {
         ((index % count) + count) % count
     }
+}
+
+/// What ``WallNavigation/selection(after:in:selected:)`` decides.
+public enum WallSelectionChange: Equatable, Sendable {
+    case keep
+    /// Show this wall, with nothing selected on it; nil when no wall is left.
+    case select(Wall.ID?)
 }
 
 /// Switching walls by themselves, for a wall on a monitor nobody touches. Off by default.

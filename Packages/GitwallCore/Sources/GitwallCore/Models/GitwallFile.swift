@@ -150,6 +150,10 @@ public struct GitwallFileMerge: Equatable, Sendable {
 
     public var hasChanges: Bool { presets.hasChanges || wallsAdded + wallsReplaced > 0 }
 
+    /// A wall already here gets new content. Undoing an earlier edit of it would write the old content over the
+    /// pasted one, so the Walls window forgets its undo history.
+    public var replacesWalls: Bool { wallsReplaced > 0 }
+
     /// "2 new walls, 10 presets replaced", plus how many stay as they are. Counts of zero are left out.
     public var summary: String {
         func noun(_ word: String, _ number: Int) -> String { number == 1 ? word : word + "s" }
@@ -264,23 +268,11 @@ public struct GitwallFile: Equatable, Sendable {
             let wallEntries = try list(.walls).get()
             guard !presetEntries.isEmpty || !wallEntries.isEmpty else { return .failure(.empty) }
 
-            var presets: [Preset] = []
-            var presetPositions: [UUID: Int] = [:]
-            for (offset, entry) in presetEntries.enumerated() {
-                let position = offset + 1
-                switch PresetTransfer.preset(from: entry, iconExists: iconExists) {
-                case .failure(let problem):
-                    throw .invalidPreset(position: position, name: PresetTransfer.usableName(of: entry), problem: problem)
-                case .success(let preset):
-                    if let first = presetPositions[preset.id] {
-                        throw .invalidPreset(position: position, name: preset.name, problem: .duplicateID(firstPosition: first))
-                    }
-                    presetPositions[preset.id] = position
-                    presets.append(preset)
-                }
-            }
+            let presets = try PresetTransfer.presets(from: presetEntries, iconExists: iconExists)
+                .mapError { GitwallFileError.invalidPreset(position: $0.position, name: $0.name, problem: $0.problem) }
+                .get()
 
-            let knownPresets = presetsInApp.union(presetPositions.keys)
+            let knownPresets = presetsInApp.union(presets.map(\.id))
             var walls: [Wall] = []
             var wallPositions: [UUID: Int] = [:]
             for (offset, entry) in wallEntries.enumerated() {
@@ -381,26 +373,51 @@ public struct GitwallFile: Equatable, Sendable {
     /// One wall with the presets its tiles use, in the order of `presets` (the app's), so the text pastes into
     /// another Gitwall as it is. A tile whose preset is gone is left out; ``copyWarning(for:presets:)`` says so.
     public static func encode(wall: Wall, presets: [Preset]) -> String {
-        let (kept, used) = exportable(wall, presets: presets)
-        return encode(presets: used, walls: [kept])
+        let (kept, _) = exportable([wall], presets: presets)
+        return encode(presets: usedPresets(by: kept, in: presets), walls: kept)
+    }
+
+    /// Every preset and every wall: the whole setup of this Mac as one file. Tiles whose preset is gone are left out;
+    /// ``copyWarning(presets:walls:)`` says so.
+    public static func encodeConfiguration(presets: [Preset], walls: [Wall]) -> String {
+        encode(presets: presets, walls: exportable(walls, presets: presets).walls)
     }
 
     /// What ``encode(wall:presets:)`` leaves out, or nil when nothing: tiles of deleted presets, and what the
     /// presets lose in the file (``PresetTransfer/copyWarning(for:)``).
     public static func copyWarning(for wall: Wall, presets: [Preset]) -> String? {
-        let (kept, used) = exportable(wall, presets: presets)
-        let dropped = wall.tiles.count - kept.tiles.count
+        let (kept, dropped) = exportable([wall], presets: presets)
+        return warning(droppedTiles: dropped, presets: usedPresets(by: kept, in: presets))
+    }
+
+    /// What ``encodeConfiguration(presets:walls:)`` leaves out, or nil when nothing.
+    public static func copyWarning(presets: [Preset], walls: [Wall]) -> String? {
+        warning(droppedTiles: exportable(walls, presets: presets).dropped, presets: presets)
+    }
+
+    private static func warning(droppedTiles dropped: Int, presets: [Preset]) -> String? {
         let tiles = dropped == 0 ? nil : "\(dropped) \(dropped == 1 ? "tile shows a preset that was" : "tiles show presets that were") deleted and \(dropped == 1 ? "is" : "are") left out."
-        let warnings = [tiles, PresetTransfer.copyWarning(for: used)].compactMap(\.self)
+        let warnings = [tiles, PresetTransfer.copyWarning(for: presets)].compactMap(\.self)
         return warnings.isEmpty ? nil : warnings.joined(separator: " ")
     }
 
-    private static func exportable(_ wall: Wall, presets: [Preset]) -> (Wall, [Preset]) {
+    /// The walls without tiles of presets that are gone, and how many tiles that left out.
+    private static func exportable(_ walls: [Wall], presets: [Preset]) -> (walls: [Wall], dropped: Int) {
         let available = Set(presets.map(\.id))
-        var kept = wall
-        kept.tiles.removeAll { !available.contains($0.presetID) }
-        let used = Set(kept.tiles.map(\.presetID))
-        return (kept, presets.filter { used.contains($0.id) })
+        var dropped = 0
+        let kept = walls.map { wall in
+            var kept = wall
+            kept.tiles.removeAll { !available.contains($0.presetID) }
+            dropped += wall.tiles.count - kept.tiles.count
+            return kept
+        }
+        return (kept, dropped)
+    }
+
+    /// The presets the tiles of `walls` show, in the order of `presets`.
+    private static func usedPresets(by walls: [Wall], in presets: [Preset]) -> [Preset] {
+        let used = Set(walls.flatMap(\.tiles).map(\.presetID))
+        return presets.filter { used.contains($0.id) }
     }
 
     private struct File: Encodable {

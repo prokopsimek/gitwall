@@ -175,17 +175,30 @@ public enum PresetTransfer {
             return .failure(.notAPresetFile)
         }
         guard !entries.isEmpty else { return .failure(.noPresets) }
+        return presets(from: entries, iconExists: iconExists)
+            .mapError { .invalidPreset(position: $0.position, name: $0.name, problem: $0.problem) }
+    }
 
+    /// A preset in a list that cannot be read: its position from 1, the name it gives if any, and why.
+    struct EntryError: Error {
+        let position: Int
+        let name: String?
+        let problem: PresetProblem
+    }
+
+    /// Every entry of a list of presets, read and checked one by one, stopping at the first that fails. Used for the
+    /// version 1 file and for the presets of a version 2 file alike.
+    static func presets(from entries: [JSONValue], iconExists: (String) -> Bool) -> Result<[Preset], EntryError> {
         var presets: [Preset] = []
         var positions: [UUID: Int] = [:]
         for (offset, entry) in entries.enumerated() {
             let position = offset + 1
             switch preset(from: entry, iconExists: iconExists) {
             case .failure(let problem):
-                return .failure(.invalidPreset(position: position, name: usableName(of: entry), problem: problem))
+                return .failure(EntryError(position: position, name: usableName(of: entry), problem: problem))
             case .success(let preset):
                 if let first = positions[preset.id] {
-                    return .failure(.invalidPreset(position: position, name: preset.name, problem: .duplicateID(firstPosition: first)))
+                    return .failure(EntryError(position: position, name: preset.name, problem: .duplicateID(firstPosition: first)))
                 }
                 positions[preset.id] = position
                 presets.append(preset)

@@ -270,6 +270,59 @@ struct GitwallFileTests {
         #expect(merge.summary == "2 unchanged")
     }
 
+    @Test("a paste replaces walls only when a wall with a known id changes")
+    func replacesWalls() {
+        let presets = PresetMerge(presets: [], added: 3, replaced: 1, unchanged: 0)
+        #expect(!GitwallFileMerge(presets: presets, walls: [], wallsAdded: 2, wallsReplaced: 0, wallsUnchanged: 1).replacesWalls)
+        #expect(GitwallFileMerge(presets: presets, walls: [], wallsAdded: 0, wallsReplaced: 1, wallsUnchanged: 0).replacesWalls)
+    }
+
+    // MARK: - The whole configuration
+
+    @Test("copying the whole configuration and pasting it into an empty one gives the same presets and walls")
+    func configurationRoundTrip() throws {
+        let presets = [
+            Preset(id: reviewID, name: "Review", icon: "eye", kinds: [.pullRequest], filter: ItemFilter(query: "review-requested:@me"), sort: .priority),
+            Preset(id: bugsID, name: "Bugs", icon: "ladybug", kinds: [.issue], filter: ItemFilter(query: "label:bug")),
+        ]
+        let walls = [
+            Wall(id: deskID, name: "Desk", tiles: [Tile(presetID: reviewID, size: .large), Tile(presetID: bugsID)]),
+            Wall(id: teamID, name: "Team", tiles: [Tile(presetID: bugsID, size: .extraLarge)]),
+        ]
+
+        let text = GitwallFile.encodeConfiguration(presets: presets, walls: walls)
+        let merge = GitwallFile.merge(try decode(text).get(), presets: [], walls: [])
+
+        #expect(merge.presets.presets == presets)
+        #expect(merge.walls.map(\.id) == walls.map(\.id))
+        #expect(zip(merge.walls, walls).allSatisfy { $0.hasSameContent(as: $1) })
+        #expect(GitwallFile.copyWarning(presets: presets, walls: walls) == nil)
+    }
+
+    @Test("every tile is written with its size, even the default one")
+    func sizeAlwaysWritten() throws {
+        let walls = [Wall(id: deskID, name: "Desk", tiles: [Tile(presetID: reviewID), Tile(presetID: reviewID, size: .small)])]
+        let text = GitwallFile.encodeConfiguration(presets: [Preset(id: reviewID, name: "Review")], walls: walls)
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+        let tiles = try #require((object["walls"] as? [[String: Any]])?.first?["tiles"] as? [[String: String]])
+        #expect(tiles.map { $0["size"] } == ["medium", "small"])
+    }
+
+    @Test("the whole configuration leaves out tiles of deleted presets, and says how many")
+    func configurationWithDeletedPreset() throws {
+        let presets = [Preset(id: reviewID, name: "Review")]
+        let walls = [
+            Wall(id: deskID, name: "Desk", tiles: [Tile(presetID: reviewID), Tile(presetID: bugsID)]),
+            Wall(id: teamID, name: "Team", tiles: [Tile(presetID: bugsID)]),
+        ]
+
+        let file = try decode(GitwallFile.encodeConfiguration(presets: presets, walls: walls)).get()
+
+        #expect(file.walls.map(\.tiles.count) == [1, 0])
+        let warning = try #require(GitwallFile.copyWarning(presets: presets, walls: walls))
+        #expect(warning.contains("2 tiles"))
+    }
+
     @Test("the summary counts walls first, then presets, in the plural where needed")
     func summary() {
         let presets = PresetMerge(presets: [], added: 0, replaced: 10, unchanged: 0)
