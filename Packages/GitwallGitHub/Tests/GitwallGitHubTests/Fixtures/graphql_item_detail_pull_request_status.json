@@ -1,0 +1,201 @@
+{
+  "data" : {
+    "rateLimit" : {
+      "cost" : 1,
+      "remaining" : 4434,
+      "resetAt" : "2026-11-03T06:40:59Z"
+    },
+    "repository" : {
+      "issueOrPullRequest" : {
+        "__typename" : "PullRequest",
+        "changedFiles" : 9,
+        "commits" : {
+          "nodes" : [
+            {
+              "commit" : {
+                "oid" : "05288453fe570eaa09955d23bc1395c0673ce44a",
+                "statusCheckRollup" : {
+                  "contexts" : {
+                    "nodes" : [
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208084956",
+                        "name" : "linux-unit (swift:6.2-noble)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208084956"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424612237/job/125208082713",
+                        "name" : "Analyze (actions)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208082713"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208084877",
+                        "name" : "linux-unit (swift:6.3-noble)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208084877"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424612237/job/125208082393",
+                        "name" : "Analyze (swift)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208082393"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208085178",
+                        "name" : "linux-unit (swift:6.4-resolute)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208085178"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "FAILURE",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208084993",
+                        "name" : "linux-unit (swiftlang/swift:nightly-main-noble)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208084993"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208084951",
+                        "name" : "linux-integration-and-dependencies (postgres:18)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208084951"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208085001",
+                        "name" : "linux-integration-and-dependencies (postgres:16)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208085001"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208084465",
+                        "name" : "linux-integration-and-dependencies (postgres:14)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208084465"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208084954",
+                        "name" : "macos-all (postgresql@17, scram-sha-256, macos-26)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208084954"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208084910",
+                        "name" : "macos-all (postgresql@17, scram-sha-256, xcode-27)",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208084910"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208085040",
+                        "name" : "api-breakage",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208085040"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208084935",
+                        "name" : "musl",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208084935"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SKIPPED",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/actions/runs/41424614799/job/125208086505",
+                        "name" : "submit-dependencies",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125208086505"
+                      },
+                      {
+                        "__typename" : "CheckRun",
+                        "conclusion" : "SUCCESS",
+                        "detailsUrl" : "https://github.com/vapor/postgres-nio/runs/125209254361",
+                        "name" : "CodeQL",
+                        "status" : "COMPLETED",
+                        "url" : "https://github.com/vapor/postgres-nio/runs/125209254361"
+                      }
+                    ]
+                  },
+                  "state" : "FAILURE"
+                }
+              }
+            }
+          ]
+        },
+        "files" : {
+          "nodes" : [
+            {
+              "additions" : 9,
+              "deletions" : 0,
+              "path" : "Sources/ConnectionPoolModule/ConnectionPool.swift"
+            },
+            {
+              "additions" : 16,
+              "deletions" : 5,
+              "path" : "Sources/ConnectionPoolModule/PoolStateMachine+ConnectionGroup.swift"
+            },
+            {
+              "additions" : 81,
+              "deletions" : 19,
+              "path" : "Sources/ConnectionPoolModule/PoolStateMachine+ConnectionState.swift"
+            },
+            {
+              "additions" : 45,
+              "deletions" : 19,
+              "path" : "Sources/ConnectionPoolModule/PoolStateMachine.swift"
+            },
+            {
+              "additions" : 13,
+              "deletions" : 2,
+              "path" : "Sources/ConnectionPoolModule/TinyFastSequence.swift"
+            },
+            {
+              "additions" : 10,
+              "deletions" : 0,
+              "path" : "Sources/PostgresNIO/Pool/PostgresClient.swift"
+            },
+            {
+              "additions" : 69,
+              "deletions" : 0,
+              "path" : "Tests/ConnectionPoolModuleTests/ConnectionPoolTests.swift"
+            },
+            {
+              "additions" : 97,
+              "deletions" : 3,
+              "path" : "Tests/ConnectionPoolModuleTests/PoolStateMachine+ConnectionStateTests.swift"
+            },
+            {
+              "additions" : 196,
+              "deletions" : 7,
+              "path" : "Tests/ConnectionPoolModuleTests/PoolStateMachineTests.swift"
+            }
+          ],
+          "totalCount" : 9
+        }
+      }
+    }
+  }
+}

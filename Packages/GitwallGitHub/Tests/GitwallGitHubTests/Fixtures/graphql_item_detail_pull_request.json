@@ -1,0 +1,248 @@
+{
+  "data" : {
+    "rateLimit" : {
+      "cost" : 1,
+      "remaining" : 4433,
+      "resetAt" : "2026-11-03T06:40:59Z"
+    },
+    "repository" : {
+      "issueOrPullRequest" : {
+        "__typename" : "PullRequest",
+        "baseRefName" : "main",
+        "body" : "Fix for #679 \r\n\r\nOpening as a draft to gather some initial feedback. The main missing thing is a jitter mechanism, without it all connections that are opened simultaneously may be closed at the same time. We may want to avoid that.\r\n\r\nThis adds a `maximumConnectionLifetime` flag to the pool configuration. When the flag is set and a connection is created, a timer is scheduled. If and when the timer is triggered, the connection is closed immediately if idle, and gracefully shut down if leased (i.e the work it's doing is awaited to finish before shutting down). If, for example, the connection is closed before the timer, the timer is canceled.\r\n\r\nThis PR replaces `Max2Sequence` with `TinyFastSequence` in a bunch of places since we're now possibly carrying 3 timers instead of two, and testing showed that the synthesised Equatable conformance of `TinyFastSequence` also checked the `reservedCapacity` property, possibly yielding `false` even if the elements were equal, so this also carries a fix for that.",
+        "closingIssuesReferences" : {
+          "nodes" : [
+
+          ]
+        },
+        "comments" : {
+          "nodes" : [
+            {
+              "author" : {
+                "__typename" : "Bot",
+                "avatarUrl" : "https://avatars.githubusercontent.com/in/254?v=4",
+                "login" : "codecov"
+              },
+              "body" : "## [Codecov](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?dropdown=coverage&src=pr&el=h1&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor) Report\n:x: Patch coverage is `91.83673%` with `8 lines` in your changes missing coverage. Please review.\n:white_check_mark: Project coverage is 78.87%. Comparing base ([`1025d0a`](https://app.codecov.io/gh/vapor/postgres-nio/commit/1025d0a10ea9f5dd110f13e9b62aa42dc4358841?dropdown=coverage&el=desc&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor)) to head ([`0528845`](https://app.codecov.io/gh/vapor/postgres-nio/commit/05288453fe570eaa09955d23bc1395c0673ce44a?dropdown=coverage&el=desc&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor)).\n\n| [Files with missing lines](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?dropdown=coverage&src=pr&el=tree&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor) | Patch % | Lines |\n|---|---|---|\n| [...nPoolModule/PoolStateMachine+ConnectionState.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FConnectionPoolModule%2FPoolStateMachine%2BConnectionState.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Db25uZWN0aW9uUG9vbE1vZHVsZS9Qb29sU3RhdGVNYWNoaW5lK0Nvbm5lY3Rpb25TdGF0ZS5zd2lmdA==) | 94.11% | [3 Missing :warning: ](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor) |\n| [...ources/ConnectionPoolModule/TinyFastSequence.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FConnectionPoolModule%2FTinyFastSequence.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Db25uZWN0aW9uUG9vbE1vZHVsZS9UaW55RmFzdFNlcXVlbmNlLnN3aWZ0) | 40.00% | [3 Missing :warning: ](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor) |\n| [...ources/ConnectionPoolModule/PoolStateMachine.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FConnectionPoolModule%2FPoolStateMachine.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Db25uZWN0aW9uUG9vbE1vZHVsZS9Qb29sU3RhdGVNYWNoaW5lLnN3aWZ0) | 93.54% | [2 Missing :warning: ](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor) |\n\n<details><summary>Additional details and impacted files</summary>\n\n\n\n```diff\n@@            Coverage Diff             @@\n##             main     #686      +/-   ##\n==========================================\n+ Coverage   78.70%   78.87%   +0.17%     \n==========================================\n  Files         138      138              \n  Lines       11116    11183      +67     \n==========================================\n+ Hits         8749     8821      +72     \n+ Misses       2367     2362       -5     \n```\n\n| [Files with missing lines](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?dropdown=coverage&src=pr&el=tree&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor) | Coverage Δ | |\n|---|---|---|\n| [Sources/ConnectionPoolModule/ConnectionPool.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FConnectionPoolModule%2FConnectionPool.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Db25uZWN0aW9uUG9vbE1vZHVsZS9Db25uZWN0aW9uUG9vbC5zd2lmdA==) | `95.72% <100.00%> (+0.46%)` | :arrow_up: |\n| [...nPoolModule/PoolStateMachine+ConnectionGroup.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FConnectionPoolModule%2FPoolStateMachine%2BConnectionGroup.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Db25uZWN0aW9uUG9vbE1vZHVsZS9Qb29sU3RhdGVNYWNoaW5lK0Nvbm5lY3Rpb25Hcm91cC5zd2lmdA==) | `92.27% <100.00%> (+0.27%)` | :arrow_up: |\n| [Sources/PostgresNIO/Pool/PostgresClient.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FPostgresNIO%2FPool%2FPostgresClient.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Qb3N0Z3Jlc05JTy9Qb29sL1Bvc3RncmVzQ2xpZW50LnN3aWZ0) | `72.92% <100.00%> (+0.30%)` | :arrow_up: |\n| [...ources/ConnectionPoolModule/PoolStateMachine.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FConnectionPoolModule%2FPoolStateMachine.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Db25uZWN0aW9uUG9vbE1vZHVsZS9Qb29sU3RhdGVNYWNoaW5lLnN3aWZ0) | `93.80% <93.54%> (+0.34%)` | :arrow_up: |\n| [...nPoolModule/PoolStateMachine+ConnectionState.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FConnectionPoolModule%2FPoolStateMachine%2BConnectionState.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Db25uZWN0aW9uUG9vbE1vZHVsZS9Qb29sU3RhdGVNYWNoaW5lK0Nvbm5lY3Rpb25TdGF0ZS5zd2lmdA==) | `91.49% <94.11%> (+1.85%)` | :arrow_up: |\n| [...ources/ConnectionPoolModule/TinyFastSequence.swift](https://app.codecov.io/gh/vapor/postgres-nio/pull/686?src=pr&el=tree&filepath=Sources%2FConnectionPoolModule%2FTinyFastSequence.swift&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor#diff-U291cmNlcy9Db25uZWN0aW9uUG9vbE1vZHVsZS9UaW55RmFzdFNlcXVlbmNlLnN3aWZ0) | `96.15% <40.00%> (-1.45%)` | :arrow_down: |\n\n... and [2 files with indirect coverage changes](https://app.codecov.io/gh/vapor/postgres-nio/pull/686/indirect-changes?src=pr&el=tree-more&utm_medium=referral&utm_source=github&utm_content=comment&utm_campaign=pr+comments&utm_term=vapor)\n</details>\n<details><summary> :rocket: New features to boost your workflow: </summary>\n\n- :snowflake: [Test Analytics](https://docs.codecov.com/docs/test-analytics): Detect flaky tests, report on failures, and find test suite problems.\n</details>",
+              "createdAt" : "2026-09-28T10:39:26Z",
+              "id" : "IC_kwDOCPpRxc8AAAABXca-WQ",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686#issuecomment-5868273241"
+            }
+          ]
+        },
+        "headRefName" : "max-connection-lifetime",
+        "reviews" : {
+          "nodes" : [
+            {
+              "author" : {
+                "__typename" : "User",
+                "avatarUrl" : "https://avatars.githubusercontent.com/u/9382567?u=519b4f0d165f180f80f8c03f3d0dc45faae88259&v=4",
+                "login" : "adam-fowler"
+              },
+              "body" : "Not looked in detail at this yet. But one thing that could be addressed. Where you have replaced `Max2Sequence` with a `TinyFastSequence` containing 3 timers you have introduced a new allocation. Perhaps `TinyFastSequence` should include a case for three elements to avoid this.",
+              "createdAt" : "2026-09-29T08:21:10Z",
+              "id" : "PRR_kwDOCPpRxc8AAAABPt1u1g",
+              "state" : "COMMENTED",
+              "submittedAt" : "2026-09-29T08:21:10Z",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686#pullrequestreview-5349666518"
+            },
+            {
+              "author" : {
+                "__typename" : "User",
+                "avatarUrl" : "https://avatars.githubusercontent.com/u/9938337?u=167b274502f6a1ae628b6803a5d643e03358a8d6&v=4",
+                "login" : "0xTim"
+              },
+              "body" : "Couple of edge cases to fix",
+              "createdAt" : "2026-11-03T01:50:38Z",
+              "id" : "PRR_kwDOCPpRxc8AAAABVn8XAg",
+              "state" : "CHANGES_REQUESTED",
+              "submittedAt" : "2026-11-03T02:01:46Z",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686#pullrequestreview-5746136834"
+            }
+          ]
+        },
+        "timelineItems" : {
+          "nodes" : [
+            {
+              "__typename" : "PullRequestCommit",
+              "commit" : {
+                "abbreviatedOid" : "ad2662d",
+                "author" : {
+                  "user" : {
+                    "login" : "ptoffy"
+                  }
+                },
+                "committedDate" : "2026-09-28T10:00:29Z",
+                "messageHeadline" : "Add maximum connection lifetime timer"
+              },
+              "id" : "PURC_lADOCPpRxc8AAAABFePZi9oAKGFkMjY2MmQ2NWQxOTMzMGZmM2EwNDY3N2U3YmViNGY1OGMwOWQ2NzU",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686/commits/ad2662d65d19330ff3a04677e7beb4f58c09d675"
+            },
+            {
+              "__typename" : "LabeledEvent",
+              "actor" : {
+                "login" : "ptoffy"
+              },
+              "createdAt" : "2026-09-28T10:09:08Z",
+              "id" : "LE_lADOCPpRxc8AAAABTo1n5M8AAAAHckiIXw",
+              "label" : {
+                "name" : "ConnectionPool"
+              }
+            },
+            {
+              "__typename" : "PullRequestCommit",
+              "commit" : {
+                "abbreviatedOid" : "e3af523",
+                "author" : {
+                  "user" : {
+                    "login" : "ptoffy"
+                  }
+                },
+                "committedDate" : "2026-09-28T10:27:46Z",
+                "messageHeadline" : "Fix test"
+              },
+              "id" : "PURC_lADOCPpRxc8AAAABFePZi9oAKGUzYWY1MjM5MTlkMzRlZDIzM2JmZTM5YTFmYWNmZTFiMzAyOTlmNmM",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686/commits/e3af523919d34ed233bfe39a1facfe1b30299f6c"
+            },
+            {
+              "__typename" : "PullRequestCommit",
+              "commit" : {
+                "abbreviatedOid" : "4abed78",
+                "author" : {
+                  "user" : {
+                    "login" : "ptoffy"
+                  }
+                },
+                "committedDate" : "2026-09-28T10:28:18Z",
+                "messageHeadline" : "Merge branch 'main' into max-connection-lifetime"
+              },
+              "id" : "PURC_lADOCPpRxc8AAAABFePZi9oAKDRhYmVkNzg5Yjg1ZDc4NjM5ZDJkMTc1MzMwOWEzYmZhODc1YTJkNzQ",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686/commits/4abed789b85d78639d2d1753309a3bfa875a2d74"
+            },
+            {
+              "__typename" : "IssueComment",
+              "author" : {
+                "login" : "codecov"
+              },
+              "createdAt" : "2026-09-28T10:39:26Z",
+              "id" : "IC_kwDOCPpRxc8AAAABXca-WQ",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686#issuecomment-5868273241"
+            },
+            {
+              "__typename" : "PullRequestCommit",
+              "commit" : {
+                "abbreviatedOid" : "8637685",
+                "author" : {
+                  "user" : {
+                    "login" : "ptoffy"
+                  }
+                },
+                "committedDate" : "2026-09-28T14:07:18Z",
+                "messageHeadline" : "Minor nits"
+              },
+              "id" : "PURC_lADOCPpRxc8AAAABFePZi9oAKDg2Mzc2ODU2MjllY2FmMjVkMGQyMDRiN2ViMGI1MWVlNzA2MzFlOGM",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686/commits/8637685629ecaf25d0d204b7eb0b51ee70631e8c"
+            },
+            {
+              "__typename" : "PullRequestReview",
+              "author" : {
+                "login" : "adam-fowler"
+              },
+              "createdAt" : "2026-09-29T08:21:10Z",
+              "id" : "PRR_kwDOCPpRxc8AAAABPt1u1g",
+              "state" : "COMMENTED",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686#pullrequestreview-5349666518"
+            },
+            {
+              "__typename" : "PullRequestCommit",
+              "commit" : {
+                "abbreviatedOid" : "810b84d",
+                "author" : {
+                  "user" : {
+                    "login" : "0xTim"
+                  }
+                },
+                "committedDate" : "2026-10-28T10:51:01Z",
+                "messageHeadline" : "Merge branch 'main' into max-connection-lifetime"
+              },
+              "id" : "PURC_lADOCPpRxc8AAAABFePZi9oAKDgxMGI4NGQ1MzYwYmI5M2VlMGI0ZTdlNDA3YTY3NmVjYzNiNzE3MzI",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686/commits/810b84d5360bb93ee0b4e7e407a676ecc3b71732"
+            },
+            {
+              "__typename" : "PullRequestCommit",
+              "commit" : {
+                "abbreviatedOid" : "c7a541f",
+                "author" : {
+                  "user" : {
+                    "login" : "ptoffy"
+                  }
+                },
+                "committedDate" : "2026-10-29T14:44:08Z",
+                "messageHeadline" : "Add 2.5% jitter mechanism"
+              },
+              "id" : "PURC_lADOCPpRxc8AAAABFePZi9oAKGM3YTU0MWZiNzNiZGQ3ZmRjN2E3ZGUzZDI4NDgxNDFiNTRhNGQ4ZTg",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686/commits/c7a541fb73bdd7fdc7a7de3d2848141b54a4d8e8"
+            },
+            {
+              "__typename" : "ReadyForReviewEvent",
+              "actor" : {
+                "login" : "ptoffy"
+              },
+              "createdAt" : "2026-10-29T14:44:55Z",
+              "id" : "RFRE_lADOCPpRxc8AAAABTo1n5M8AAAAIDi3wPw"
+            },
+            {
+              "__typename" : "ReviewRequestedEvent",
+              "actor" : {
+                "login" : "ptoffy"
+              },
+              "createdAt" : "2026-10-29T14:44:57Z",
+              "id" : "RRE_lADOCPpRxc8AAAABTo1n5M8AAAAIDi394w",
+              "requestedReviewer" : {
+                "__typename" : "User",
+                "login" : "fabianfett"
+              }
+            },
+            {
+              "__typename" : "ReviewRequestedEvent",
+              "actor" : {
+                "login" : "ptoffy"
+              },
+              "createdAt" : "2026-10-29T14:44:57Z",
+              "id" : "RRE_lADOCPpRxc8AAAABTo1n5M8AAAAIDi4Cqg",
+              "requestedReviewer" : {
+                "__typename" : "User",
+                "login" : "gwynne"
+              }
+            },
+            {
+              "__typename" : "PullRequestCommit",
+              "commit" : {
+                "abbreviatedOid" : "0528845",
+                "author" : {
+                  "user" : {
+                    "login" : "ptoffy"
+                  }
+                },
+                "committedDate" : "2026-11-02T09:55:38Z",
+                "messageHeadline" : "Merge branch 'main' into max-connection-lifetime"
+              },
+              "id" : "PURC_lADOCPpRxc8AAAABFePZi9oAKDA1Mjg4NDUzZmU1NzBlYWEwOTk1NWQyM2JjMTM5NWMwNjczY2U0NGE",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686/commits/05288453fe570eaa09955d23bc1395c0673ce44a"
+            },
+            {
+              "__typename" : "PullRequestReview",
+              "author" : {
+                "login" : "0xTim"
+              },
+              "createdAt" : "2026-11-03T01:50:38Z",
+              "id" : "PRR_kwDOCPpRxc8AAAABVn8XAg",
+              "state" : "CHANGES_REQUESTED",
+              "url" : "https://github.com/vapor/postgres-nio/pull/686#pullrequestreview-5746136834"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

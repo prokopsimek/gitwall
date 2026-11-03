@@ -1,0 +1,127 @@
+{
+  "data" : {
+    "rateLimit" : {
+      "cost" : 1,
+      "remaining" : 4432,
+      "resetAt" : "2026-11-03T06:40:59Z"
+    },
+    "repository" : {
+      "issueOrPullRequest" : {
+        "__typename" : "Issue",
+        "body" : "### Describe the issue\r\n\r\nUnable to send multiple SQL commands in one `simpleQuery`.\r\n\r\n### Vapor version\r\n\r\n1.21.5\r\n\r\n### Operating system and version\r\n\r\nmacOS 15\r\n\r\n### Swift version\r\n\r\nswift-driver version: 1.109.2 Apple Swift version 6.0 (swiftlang-6.0.0.3.300 clang-1600.0.20.10) Target: arm64-apple-macosx15.0\r\n\r\n### Steps to reproduce\r\n\r\n```swift\r\nlet db: PostgresDatabase = ...\r\n_ = try await db.simpleQuery(\"\"\"\r\nSELECT current_setting('application_name');\r\nSELECT current_setting('something_else');\r\n\"\"\").get()\r\n```\r\n\r\n### Outcome\r\n\r\n```\r\nserver: cannot insert multiple commands into a prepared statement (exec_parse_message)\r\n```\r\n\r\n### Additional notes\r\n\r\nPostgres documentation mentions that multiple SQL commands in one simple query is allowed:\r\n\r\n> [A simple query cycle is initiated by the frontend sending a Query message to the backend. The message includes an SQL command (or commands) expressed as a text string.](https://arc.net/l/quote/sxdzhjri)",
+        "closedByPullRequestsReferences" : {
+          "nodes" : [
+            {
+              "number" : 505,
+              "repository" : {
+                "nameWithOwner" : "vapor/postgres-nio"
+              },
+              "state" : "OPEN",
+              "title" : "Implement Basic `SimpleQuery` Handling ",
+              "url" : "https://github.com/vapor/postgres-nio/pull/505"
+            }
+          ]
+        },
+        "comments" : {
+          "nodes" : [
+            {
+              "author" : {
+                "__typename" : "User",
+                "avatarUrl" : "https://avatars.githubusercontent.com/u/1783465?u=1e2e129d0fcbd125c9928c10b8946edc043b3a6a&v=4",
+                "login" : "vzsg"
+              },
+              "body" : "I think the `simpleQuery` method is named as such in a casual manner: it's \"simple\" simply because a String goes in and rows come out. That's unrelated to the wire message the doc page is about, and is actually implemented as a prepared statement behind the scenes...",
+              "createdAt" : "2024-08-15T13:22:05Z",
+              "id" : "IC_kwDOCPpRxc6IkdqZ",
+              "url" : "https://github.com/vapor/postgres-nio/issues/499#issuecomment-2291260057"
+            },
+            {
+              "author" : {
+                "__typename" : "User",
+                "avatarUrl" : "https://avatars.githubusercontent.com/u/54685446?u=057fdc1568cdd39937361df61297577766000f12&v=4",
+                "login" : "MahdiBM"
+              },
+              "body" : "That's what I figured ...\nLooks to me, too big of a coincidence that they have the same name, but I guess the best solution right now is to just add a new function supporting the definition in Postgres' wire protocol.",
+              "createdAt" : "2024-08-15T14:59:35Z",
+              "id" : "IC_kwDOCPpRxc6IlRfR",
+              "url" : "https://github.com/vapor/postgres-nio/issues/499#issuecomment-2291472337"
+            },
+            {
+              "author" : {
+                "__typename" : "User",
+                "avatarUrl" : "https://avatars.githubusercontent.com/u/54685446?u=057fdc1568cdd39937361df61297577766000f12&v=4",
+                "login" : "MahdiBM"
+              },
+              "body" : "Or it's possible we can just change the implementation of the current function without any breaking behavior changes.",
+              "createdAt" : "2024-08-15T15:03:01Z",
+              "id" : "IC_kwDOCPpRxc6IlTEE",
+              "url" : "https://github.com/vapor/postgres-nio/issues/499#issuecomment-2291478788"
+            },
+            {
+              "author" : {
+                "__typename" : "User",
+                "avatarUrl" : "https://avatars.githubusercontent.com/u/6780861?u=7fd713210074f562a400e4c7815baa31b1b3e0e0&v=4",
+                "login" : "fabianfett"
+              },
+              "body" : "`simpleQuery` used to allow multiple commands, before the big internals rewrite, that landed in `1.5.0`. `simpleQuery` are not so simple if you think about them more.\r\n\r\n`simpleQuery`s can have multiple selects in a single statement. How do you want to hand the rows to the user now? It would need to be an AsyncSequence of AsyncSequence of Rows... But you can only iterate the outer AsyncSequence if you have emptied the inner AsyncSequence and so forth and so forth.\r\n\r\n@MahdiBM Do you want to drive an API design for this? Once we have an API design, we can look into implementing the Simple Statement flow and fix this API short-comming.\r\n\r\nAlternative for now: Deprecate `simpleQuery`. Wdyt?\r\n\r\ncc @gwynne ",
+              "createdAt" : "2024-08-21T12:53:18Z",
+              "id" : "IC_kwDOCPpRxc6JNXnj",
+              "url" : "https://github.com/vapor/postgres-nio/issues/499#issuecomment-2301983203"
+            }
+          ]
+        },
+        "timelineItems" : {
+          "nodes" : [
+            {
+              "__typename" : "LabeledEvent",
+              "actor" : {
+                "login" : "MahdiBM"
+              },
+              "createdAt" : "2024-08-15T12:38:58Z",
+              "id" : "LE_lADOCPpRxc6TGkXrzwAAAAM8Oa91",
+              "label" : {
+                "name" : "bug"
+              }
+            },
+            {
+              "__typename" : "IssueComment",
+              "author" : {
+                "login" : "vzsg"
+              },
+              "createdAt" : "2024-08-15T13:22:05Z",
+              "id" : "IC_kwDOCPpRxc6IkdqZ",
+              "url" : "https://github.com/vapor/postgres-nio/issues/499#issuecomment-2291260057"
+            },
+            {
+              "__typename" : "IssueComment",
+              "author" : {
+                "login" : "MahdiBM"
+              },
+              "createdAt" : "2024-08-15T14:59:35Z",
+              "id" : "IC_kwDOCPpRxc6IlRfR",
+              "url" : "https://github.com/vapor/postgres-nio/issues/499#issuecomment-2291472337"
+            },
+            {
+              "__typename" : "IssueComment",
+              "author" : {
+                "login" : "MahdiBM"
+              },
+              "createdAt" : "2024-08-15T15:03:01Z",
+              "id" : "IC_kwDOCPpRxc6IlTEE",
+              "url" : "https://github.com/vapor/postgres-nio/issues/499#issuecomment-2291478788"
+            },
+            {
+              "__typename" : "IssueComment",
+              "author" : {
+                "login" : "fabianfett"
+              },
+              "createdAt" : "2024-08-21T12:53:18Z",
+              "id" : "IC_kwDOCPpRxc6JNXnj",
+              "url" : "https://github.com/vapor/postgres-nio/issues/499#issuecomment-2301983203"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
