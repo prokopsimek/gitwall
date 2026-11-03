@@ -178,8 +178,16 @@ struct MainWindowView: View {
     private var statusBar: some View {
         HStack(spacing: 10) {
             if let preset = environment.selectedPreset {
-                Text("\(environment.count(for: preset)) items")
-                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                // While a search narrows the list, how many of the preset's items it shows.
+                let count = environment.count(for: preset)
+                Group {
+                    if ItemSearch.isActive(query) {
+                        Text("\(visibleItems.count) of ^[\(count) item](inflect: true)")
+                    } else {
+                        Text("^[\(count) item](inflect: true)")
+                    }
+                }
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             if let fetchedAt = environment.snapshot?.fetchedAt {
                 Text("Synced \(fetchedAt, style: .relative) ago")
