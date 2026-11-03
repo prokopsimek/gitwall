@@ -194,7 +194,7 @@ public enum PresetTransfer {
         return .success(presets)
     }
 
-    private static func preset(from entry: JSONValue, iconExists: (String) -> Bool) -> Result<Preset, PresetProblem> {
+    static func preset(from entry: JSONValue, iconExists: (String) -> Bool) -> Result<Preset, PresetProblem> {
         guard case .object(let fields) = entry else { return .failure(.notAnObject) }
         let unknown = Set(fields.keys).subtracting(Key.allCases.map(\.rawValue))
         guard unknown.isEmpty else { return .failure(.unknownKeys(unknown.sorted())) }
@@ -257,7 +257,7 @@ public enum PresetTransfer {
     }
 
     /// The name for the error message, when the preset has one worth showing.
-    private static func usableName(of entry: JSONValue) -> String? {
+    static func usableName(of entry: JSONValue) -> String? {
         guard case .object(let fields) = entry, case .string(let name)? = fields[Key.name.rawValue], !isBlank(name) else {
             return nil
         }
@@ -270,7 +270,7 @@ public enum PresetTransfer {
         return ItemFilter(query: query)
     }
 
-    private static func isBlank(_ text: String) -> Bool {
+    static func isBlank(_ text: String) -> Bool {
         text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -281,16 +281,7 @@ public enum PresetTransfer {
     public static func encode(_ presets: [Preset]) -> String {
         let file = File(
             version: version,
-            presets: presets.map { preset in
-                Entry(
-                    id: preset.id,
-                    name: preset.name,
-                    query: preset.filter.query ?? "",
-                    icon: preset.icon,
-                    sort: preset.sort,
-                    kinds: ItemKind.allCases.filter(preset.kinds.contains)
-                )
-            }
+            presets: presets.map(Entry.init)
         )
         guard let data = try? SnapshotCoding.encode(file) else {
             preconditionFailure("Presets of strings and UUIDs could not be encoded")
@@ -303,13 +294,23 @@ public enum PresetTransfer {
         let presets: [Entry]
     }
 
-    private struct Entry: Encodable {
+    /// One preset as the file writes it; also the presets of a Gitwall file (``GitwallFile``).
+    struct Entry: Encodable {
         let id: UUID
         let name: String
         let query: String
         let icon: String
         let sort: SortOrder
         let kinds: [ItemKind]
+
+        init(_ preset: Preset) {
+            id = preset.id
+            name = preset.name
+            query = preset.filter.query ?? ""
+            icon = preset.icon
+            sort = preset.sort
+            kinds = ItemKind.allCases.filter(preset.kinds.contains)
+        }
     }
 
     /// What ``encode(_:)`` leaves out of `presets` that changes which items they show, or nil when nothing. Notifications
@@ -383,7 +384,7 @@ public enum PresetTransfer {
 
 /// Any JSON value, so the paste can name unknown keys and wrong types itself instead of passing on a
 /// `DecodingError`.
-private enum JSONValue: Decodable, Equatable {
+enum JSONValue: Decodable, Equatable {
     case object([String: JSONValue])
     case array([JSONValue])
     case string(String)
