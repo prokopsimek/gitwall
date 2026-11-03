@@ -323,6 +323,22 @@ struct GitwallFileTests {
         #expect(warning.contains("2 tiles"))
     }
 
+    @Test("the confirmation explains what happens to replaced presets and walls only when the paste replaces some")
+    func notes() {
+        func merge(presetsReplaced: Int, wallsReplaced: Int) -> GitwallFileMerge {
+            GitwallFileMerge(
+                presets: PresetMerge(presets: [], added: 16, replaced: presetsReplaced, unchanged: 3),
+                walls: [], wallsAdded: 3, wallsReplaced: wallsReplaced, wallsUnchanged: 1
+            )
+        }
+        #expect(merge(presetsReplaced: 0, wallsReplaced: 0).notes == [.nothingIsDeleted])
+        #expect(merge(presetsReplaced: 6, wallsReplaced: 0).notes == [.replacedPresetsKeepLocalSettings, .nothingIsDeleted])
+        #expect(merge(presetsReplaced: 0, wallsReplaced: 1).notes == [.replacedWallsTakePastedContent, .nothingIsDeleted])
+        #expect(merge(presetsReplaced: 2, wallsReplaced: 2).notes == [
+            .replacedPresetsKeepLocalSettings, .replacedWallsTakePastedContent, .nothingIsDeleted,
+        ])
+    }
+
     @Test("the summary counts walls first, then presets, in the plural where needed")
     func summary() {
         let presets = PresetMerge(presets: [], added: 0, replaced: 10, unchanged: 0)

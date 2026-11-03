@@ -22,13 +22,25 @@ enum ConfigurationPaste {
             }
             let alert = NSAlert()
             alert.messageText = "Paste configuration?"
-            alert.informativeText = "\(preview.summary). A replaced preset keeps its accounts and repositories, notifications and menu bar count; its other filters give way to the pasted query. A replaced wall takes the pasted name and tiles. Nothing is deleted."
+            alert.informativeText = (["\(preview.summary)."] + preview.notes.map(text(for:))).joined(separator: " ")
             alert.addButton(withTitle: "Paste")
             alert.addButton(withTitle: "Cancel")
             NSApp.activate()
             guard alert.runModal() == .alertFirstButtonReturn else { return nil }
             environment.pasteConfiguration(file)
             return file
+        }
+    }
+
+    /// The rules the confirmation states, only those that apply to the paste (`GitwallFileMerge.notes`).
+    private static func text(for note: PasteNote) -> String {
+        switch note {
+        case .replacedPresetsKeepLocalSettings:
+            String(localized: "A replaced preset keeps its accounts and repositories, notifications and menu bar count; its other filters give way to the pasted query.")
+        case .replacedWallsTakePastedContent:
+            String(localized: "A replaced wall takes the pasted name and tiles.")
+        case .nothingIsDeleted:
+            String(localized: "Nothing is deleted.")
         }
     }
 

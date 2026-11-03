@@ -166,6 +166,27 @@ public struct GitwallFileMerge: Equatable, Sendable {
         if unchanged > 0 { parts.append("\(unchanged) unchanged") }
         return parts.joined(separator: ", ")
     }
+
+    /// What the confirmation explains after the counts: what happens to a replaced preset or wall, only when the paste
+    /// replaces one, and always that nothing is deleted.
+    public var notes: [PasteNote] {
+        var notes: [PasteNote] = []
+        if presets.replaced > 0 { notes.append(.replacedPresetsKeepLocalSettings) }
+        if replacesWalls { notes.append(.replacedWallsTakePastedContent) }
+        notes.append(.nothingIsDeleted)
+        return notes
+    }
+}
+
+/// A rule of pasting that the confirmation states (``GitwallFileMerge/notes``). The app words them.
+public enum PasteNote: Equatable, Sendable {
+    /// A replaced preset keeps its accounts and repositories, notifications and menu bar count; its other filters give
+    /// way to the pasted query (`docs/adr/0013`).
+    case replacedPresetsKeepLocalSettings
+    /// A replaced wall takes the pasted name and tiles (`docs/adr/0014`).
+    case replacedWallsTakePastedContent
+    /// A paste never deletes a preset or a wall.
+    case nothingIsDeleted
 }
 
 /// Presets and walls in one portable JSON file, so a whole setup pastes in one step. Version 2 of the preset file
