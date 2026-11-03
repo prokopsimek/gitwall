@@ -48,6 +48,8 @@ final class MainMenuController: NSObject {
         sidebar.keyEquivalentModifierMask = [.command, .control]
         main.addItem(submenu(view, title: "View"))
 
+        main.addItem(submenu(ItemMenu.build(), title: "Item"))
+
         // Window menu
         let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")

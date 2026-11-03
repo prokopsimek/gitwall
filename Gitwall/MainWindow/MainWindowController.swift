@@ -8,16 +8,15 @@ final class MainWindowState {
     var showingWidgetHelp = false
 }
 
-/// The main window: presets in a sidebar, items on the right. Opened from the Dock, the Window menu,
-/// the status item menu and `gitwall://view` deep links. Closing it keeps the app running.
+/// The main window: presets in a sidebar, items in the middle, Detail of the selected item on the right. Opened from
+/// the Dock, the Window menu, the status item menu and `gitwall://view` deep links. Closing it keeps the app running.
 @MainActor
-final class MainWindowController: NSWindowController {
-    private let environment: AppEnvironment
+final class MainWindowController: ItemWindowController {
     let state = MainWindowState()
 
     init(environment: AppEnvironment) {
-        self.environment = environment
-        let hosting = NSHostingController(rootView: MainWindowView(environment: environment, state: state))
+        let detail = DetailModel(environment: environment)
+        let hosting = NSHostingController(rootView: MainWindowView(environment: environment, state: state, detail: detail))
         let window = NSWindow(contentViewController: hosting)
         window.title = "Gitwall"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
@@ -29,11 +28,16 @@ final class MainWindowController: NSWindowController {
         window.setContentSize(NSSize(width: 980, height: 640))
         window.center()
         window.setFrameAutosaveName("GitwallMain")
-        super.init(window: window)
+        super.init(window: window, environment: environment, detail: detail)
+        #if DEBUG
+        // `--debug-detail owner/repo#123` opens Detail of that item, for screenshots without clicking.
+        let args = CommandLine.arguments
+        if let index = args.firstIndex(of: "--debug-detail"), args.indices.contains(index + 1),
+           let item = environment.snapshot?.items.first(where: { "\($0.repoFullName)#\($0.number)" == args[index + 1] }) {
+            detail.show(item.id)
+        }
+        #endif
     }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     func show(presetID: UUID?) {
         if let presetID, environment.config.preset(id: presetID) != nil {

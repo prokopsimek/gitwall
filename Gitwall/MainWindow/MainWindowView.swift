@@ -5,6 +5,7 @@ import SwiftUI
 struct MainWindowView: View {
     @Bindable var environment: AppEnvironment
     @Bindable var state: MainWindowState
+    let detail: DetailModel
     @State private var query = ""
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
@@ -13,7 +14,8 @@ struct MainWindowView: View {
             sidebar
                 .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
         } detail: {
-            detail
+            itemColumn
+                .itemDetailInspector(detail, environment: environment, preset: environment.selectedPreset)
         }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $state.showingWidgetHelp) {
@@ -65,9 +67,9 @@ struct MainWindowView: View {
         }
     }
 
-    // MARK: Detail
+    // MARK: Items
 
-    private var detail: some View {
+    private var itemColumn: some View {
         VStack(spacing: 0) {
             header
             Divider()
@@ -119,6 +121,13 @@ struct MainWindowView: View {
                 Image(systemName: "gearshape")
             }
             .help("Settings (⌘,)")
+            Button {
+                detail.toggle()
+            } label: {
+                Image(systemName: "sidebar.trailing")
+            }
+            .help(detail.isPresented ? "Hide Detail (⌥⌘I)" : "Show Detail (⌥⌘I)")
+            .accessibilityIdentifier("toggle-detail")
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 16)
@@ -134,7 +143,7 @@ struct MainWindowView: View {
                 EmptyStateView(title: "No matches", symbol: "magnifyingglass",
                                message: "Nothing in “\(environment.selectedPreset?.name ?? "")” matches “\(query)”.")
             } else {
-                ItemListView(items: visible, environment: environment, style: .regular)
+                ItemListView(items: visible, environment: environment, style: .regular, detail: detail)
             }
         case .empty(let kind):
             EmptyStateView(kind: kind, environment: environment)

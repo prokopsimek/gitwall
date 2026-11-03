@@ -9,10 +9,14 @@ public struct DetailView: View {
     let actions: DetailActions
     @State private var expanded: Set<DetailFold>
     @State private var showsWholeLatestWord = false
+    private let scrollsToExpanded: Bool
 
-    public init(content: DetailContent, actions: DetailActions, initiallyExpanded: Set<DetailFold> = []) {
+    /// `initiallyExpanded` opens folds from the start; `scrollsToExpanded` scrolls to the first of them, so a
+    /// screenshot can show one without scrolling by hand.
+    public init(content: DetailContent, actions: DetailActions, initiallyExpanded: Set<DetailFold> = [], scrollsToExpanded: Bool = false) {
         self.content = content
         self.actions = actions
+        self.scrollsToExpanded = scrollsToExpanded
         _expanded = State(initialValue: initiallyExpanded)
     }
 
@@ -39,6 +43,11 @@ public struct DetailView: View {
             .onChange(of: item.id) {
                 showsWholeLatestWord = false
                 proxy.scrollTo("top", anchor: .top)
+            }
+            .task(id: item.id) {
+                guard scrollsToExpanded, let first = DetailFold.allCases.first(where: expanded.contains) else { return }
+                try? await Task.sleep(for: .seconds(1))
+                proxy.scrollTo(first, anchor: .top)
             }
         }
         .environment(\.openURL, OpenURLAction { url in
@@ -225,11 +234,13 @@ public struct DetailView: View {
             } label: {
                 foldLabel("Description")
             }
+            .id(DetailFold.description)
             DisclosureGroup(isExpanded: binding(.conversation)) {
                 DetailConversation(content: content, actions: actions).padding(.top, 6)
             } label: {
                 foldLabel("Conversation", count: item.commentCount)
             }
+            .id(DetailFold.conversation)
             if isPullRequest {
                 DisclosureGroup(isExpanded: binding(.files)) {
                     remotePart(content.detail?.files, what: "the files") { files in
@@ -239,6 +250,7 @@ public struct DetailView: View {
                 } label: {
                     foldLabel("Files", count: (try? content.detail?.files.get())?.totalCount)
                 }
+                .id(DetailFold.files)
             }
             DisclosureGroup(isExpanded: binding(.linked)) {
                 remotePart(content.detail?.linkedItems, what: "the linked items") { linked in
@@ -248,11 +260,13 @@ public struct DetailView: View {
             } label: {
                 foldLabel("Linked", count: (try? content.detail?.linkedItems.get())?.count)
             }
+            .id(DetailFold.linked)
             DisclosureGroup(isExpanded: binding(.metadata)) {
                 DetailMetadata(item: item).padding(.top, 6)
             } label: {
                 foldLabel("Labels, assignees, milestone")
             }
+            .id(DetailFold.metadata)
         }
     }
 

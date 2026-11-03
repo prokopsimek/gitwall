@@ -8,16 +8,104 @@ struct ItemListView: View {
     let items: [WorkItem]
     let environment: AppEnvironment
     var style: WorkItemRow.Style = .regular
+    /// With Detail (main window): a click selects and shows Detail, a double click opens the item, ↑↓ move the
+    /// selection. Without it (popover): a click opens the item, as before.
+    var detail: DetailModel? = nil
+    @FocusState private var isFocused: Bool
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(items) { item in
-                    ItemRowButton(item: item, environment: environment, style: style)
-                    Divider().padding(.leading, 42)
+        if let detail {
+            selectableList(detail)
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(items) { item in
+                        ItemRowButton(item: item, environment: environment, style: style)
+                        Divider().padding(.leading, 42)
+                    }
                 }
             }
         }
+    }
+
+    private func selectableList(_ detail: DetailModel) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(items) { item in
+                        SelectableItemRow(item: item, environment: environment, style: style, detail: detail) {
+                            isFocused = true
+                        }
+                        .id(item.id)
+                        Divider().padding(.leading, 42)
+                    }
+                }
+            }
+            .focusable()
+            .focusEffectDisabled()
+            .focused($isFocused)
+            .onMoveCommand { direction in
+                switch direction {
+                case .up: detail.move(by: -1)
+                case .down: detail.move(by: 1)
+                default: break
+                }
+            }
+            .onChange(of: detail.selectedItemID) { _, id in
+                guard let id else { return }
+                withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(id) }
+            }
+            .onChange(of: items.map(\.id), initial: true) { _, ids in detail.visibleItemIDs = ids }
+        }
+    }
+}
+
+/// A row of the main window's list: selected on a click, opened on a double click.
+private struct SelectableItemRow: View {
+    let item: WorkItem
+    let environment: AppEnvironment
+    let style: WorkItemRow.Style
+    let detail: DetailModel
+    let onClick: () -> Void
+    @State private var hovering = false
+
+    private var isSelected: Bool { detail.selectedItemID == item.id }
+
+    var body: some View {
+        WorkItemRow(
+            item: item,
+            avatar: environment.avatar(for: item.author.avatarURL).map { Image(nsImage: $0) },
+            style: style,
+            isNew: environment.newItemIDs.contains(item.id),
+            isChanged: environment.details.hasChanged(item)
+        )
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(background)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) { environment.open(item) }
+        .simultaneousGesture(TapGesture().onEnded {
+            detail.show(item.id)
+            onClick()
+        })
+        .onHover { hovering = $0 }
+        .contextMenu {
+            Button("Show Detail") { detail.show(item.id) }
+            ItemContextMenu(item: item, environment: environment)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAction {
+            detail.show(item.id)
+            onClick()
+        }
+        .accessibilityAction(named: "Open in Browser") { environment.open(item) }
+        .accessibilityIdentifier("item-\(item.repoFullName)-\(item.number)")
+    }
+
+    private var background: Color {
+        if isSelected { return Color.accentColor.opacity(0.18) }
+        return hovering ? Color.primary.opacity(0.06) : .clear
     }
 }
 
@@ -45,18 +133,26 @@ struct ItemRowButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .contextMenu {
-            Button("Open in Browser") { environment.open(item) }
-            Button("Copy Link") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(item.url.absoluteString, forType: .string)
-            }
-            Button("Copy Title") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString("\(item.title) (\(item.repoFullName)#\(item.number))", forType: .string)
-            }
-        }
+        .contextMenu { ItemContextMenu(item: item, environment: environment) }
         .accessibilityIdentifier("item-\(item.repoFullName)-\(item.number)")
+    }
+}
+
+/// Open and copy, the same for every list.
+private struct ItemContextMenu: View {
+    let item: WorkItem
+    let environment: AppEnvironment
+
+    var body: some View {
+        Button("Open in Browser") { environment.open(item) }
+        Button("Copy Link") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(item.url.absoluteString, forType: .string)
+        }
+        Button("Copy Title") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("\(item.title) (\(item.repoFullName)#\(item.number))", forType: .string)
+        }
     }
 }
 
