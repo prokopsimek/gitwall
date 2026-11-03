@@ -418,7 +418,7 @@ saw them.
 | Keys | Does |
 |---|---|
 | ⌘2 | Open the Walls window |
-| ⌘⇧] / ⌘⇧[ or ⌃⇥ / ⌃⇧⇥ | Next / previous wall |
+| ⌘⇧] / ⌘⇧[ or ⌃⇥ / ⌃⇧⇥ | Next / previous wall; ⌃⇥ and ⌃⇧⇥ on every keyboard layout |
 | ⇥ / ⇧⇥ | Next / previous tile |
 | ↓ / ↑ | Next / previous item in the tile |
 | ↩ or Space, a click | Show Detail of the item |
@@ -432,6 +432,12 @@ saw them.
 | ⌘Z / ⇧⌘Z | Undo / redo a change to a wall |
 | ⌘+ / ⌘− / ⌘0 | Zoom in / out / actual size, remembered for the window |
 | ⌃⌘F | Full screen, on whichever display the window is. The tiles grow to fill the screen, beside Detail when it is open; ⌘+ and ⌘− zoom from there and ⌘0 (View › Fit to Screen) fits the wall again |
+
+**On other keyboard layouts** macOS adapts the shortcuts with a digit or a symbol to the keyboard, so the menus can
+show other keys than this table; press what the menu shows. On a Czech keyboard, for example, View › Zoom In shows ⌘%
+(⌘= on the same key works too), Actual Size ⌘É, Wall › Next and Previous Wall ⇧⌘) and ⇧⌘Ú, and Window › Gitwall and
+Walls ⌘+ and ⌘Ě, so ⌘+ there opens the main window instead of zooming in. 1–4 while editing are the first four keys of
+the number row, with or without Shift. ⌃⇥ and ⌃⇧⇥ switch walls whatever the layout.
 
 A double click on a tab renames it; its context menu also duplicates, copies and deletes the wall. A click on a tile's
 title opens that preset in the main window. **View › Rotate Walls** switches walls by itself every 30 seconds to
