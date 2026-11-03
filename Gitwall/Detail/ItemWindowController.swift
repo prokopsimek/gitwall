@@ -46,7 +46,8 @@ class ItemWindowController: NSWindowController, NSWindowDelegate, NSMenuItemVali
         copy(item.url.absoluteString)
     }
 
-    /// Edit › Copy (⌘C) when no text has the focus: the link, as Item › Copy Link says.
+    /// Edit › Copy (⌘C) when no text has the focus: the link, as Item › Copy Link says. In a text field the field
+    /// editor answers `copy:` first and copies the selected text; Copy Link itself has no key, so ⌘C stays Edit's.
     @objc(copy:) func copyFromEditMenu(_ sender: Any?) { copyItemLink(sender) }
 
     @objc func copyItemReference(_ sender: Any?) {
@@ -61,7 +62,7 @@ class ItemWindowController: NSWindowController, NSWindowDelegate, NSMenuItemVali
 
     @objc func copyItemCheckoutCommand(_ sender: Any?) {
         guard let item else { return }
-        copy(DetailPresentation.checkoutCommand(of: item))
+        copy(DetailPresentation.checkoutCommand(of: item, baseURL: account?.baseURL))
     }
 
     private var branchName: String? {

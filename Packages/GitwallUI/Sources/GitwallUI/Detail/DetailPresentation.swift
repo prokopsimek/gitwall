@@ -41,15 +41,14 @@ public enum DetailPresentation {
 
     /// One row per reviewer: the latest approval, change request or dismissal, which a later plain comment does not
     /// replace (as on GitHub), else a comment; then everyone still asked. The author's own comments are no review.
+    /// Logins match as ``LoginMatch`` says, and a row keeps the spelling of the person's first review.
     /// `reviews` is nil until they load, and the snapshot's reviewers stand in.
     public static func reviewers(for item: WorkItem, reviews: [DetailReview]?) -> [Reviewer] {
-        func same(_ lhs: String, _ rhs: String) -> Bool { lhs.caseInsensitiveCompare(rhs) == .orderedSame }
         var result: [Reviewer] = []
         if let reviews {
-            var order: [String] = []
-            var verdicts: [String: Reviewer.State] = [:]
-            for review in reviews.sorted(by: { $0.submittedAt < $1.submittedAt }) where !same(review.author.login, item.author.login) {
-                let login = review.author.login
+            for review in reviews.sorted(by: { $0.submittedAt < $1.submittedAt })
+            where !LoginMatch.same(review.author.login, item.author.login) {
+                let row = result.firstIndex { LoginMatch.same($0.login, review.author.login) }
                 let state: Reviewer.State
                 switch review.verdict {
                 case .pending: continue
@@ -57,17 +56,15 @@ public enum DetailPresentation {
                 case .changesRequested: state = .changesRequested
                 case .dismissed: state = .dismissed
                 case .commented:
-                    if let current = verdicts[login], current != .commented { continue }
+                    if let row, result[row].state != .commented { continue }
                     state = .commented
                 }
-                if verdicts[login] == nil { order.append(login) }
-                verdicts[login] = state
+                if let row { result[row].state = state } else { result.append(Reviewer(login: review.author.login, state: state)) }
             }
-            result = order.map { Reviewer(login: $0, state: verdicts[$0] ?? .commented) }
         } else {
             result = item.reviewers.map { Reviewer(login: $0.login, state: .reviewed) }
         }
-        for requested in item.requestedReviewers where !result.contains(where: { same($0.login, requested.login) }) {
+        for requested in item.requestedReviewers where !result.contains(where: { LoginMatch.same($0.login, requested.login) }) {
             result.append(Reviewer(login: requested.login, state: .requested))
         }
         return result
@@ -139,13 +136,60 @@ public enum DetailPresentation {
         }
     }
 
+    /// What a review without a summary was: a bare approval or change request, or only inline comments.
+    public static func silentReview(_ verdict: ReviewVerdict, inlineCommentCount: Int) -> String {
+        let inline = switch inlineCommentCount {
+        case 0: ""
+        case 1: " with 1 inline comment"
+        default: " with \(inlineCommentCount) inline comments"
+        }
+        return switch verdict {
+        case .approved: "Approved\(inline)"
+        case .changesRequested: "Requested changes\(inline)"
+        case .commented: "Reviewed\(inline)"
+        case .dismissed: "Reviewed\(inline); the review was dismissed"
+        case .pending: "Started a review\(inline)"
+        }
+    }
+
+    /// "Why it's here": the preset's line only when terms of its query matched (`Matches label:bug in “Bugs”`), then
+    /// the facts that hold whatever the preset says.
+    public struct WhyItsHere: Hashable, Sendable {
+        public var terms: [String]
+        public var presetName: String?
+        public var facts: [MatchReason]
+
+        public init(_ reasons: [MatchReason], presetName: String?) {
+            terms = reasons.compactMap { if case .queryTerm(let term) = $0 { term } else { nil } }
+            facts = reasons.filter { if case .queryTerm = $0 { false } else { true } }
+            self.presetName = presetName
+        }
+
+        public var presetLine: String? {
+            guard let presetName, !terms.isEmpty else { return nil }
+            return "Matches \(terms.joined(separator: " ")) in “\(presetName)”"
+        }
+
+        public var isEmpty: Bool { presetLine == nil && facts.isEmpty }
+    }
+
+    /// Links in someone else's text open only when they lead to a web page; `javascript:`, `file:`, app schemes and
+    /// links without a host never reach the system.
+    public static func isOpenable(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http" else { return false }
+        return !(url.host ?? "").isEmpty
+    }
+
     /// `owner/repo#123`, for Copy Reference.
     public static func reference(of item: WorkItem) -> String {
         "\(item.repoFullName)#\(item.number)"
     }
 
-    /// For Copy `gh pr checkout`; GitHub pull requests only.
-    public static func checkoutCommand(of item: WorkItem) -> String {
-        "gh pr checkout \(item.number) -R \(item.repoFullName)"
+    /// For Copy `gh pr checkout`; GitHub pull requests only. `baseURL` is the account's: on GitHub Enterprise `gh`
+    /// needs the host in front of the repository.
+    public static func checkoutCommand(of item: WorkItem, baseURL: URL?) -> String {
+        let host = baseURL?.host?.lowercased() ?? "github.com"
+        let repository = host == "github.com" ? item.repoFullName : "\(host)/\(item.repoFullName)"
+        return "gh pr checkout \(item.number) -R \(repository)"
     }
 }

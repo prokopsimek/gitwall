@@ -50,7 +50,11 @@ struct DetailSectionError: View {
             case .missingPermission:
                 Label("GitHub did not let this token read \(what). The rest of Detail works.", systemImage: "lock")
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Token setup…", action: actions.openTokenSetup).buttonStyle(.link)
+                // Try Again after the token's permissions were changed on GitHub; the token itself stays the same.
+                HStack(spacing: 12) {
+                    Button("Token setup…", action: actions.openTokenSetup).buttonStyle(.link)
+                    Button("Try Again", action: actions.retry).buttonStyle(.link)
+                }
             case .failed(let message):
                 Label("Could not load \(what): \(message)", systemImage: "exclamationmark.triangle")
                     .fixedSize(horizontal: false, vertical: true)
@@ -335,6 +339,18 @@ struct DetailPullRequestStatus: View {
 }
 
 /// Comments and reviews with a text, oldest first, as on the provider.
+/// A review without a summary: what it was instead of an empty text.
+struct DetailSilentReview: View {
+    let verdict: ReviewVerdict
+    let inlineCommentCount: Int
+
+    var body: some View {
+        Text(DetailPresentation.silentReview(verdict, inlineCommentCount: inlineCommentCount))
+            .font(.callout.italic())
+            .foregroundStyle(.secondary)
+    }
+}
+
 struct DetailConversation: View {
     let content: DetailContent
     let actions: DetailActions
@@ -344,6 +360,7 @@ struct DetailConversation: View {
         let author: String
         let verdict: ReviewVerdict?
         let body: String
+        var inlineCommentCount = 0
         let date: Date
         let url: URL?
     }
@@ -367,8 +384,9 @@ struct DetailConversation: View {
         let comments = ((try? detail.comments.get()) ?? []).map {
             Entry(id: $0.id, author: $0.author.login, verdict: nil, body: $0.body, date: $0.createdAt, url: $0.url)
         }
-        let reviews = ((try? detail.reviews.get()) ?? []).filter { $0.verdict != .pending && !$0.body.isEmpty }.map {
-            Entry(id: $0.id, author: $0.author.login, verdict: $0.verdict, body: $0.body, date: $0.submittedAt, url: $0.url)
+        let reviews = ((try? detail.reviews.get()) ?? []).filter { $0.verdict != .pending }.map {
+            Entry(id: $0.id, author: $0.author.login, verdict: $0.verdict, body: $0.body, inlineCommentCount: $0.inlineCommentCount,
+                  date: $0.submittedAt, url: $0.url)
         }
         let all = (comments + reviews).sorted { $0.date < $1.date }
         VStack(alignment: .leading, spacing: 14) {
@@ -382,7 +400,11 @@ struct DetailConversation: View {
                 VStack(alignment: .leading, spacing: 6) {
                     DetailAuthorLine(login: entry.author, verdict: entry.verdict, date: entry.date, now: content.now, url: entry.url,
                                      actions: actions)
-                    MarkdownView(entry.body).font(.callout)
+                    if let verdict = entry.verdict, entry.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        DetailSilentReview(verdict: verdict, inlineCommentCount: entry.inlineCommentCount)
+                    } else {
+                        MarkdownView(entry.body).font(.callout)
+                    }
                 }
             }
         }

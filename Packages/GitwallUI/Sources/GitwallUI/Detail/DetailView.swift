@@ -60,24 +60,19 @@ public struct DetailView: View {
 
     @ViewBuilder
     private var whyItsHere: some View {
-        let terms = content.reasons.compactMap { reason -> String? in
-            if case .queryTerm(let term) = reason { return term }
-            return nil
-        }
-        let facts = content.reasons.filter { if case .queryTerm = $0 { false } else { true } }
-        if content.presetName != nil || !content.reasons.isEmpty {
+        let why = DetailPresentation.WhyItsHere(content.reasons, presetName: content.presetName)
+        let facts = why.facts
+        if !why.isEmpty {
             DetailGroup("Why it's here") {
-                if let presetName = content.presetName {
+                if let presetName = why.presetName, why.presetLine != nil {
                     Label {
-                        if terms.isEmpty {
-                            Text("In “\(presetName)”")
-                        } else {
-                            Text("In “\(presetName)”: ") + Text(terms.joined(separator: "  ")).font(.callout.monospaced())
-                        }
+                        Text("Matches ") + Text(why.terms.joined(separator: " ")).font(.callout.monospaced())
+                            + Text(" in “\(presetName)”")
                     } icon: {
                         Image(systemName: DetailPresentation.symbol(for: .queryTerm("")))
                     }
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(why.presetLine ?? "")
                 }
                 ForEach(facts, id: \.self) { fact in
                     Label(DetailPresentation.describe(fact, pullRequestTerm: content.pullRequestTerm),
@@ -178,6 +173,9 @@ public struct DetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 DetailAuthorLine(login: utterance.author.login, verdict: utterance.verdict, date: utterance.date, now: content.now,
                                  url: utterance.url, actions: actions)
+                if let verdict = utterance.verdict, blocks.isEmpty {
+                    DetailSilentReview(verdict: verdict, inlineCommentCount: utterance.inlineCommentCount)
+                }
                 MarkdownView(blocks: shortened ? Array(blocks.prefix(4)) : blocks)
                     .font(.callout)
                 if shortened {

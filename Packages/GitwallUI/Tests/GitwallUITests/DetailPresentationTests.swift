@@ -53,6 +53,63 @@ struct DetailPresentationTests {
         ])
     }
 
+    @Test("reviewers: one row per person whatever the case of the login or a [bot] suffix")
+    func reviewersMatchLogins() {
+        let item = pull(author: "Jana", requested: ["copilot-pull-request-reviewer"])
+        let reviewers = DetailPresentation.reviewers(for: item, reviews: [
+            review("mara", .approved, minutes: -30),
+            review("Mara", .commented, minutes: -10),
+            review("jana", .commented, minutes: -8),
+            review("copilot-pull-request-reviewer[bot]", .commented, minutes: -5),
+        ])
+        #expect(reviewers == [
+            .init(login: "mara", state: .approved),
+            .init(login: "copilot-pull-request-reviewer[bot]", state: .commented),
+        ])
+    }
+
+    @Test("a review without a summary says what it was")
+    func silentReviews() {
+        #expect(DetailPresentation.silentReview(.changesRequested, inlineCommentCount: 0) == "Requested changes")
+        #expect(DetailPresentation.silentReview(.changesRequested, inlineCommentCount: 2) == "Requested changes with 2 inline comments")
+        #expect(DetailPresentation.silentReview(.approved, inlineCommentCount: 0) == "Approved")
+        #expect(DetailPresentation.silentReview(.approved, inlineCommentCount: 1) == "Approved with 1 inline comment")
+        #expect(DetailPresentation.silentReview(.commented, inlineCommentCount: 4) == "Reviewed with 4 inline comments")
+        #expect(DetailPresentation.silentReview(.commented, inlineCommentCount: 0) == "Reviewed")
+        #expect(DetailPresentation.silentReview(.dismissed, inlineCommentCount: 0) == "Reviewed; the review was dismissed")
+    }
+
+    @Test("Why it's here names the preset only with the terms that matched")
+    func whyItsHere() {
+        let matched = DetailPresentation.WhyItsHere([.queryTerm("label:needs:approval"), .assignedToMe], presetName: "Čeká na mě")
+        #expect(matched.presetLine == "Matches label:needs:approval in “Čeká na mě”")
+        #expect(matched.terms == ["label:needs:approval"])
+        #expect(matched.facts == [.assignedToMe])
+        #expect(!matched.isEmpty)
+
+        let bare = DetailPresentation.WhyItsHere([.assignedToMe], presetName: "All open")
+        #expect(bare.presetLine == nil)
+        #expect(bare.facts == [.assignedToMe])
+
+        let nothing = DetailPresentation.WhyItsHere([], presetName: "All open")
+        #expect(nothing.presetLine == nil)
+        #expect(nothing.isEmpty)
+
+        let terms = DetailPresentation.WhyItsHere([.queryTerm("is:pr"), .queryTerm("author:@me")], presetName: "Mine")
+        #expect(terms.presetLine == "Matches is:pr author:@me in “Mine”")
+    }
+
+    @Test("links open only on the web: http and https with a host")
+    func openableLinks() throws {
+        for link in ["https://github.com/acme/app/pull/7", "http://example.com/a", "HTTPS://example.com"] {
+            #expect(DetailPresentation.isOpenable(try #require(URL(string: link))), "\(link)")
+        }
+        for link in ["javascript:alert(1)", "file:///etc/passwd", "x-gitwall://open", "mailto:a@b.c", "ssh://host/repo",
+                     "https:relative", "/acme/app/issues/1", "#section"] {
+            #expect(!DetailPresentation.isOpenable(try #require(URL(string: link))), "\(link)")
+        }
+    }
+
     @Test("reviewers before the reviews load come from the snapshot")
     func reviewersFromSnapshot() {
         var item = pull(requested: ["tomas"])
@@ -99,6 +156,10 @@ struct DetailPresentationTests {
     func copies() {
         let item = pull()
         #expect(DetailPresentation.reference(of: item) == "acme/app#7")
-        #expect(DetailPresentation.checkoutCommand(of: item) == "gh pr checkout 7 -R acme/app")
+        #expect(DetailPresentation.checkoutCommand(of: item, baseURL: URL(string: "https://github.com")) == "gh pr checkout 7 -R acme/app")
+        #expect(DetailPresentation.checkoutCommand(of: item, baseURL: URL(string: "https://GitHub.com/")) == "gh pr checkout 7 -R acme/app")
+        #expect(DetailPresentation.checkoutCommand(of: item, baseURL: nil) == "gh pr checkout 7 -R acme/app")
+        #expect(DetailPresentation.checkoutCommand(of: item, baseURL: URL(string: "https://github.example.com"))
+            == "gh pr checkout 7 -R github.example.com/acme/app")
     }
 }
