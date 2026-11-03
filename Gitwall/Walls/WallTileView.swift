@@ -73,7 +73,6 @@ struct WallTileView: View {
         } notice: {
             EmptyView()
         }
-        .help("Click the title to open “\(preset.name)” in the main window")
     }
 
     private var deletedPreset: some View {
