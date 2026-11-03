@@ -199,6 +199,32 @@ struct WallsAppTests {
         #expect(!WallsCommand.isEnabled(.nextTile, in: model.state(isKeyWindow: true, isTyping: false)))
     }
 
+    @Test("full screen, zoom is relative to the fit and ⌘0 returns to it; the window keeps its own zoom")
+    func fullScreenZoom() {
+        let environment = environment()
+        environment.enterSampleData()
+        let defaults = UserDefaults(suiteName: "gitwall.tests.\(UUID().uuidString)")!
+        let model = WallsModel(environment: environment, defaults: defaults)
+        model.zoom(step: 1)
+        #expect(model.zoom == 1.25)
+
+        model.isFullScreen = true
+        #expect(model.fullScreenZoom == 1)
+        #expect(!WallsCommand.isEnabled(.actualSize, in: model.state(isKeyWindow: true, isTyping: false)), "at the fit")
+        model.zoom(step: 1)
+        model.zoom(step: 1)
+        #expect(model.fullScreenZoom == 1.5)
+        #expect(model.zoom == 1.25)
+        #expect(WallsCommand.isEnabled(.actualSize, in: model.state(isKeyWindow: true, isTyping: false)))
+        model.zoom(step: 0)
+        #expect(model.fullScreenZoom == 1)
+
+        model.zoom(step: -1)
+        model.isFullScreen = false
+        #expect(model.state(isKeyWindow: true, isTyping: false).zoom == 1.25)
+        #expect(WallsModel(environment: environment, defaults: defaults).fullScreenZoom == 0.75, "remembered")
+    }
+
     @Test("every Walls command has a menu action of its own")
     func menuActions() {
         for command in WallsCommand.allCases {

@@ -78,6 +78,9 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   Undo finds a wall by its id, so a paste that only adds walls leaves the history alone. A paste that replaces a wall
   clears it (`AppEnvironment.onWallsReplacedByPaste`): undoing an earlier edit would write the old wall over the pasted
   one.
+- Full screen the grid fills the screen beside Detail (`WallLayout.fit`). `WallsWindowController` sets
+  `WallsModel.isFullScreen` as the window enters and leaves full screen; ⌘+ and ⌘− then change `fullScreenZoom`, which
+  is relative to the fit, and the window's own `zoom` stays as it was.
 - The name typed into a tab lives in `WallsModel.renameDraft`. Switching walls commits it first, so ⌘⇧] or a click on
   another tab in the middle of a rename keeps the name.
 - Activation policy: the app is `regular` in Info.plist and drops to `accessory` when the user hides the
@@ -94,7 +97,9 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   command did not. `DetailModel` marks an item seen only
   after its detail loaded while it is still shown (`ItemDetailService.markSeen`, `persist: !usesSampleContent`;
   sample items keep their times in memory), opens only http(s) links, and clears a selection the new preset does
-  not list (`presetDidChange`). Replacing a credential or removing an account calls `details.forget(accountID:)`.
+  not list (`presetDidChange`). Navigation that leaves nothing selected (another wall, tile or preset, rotation) closes
+  Detail instead of showing "No Item Selected" (`DetailVisibility`). Replacing a credential or removing an account
+  calls `details.forget(accountID:)`.
   See `docs/adr/0015`.
 
 ## Debug launch arguments (Debug builds only)

@@ -212,13 +212,14 @@ private struct WallTab: View {
 }
 
 /// The tiles of one wall on a grid of cells about the size of a small widget. Zoom scales the whole grid, so a wall
-/// on a large monitor reads from across the room with fewer, larger tiles.
+/// on a large monitor reads from across the room with fewer, larger tiles. Full screen, the grid is scaled to fill
+/// the screen beside Detail (`WallLayout.fit`).
 private struct WallGrid: View {
     let model: WallsModel
     let wall: Wall
 
-    private static let cellHeight = 170.0
-    private static let spacing = 16.0
+    private static let cellHeight = WallLayout.cellHeight
+    private static let spacing = WallLayout.spacing
     private static let margin = 20.0
 
     private struct Placed: Identifiable {
@@ -229,13 +230,18 @@ private struct WallGrid: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let zoom = model.zoom
-            let width = max(proxy.size.width - 2 * Self.margin, 200) / zoom
-            let columns = WallLayout.columns(forWidth: width)
+            let area = (width: max(proxy.size.width - 2 * Self.margin, 200), height: max(proxy.size.height - 2 * Self.margin, 100))
+            let sizes = wall.tiles.map(\.size)
+            let layout = model.isFullScreen
+                ? WallLayout.fit(sizes, width: area.width, height: area.height, zoom: model.fullScreenZoom)
+                : WallFit(scale: model.zoom, columns: WallLayout.columns(forWidth: area.width / model.zoom))
+            let zoom = layout.scale
+            let width = area.width / zoom
+            let columns = layout.columns
             let cellWidth = (width - Double(columns - 1) * Self.spacing) / Double(columns)
-            let rects = WallLayout.pack(wall.tiles.map(\.size), columns: columns)
+            let rects = WallLayout.pack(sizes, columns: columns)
             let rows = WallLayout.rowCount(rects)
-            let height = Double(rows) * Self.cellHeight + Double(max(rows - 1, 0)) * Self.spacing
+            let height = WallLayout.span(rows, cell: Self.cellHeight)
             let placed = zip(wall.tiles, rects).map { Placed(tile: $0, rect: $1) }
 
             ScrollView(.vertical) {
@@ -243,8 +249,8 @@ private struct WallGrid: View {
                     ForEach(placed) { placed in
                         WallTileView(model: model, tile: placed.tile)
                             .frame(
-                                width: span(placed.rect.width, cell: cellWidth),
-                                height: span(placed.rect.height, cell: Self.cellHeight)
+                                width: WallLayout.span(placed.rect.width, cell: cellWidth),
+                                height: WallLayout.span(placed.rect.height, cell: Self.cellHeight)
                             )
                             .offset(
                                 x: Double(placed.rect.column) * (cellWidth + Self.spacing),
@@ -265,10 +271,6 @@ private struct WallGrid: View {
                 }
             }
         }
-    }
-
-    private func span(_ cells: Int, cell: Double) -> Double {
-        Double(cells) * cell + Double(cells - 1) * Self.spacing
     }
 }
 

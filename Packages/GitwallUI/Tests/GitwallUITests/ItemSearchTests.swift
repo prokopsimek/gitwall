@@ -18,6 +18,14 @@ struct ItemSearchTests {
         #expect(ItemSearch.filter(items, query: "   ").count == 2)
     }
 
+    @Test("a search is active while the query has a word, which is when the status bar counts what it leaves")
+    func isActive() {
+        #expect(!ItemSearch.isActive(""))
+        #expect(!ItemSearch.isActive("  \t "))
+        #expect(ItemSearch.isActive("cart"))
+        #expect(ItemSearch.isActive(" #7 "))
+    }
+
     @Test("matches title, repository, number and author case-insensitively")
     func matches() {
         let items = [

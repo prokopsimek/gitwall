@@ -64,7 +64,11 @@ final class DetailModel {
 
     // MARK: Selection
 
+    /// The list moved the selection: arrows, another tile, wall or preset. Navigation that leaves nothing selected
+    /// closes Detail (`DetailVisibility`).
     func select(_ itemID: String?) {
+        let presented = DetailVisibility.isPresented(isPresented, afterNavigatingTo: itemID)
+        if presented != isPresented { isPresented = presented }
         guard itemID != selectedItemID else { return }
         selectedItemID = itemID
         scheduleOpen()

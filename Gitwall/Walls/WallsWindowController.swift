@@ -104,6 +104,13 @@ final class WallsWindowController: ItemWindowController {
         model.showWall(offset: 1)
     }
 
+    // MARK: Full screen
+
+    /// Full screen, the wall fills the screen and ⌘+ and ⌘− zoom relative to that fit; the window keeps its own zoom.
+    @objc func windowWillEnterFullScreen(_ notification: Notification) { model.isFullScreen = true }
+
+    @objc func windowWillExitFullScreen(_ notification: Notification) { model.isFullScreen = false }
+
     // MARK: Item menu
 
     /// ⌥⌘I with nothing selected starts at the first item, so the wall and Detail show the same one.
@@ -124,6 +131,7 @@ final class WallsWindowController: ItemWindowController {
         case .setTileSize: item.state = model.selectedTile?.size.number == item.tag ? .on : .off
         case .toggleRotation: item.state = model.rotates ? .on : .off
         case .setRotationInterval: item.state = Int(model.rotation.interval) == item.tag ? .on : .off
+        case .actualSize: item.title = model.isFullScreen ? "Fit to Screen" : "Actual Size"
         default: break
         }
         return WallsCommand.isEnabled(command, in: currentState)
@@ -135,6 +143,7 @@ final class WallsWindowController: ItemWindowController {
         window?.setContentSize(NSSize(width: 1280, height: 800))
         window?.center()
         model.zoom = 1
+        model.fullScreenZoom = 1
         switch mode {
         case "edit":
             model.isEditing = true

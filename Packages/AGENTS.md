@@ -9,12 +9,12 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 
 | Package | Owns |
 |---|---|
-| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`, `PresetTransfer` (preset JSON for copy and paste), `Wall`/`Tile`/`TileSize`, `WallLayout`, `GitwallFile` (presets and walls as one JSON file), `SyncStatus`, `FilterCache`, `WallsCommand`/`WallsKeys` (what the Walls window's menus and keys do, and when). |
+| `GitwallCore` | Models (`WorkItem`, `Account`, `Preset`, `Snapshot`), `GitProvider` protocol, `FilterEngine`, `SyncEngine`, snapshot/config stores, `SnapshotDiff`, `DeepLink`, `OnboardingStep`, `DemoData`, `PresetTransfer` (preset JSON for copy and paste), `Wall`/`Tile`/`TileSize`, `WallLayout` (with the full-screen `fit`), `GitwallFile` (presets and walls as one JSON file), `SyncStatus`, `FilterCache`, `WallsCommand`/`WallsKeys` (what the Walls window's menus and keys do, and when). |
 | `GitwallUI` | Row views, status icons, time formatting shared by popover, window and widget; `TileView`, the tile drawn by both the widgets and the Walls window. |
 | `GitwallAuth` | Keychain `TokenStore`, `StoredToken`, OAuth flows (`GitHubDeviceFlow`, `GitLabPKCEFlow`), `PKCE`, `TokenRefresher`, `RefreshingTokenReader`, token expiry parsing, `OAuthClients` (public client IDs). |
 | `GitwallGitHub` | `GitHubProvider`: GraphQL for lists, REST for identity and discovery, Link pagination. |
 | `GitwallGitLab` | `GitLabProvider`: one GraphQL request per project or group (complexity limit), REST discovery. Sends the token as a bearer credential, which covers both personal access tokens and OAuth. |
-| `GitwallCore` · Detail | `ItemDetail`, `DetailFetcher` (on-demand fetch, shared while in flight), `DetailCache` (the one cache, kept by the app), `NextStep`, `LatestWord`, `WhatsNew`, `SeenStore` (`seen.json`), `FilterEngine.explain` (`MatchReason`). |
+| `GitwallCore` · Detail | `ItemDetail`, `DetailFetcher` (on-demand fetch, shared while in flight), `DetailCache` (the one cache, kept by the app), `NextStep`, `LatestWord`, `WhatsNew`, `SeenStore` (`seen.json`), `FilterEngine.explain` (`MatchReason`), `DetailVisibility` (navigation that leaves nothing selected closes Detail). |
 | `GitwallUI` · Detail | `DetailView` and its wording (`DetailPresentation`), `MarkdownView` and the native Markdown parser (`MarkdownBlock`). |
 | `GitwallGitHub` · Detail | Item detail in two read-only GraphQL queries (`GraphQL+ItemDetail.swift`, `GitHubProvider+ItemDetail.swift`). |
 
