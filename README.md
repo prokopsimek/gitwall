@@ -107,6 +107,37 @@ the preset you pick for it.
 
 ![Menu bar popover](docs/screenshots/07-menubar.jpg)
 
+**Detail next to the list.** Click an item in the main window and Detail opens on the right, with what a decision
+needs on the first screen:
+
+- **Why it's here**: the preset, the terms of its query the item matched, and facts such as *Review requested from
+  you*, *Checks are failing* or *Merge conflict*.
+- **Next step**, one button with the exact link: *Review changes* opens the Files tab, *Reply to …* the comment
+  itself, *Open failing check* that check's log, *Ready to merge* the pull request.
+- **Latest word** of the other side, or *You replied last · 2h ago* when it is your turn to wait.
+- **Status** of a pull request: reviewers and their verdicts, failing checks by name (the passed ones folded as
+  *12 passed*), conflicts, size and the branch with a copy button.
+- **What's new** since you last opened it here, with what arrives while you look marked as it comes in. The list
+  marks items that changed since you opened them.
+
+The description (Markdown, `<details>` folded), the conversation, the files and linked items are folded below.
+Detail only reads: there is no approve or merge button, every action opens the item on GitHub. It asks GitHub for one
+item when you open it, so the sync costs nothing more; see
+[ADR 0015](docs/adr/0015-detail-is-read-only-and-fetched-on-demand.md). GitLab items show what the last sync knows and
+a link, for now. The menu bar popover and the widgets still open the browser.
+
+| Keys | In the main window |
+|---|---|
+| Click, ↑ ↓ | Select an item; Detail follows after a short pause |
+| Space or ↩ | Show Detail |
+| Esc | Close Detail |
+| ⌥⌘I | Show or hide the Detail panel |
+| Double-click, ⌘↩ | Open on GitHub or GitLab |
+| ⌘C | Copy the link |
+| ⇧⌘C | Copy the reference, `owner/repo#123` |
+| ⌥⌘C | Copy the branch name of a pull request |
+| Item › Copy “gh pr checkout” Command | `gh pr checkout 123 -R owner/repo`, for GitHub pull requests |
+
 And also:
 
 - Sign in with GitHub or GitLab in one click, or paste a personal access token. OAuth tokens refresh in the
@@ -168,9 +199,9 @@ empty. Add Account notices when you are already connected and offers to replace 
 
    | Permission | Gitwall uses it for |
    |---|---|
-   | Pull requests | pull requests, reviews and review requests |
-   | Issues | issues, labels, assignees and milestones |
-   | Commit statuses | the CI state of pull requests |
+   | Pull requests | pull requests, reviews and review requests; in Detail also comments, files and the timeline |
+   | Issues | issues, labels, assignees and milestones; in Detail also comments and the timeline of issues |
+   | Commit statuses | the CI state of pull requests, and in Detail the checks by name |
    | Contents | the CI state as well: without it GitHub hides the commit that carries the state |
    | Metadata | required by GitHub, added automatically |
 
@@ -221,6 +252,15 @@ open project, with the options `P0`–`P3`; `P1 - high` counts too, `High` does 
 
 Without it, Gitwall keeps working with label priorities and says so under the account in Settings › Accounts. The
 lookup is one extra request per 100 items and costs about one point of GitHub's hourly rate limit.
+
+#### GitHub and Detail
+
+Detail reads the same things the lists do, in more depth, and asks for no new scope or permission. A classic token
+or a sign-in with `repo` reads all of it. With a fine-grained token, *Pull requests* and *Issues* cover the
+description, comments, reviews, timeline and files; the checks by name come from *Commit statuses* and *Contents*.
+Fine-grained tokens cannot get GitHub's *Checks* permission, and whether GitHub then lists check runs such as GitHub
+Actions jobs by name for such a token has not been checked yet. When it does not, Detail says that the token may not
+read the checks, links here, and shows everything else.
 
 #### GitLab fine-grained token
 
@@ -388,6 +428,7 @@ same `FilterEngine` the app uses, so both always agree.
 | `--debug-demo` | Fictional accounts and items, no network; add `--debug-demo-widgets` to see all widget sizes |
 | `--debug-onboarding-step <step>` | Jump straight to one walkthrough screen |
 | `--debug-github-token <pat> --debug-repos a/b` | Create a GitHub account without clicking |
+| `--debug-detail owner/repo#123` | Open Detail of that item in the main window; add `--debug-detail-expand description,conversation` to unfold sections |
 
 ```sh
 build/DerivedData/Build/Products/Debug/Gitwall.app/Contents/MacOS/Gitwall --debug-fresh
@@ -404,6 +445,8 @@ GITWALL_GITHUB_TOKEN=github_pat_… GITWALL_GITHUB_REPO=owner/private-repo \
 GITWALL_GITLAB_TOKEN=glpat-… GITWALL_GITLAB_URL=https://gitlab.example.com \
   swift test --package-path Packages/GitwallGitLab --filter Integration
 GITWALL_OAUTH_INTERACTIVE=1 swift test --package-path Packages/GitwallAuth --filter Interactive
+GITWALL_GITHUB_TOKEN=github_pat_… GITWALL_GITHUB_DETAIL=owner/repo#123 \
+  swift test --package-path Packages/GitwallGitHub --filter ItemDetailIntegration
 ```
 
 Run the provider suites with both a classic and a fine-grained token when you touch the queries: fine-grained

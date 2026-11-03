@@ -13,6 +13,7 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | First run | `Onboarding/` |
 | Services | `Services/` (avatars, notifications, OAuth coordinator) |
 | Shared views | `Shared/` (item rows and empty states used by popover and window) |
+| Detail | `Detail/` (`DetailModel` per window, `ItemDetailService` app-wide, `ItemWindowController` and the Item menu) |
 
 ## Rules
 
@@ -61,6 +62,13 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
   Dock icon. Going the other way at runtime leaves a generic Dock icon, hence the order in
   `applicationWillFinishLaunching`.
 
+- **Detail in a window**: subclass `ItemWindowController` (it is the window's delegate and answers the Item menu
+  through the responder chain), attach `.itemDetailInspector(model, environment:, preset:)` to the list and call
+  `model.show(item.id)` on a click. A click in such a list selects and shows Detail, a double click and ⌘↩ open the
+  browser; the popover and the widget still open the browser. Space, ↩ and Esc stay typing keys while a text field
+  is edited (`validateMenuItem`). Opening an item writes `seen.json` through `ItemDetailService.markSeen`, which takes
+  `persist: !usesSampleContent`; sample items keep their times in memory. See `docs/adr/0015`.
+
 ## Debug launch arguments (Debug builds only)
 
 | Argument | Effect |
@@ -70,4 +78,6 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 | `--debug-github-token <pat> [--debug-repos a/b,c/d]` | Creates a GitHub account without clicking. |
 | `--debug-demo [--debug-demo-preset <n>] [--debug-demo-widgets]` | Fictional data from `GitwallCore.DemoData` for App Store screenshots; widgets appear as borderless windows. |
 | `--debug-demo --debug-demo-idle-account <n>` | The sample account at that index as if it had just been removed and added again: no repositories, no items, its three presets at the end of the list (`--debug-demo-preset 7` shows the first of them). For the hints that send the user to Settings › Repositories. |
+| `--debug-detail <owner/repo#123>` | Selects that item in the main window and opens Detail, for screenshots. |
+| `--debug-detail-expand <folds>` | Opens Detail's folded sections (`description`, `conversation`, `files`, `linked`, `metadata`, comma separated) and scrolls to the first. |
 | `--debug-onboarding-step <step>` | Opens the walkthrough at one step (`welcome`, `account`, `repositories`, `presets`, `notifications`, `startup`, `widget`), so a screen can be checked without clicking through. Pairs well with `--debug-demo`. |
