@@ -18,7 +18,7 @@ extension DemoData {
         ondrej: UserRef(login: "ondrej", displayName: "Ondrej Hruby"),
         jana: UserRef(login: "jana.v", displayName: "Jana Vesela"),
         mara: UserRef(login: "mara-k", displayName: "Mara Kovac"),
-        agent: UserRef(login: "northwind-agent[bot]", displayName: "Northwind Agent")
+        agent: UserRef(login: "northwind-agent", displayName: "Northwind Agent")
     )
 
     private static func summary(_ item: WorkItem) -> ItemDetail {

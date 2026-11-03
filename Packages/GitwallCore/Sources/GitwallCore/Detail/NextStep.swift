@@ -23,8 +23,8 @@ public struct NextStep: Hashable, Sendable {
         self.url = url
     }
 
-    /// The first rule that applies, in this order: a review requested from me, someone else's latest word, failing
-    /// checks on my pull request, ready to merge, and otherwise just open it. `detail` may be nil while it loads or
+    /// The first rule that applies, in this order: a review requested from me, failing checks on my pull request,
+    /// someone else's latest word (never a bot's, see ``LatestWord``), ready to merge, and otherwise just open it. `detail` may be nil while it loads or
     /// for a provider without Detail; the rules that need it are skipped.
     public static func suggest(for item: WorkItem, detail: ItemDetail?, me: UserRef?, provider: ProviderKind) -> NextStep {
         func isMe(_ user: UserRef) -> Bool { me.map { LoginMatch.same($0.login, user.login) } ?? false }
@@ -33,13 +33,13 @@ public struct NextStep: Hashable, Sendable {
         if isPullRequest, item.requestedReviewers.contains(where: isMe) {
             return NextStep(action: .reviewChanges, url: item.url.appendingPathComponent(provider == .gitlab ? "diffs" : "files"))
         }
-        if let detail, case .fromOther(let word) = LatestWord.find(in: detail, me: me) {
-            return NextStep(action: .reply(to: word.author.login), url: word.url ?? item.url)
-        }
         let failing = ((try? detail?.checks.get()) ?? []).first { $0.state == .failed }
         if isPullRequest, isMe(item.author), item.ciState == .failure || failing != nil {
             let checksPage = item.url.appendingPathComponent(provider == .gitlab ? "pipelines" : "checks")
             return NextStep(action: .openFailingCheck(failing?.name), url: failing?.url ?? checksPage)
+        }
+        if let detail, case .fromOther(let word) = LatestWord.find(in: detail, me: me) {
+            return NextStep(action: .reply(to: word.author.login), url: word.url ?? item.url)
         }
         if isPullRequest, !item.isDraft, item.reviewState == .approved, item.ciState == .success, item.mergeState == .clean {
             return NextStep(action: .readyToMerge, url: item.url)

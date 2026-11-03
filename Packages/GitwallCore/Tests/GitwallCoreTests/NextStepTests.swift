@@ -85,7 +85,7 @@ struct NextStepTests {
         #expect(NextStep.suggest(for: item, detail: nil, me: S.me, provider: .github).action == .open)
     }
 
-    @Test("the review request wins over a reply, and a reply over my failing checks")
+    @Test("the review request wins over everything; on my own pull request a failing check wins over a reply")
     func order() {
         let mine = S.pull(author: "prokop", requested: ["prokop"], ci: .failure)
         let words = S.detail(for: mine, comments: [S.comment("1", by: "jana", minutes: -1)])
@@ -93,6 +93,20 @@ struct NextStepTests {
 
         let failing = S.pull(author: "prokop", ci: .failure)
         let reply = S.detail(for: failing, comments: [S.comment("1", by: "jana", minutes: -1)])
-        #expect(NextStep.suggest(for: failing, detail: reply, me: S.me, provider: .github).action == .reply(to: "jana"))
+        #expect(NextStep.suggest(for: failing, detail: reply, me: S.me, provider: .github).action == .openFailingCheck(nil))
+
+        let green = S.pull(author: "prokop", ci: .success)
+        let question = S.detail(for: green, comments: [S.comment("1", by: "jana", minutes: -1)])
+        #expect(NextStep.suggest(for: green, detail: question, me: S.me, provider: .github).action == .reply(to: "jana"))
+    }
+
+    @Test("a bot's comment is no reason to reply")
+    func botsAreNoReason() {
+        let item = S.issue()
+        var bot = S.comment("2", by: "codecov", minutes: -1)
+        bot.authorIsBot = true
+        let detail = S.detail(for: item, comments: [bot, S.comment("3", by: "dependabot[bot]", minutes: 0)])
+
+        #expect(NextStep.suggest(for: item, detail: detail, me: S.me, provider: .github).action == .open)
     }
 }

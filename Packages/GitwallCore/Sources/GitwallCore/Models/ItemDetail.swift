@@ -88,13 +88,17 @@ public struct Branches: Hashable, Sendable {
 public struct DetailComment: Hashable, Sendable, Identifiable {
     public var id: String
     public var author: UserRef
+    /// The provider says the author is an app, not a person (GitHub's `Bot`). Logins ending in `[bot]` are bots too;
+    /// ``LatestWord`` checks both.
+    public var authorIsBot: Bool
     public var body: String
     public var createdAt: Date
     public var url: URL?
 
-    public init(id: String, author: UserRef, body: String, createdAt: Date, url: URL?) {
+    public init(id: String, author: UserRef, authorIsBot: Bool = false, body: String, createdAt: Date, url: URL?) {
         self.id = id
         self.author = author
+        self.authorIsBot = authorIsBot
         self.body = body
         self.createdAt = createdAt
         self.url = url
@@ -114,16 +118,25 @@ public enum ReviewVerdict: String, Hashable, Sendable {
 public struct DetailReview: Hashable, Sendable, Identifiable {
     public var id: String
     public var author: UserRef
+    public var authorIsBot: Bool
     public var verdict: ReviewVerdict
+    /// The review's summary, often empty: a bare approval or change request, or only inline comments.
     public var body: String
+    /// Comments on lines of the diff that came with the review.
+    public var inlineCommentCount: Int
     public var submittedAt: Date
     public var url: URL?
 
-    public init(id: String, author: UserRef, verdict: ReviewVerdict, body: String, submittedAt: Date, url: URL?) {
+    public init(
+        id: String, author: UserRef, authorIsBot: Bool = false, verdict: ReviewVerdict, body: String,
+        inlineCommentCount: Int = 0, submittedAt: Date, url: URL?
+    ) {
         self.id = id
         self.author = author
+        self.authorIsBot = authorIsBot
         self.verdict = verdict
         self.body = body
+        self.inlineCommentCount = inlineCommentCount
         self.submittedAt = submittedAt
         self.url = url
     }
@@ -137,15 +150,17 @@ public enum CheckState: String, Hashable, Sendable {
     case skipped
 }
 
-/// A check run or a commit status, by name.
+/// A check run or a commit status, by name. Names repeat (a matrix job, a status and a check run of the same name),
+/// so ``id`` is set by whoever builds the list; by default it is the name and the link.
 public struct DetailCheck: Hashable, Sendable, Identifiable {
-    public var id: String { name }
+    public var id: String
     public var name: String
     public var state: CheckState
     /// Its log or details page, when the provider gives one.
     public var url: URL?
 
-    public init(name: String, state: CheckState, url: URL?) {
+    public init(id: String? = nil, name: String, state: CheckState, url: URL?) {
+        self.id = id ?? "\(name)|\(url?.absoluteString ?? "")"
         self.name = name
         self.state = state
         self.url = url

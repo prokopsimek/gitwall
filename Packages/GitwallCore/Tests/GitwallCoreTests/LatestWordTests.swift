@@ -63,11 +63,32 @@ struct LatestWordTests {
         #expect(latest == .youRepliedLast(at: S.at(minutes: -5)))
     }
 
-    @Test("reviews without a text from others, blank comments and pending reviews say nothing")
+    @Test("a review by someone else counts without a text: a bare change request, an approval, inline comments only")
+    func reviewsWithoutText() throws {
+        var inline = S.review("r3", by: "mara", .commented, minutes: -5)
+        inline.inlineCommentCount = 4
+        let cases: [(DetailReview, ReviewVerdict)] = [
+            (S.review("r1", by: "tomas", .changesRequested, minutes: -5), .changesRequested),
+            (S.review("r2", by: "tomas", .approved, minutes: -5), .approved),
+            (inline, .commented),
+        ]
+        for (review, verdict) in cases {
+            let latest = LatestWord.find(comments: [S.comment("1", by: "jana", minutes: -50)], reviews: [review], me: S.me)
+            guard case .fromOther(let word) = latest else {
+                Issue.record("expected \(review.author.login)'s review, got \(latest)")
+                continue
+            }
+            #expect(word.verdict == verdict)
+            #expect(word.body.isEmpty)
+            #expect(word.inlineCommentCount == review.inlineCommentCount)
+        }
+    }
+
+    @Test("blank comments and pending reviews say nothing")
     func silentEntries() {
         let latest = LatestWord.find(
             comments: [S.comment("1", by: "jana", minutes: -50), S.comment("2", by: "tomas", minutes: -10, body: "  \n")],
-            reviews: [S.review("r1", by: "mara", .approved, minutes: -5), S.review("r2", by: "prokop", .pending, minutes: -1, body: "draft")],
+            reviews: [S.review("r2", by: "prokop", .pending, minutes: -1, body: "draft")],
             me: S.me
         )
 
@@ -76,6 +97,21 @@ struct LatestWordTests {
             return
         }
         #expect(word.author.login == "jana")
+    }
+
+    @Test("bots never have the latest word: by user type or by a [bot] login")
+    func botsDoNotCount() {
+        var codecov = S.comment("2", by: "codecov", minutes: -5, body: "Coverage report")
+        codecov.authorIsBot = true
+        var copilot = S.review("r1", by: "copilot-pull-request-reviewer[bot]", .commented, minutes: -3, body: "Suggestions")
+        copilot.authorIsBot = false
+        let latest = LatestWord.find(
+            comments: [S.comment("1", by: "prokop", minutes: -20), codecov, S.comment("3", by: "renovate[bot]", minutes: -1)],
+            reviews: [copilot],
+            me: S.me
+        )
+
+        #expect(latest == .youRepliedLast(at: S.at(minutes: -20)))
     }
 
     @Test("nothing said yet")
