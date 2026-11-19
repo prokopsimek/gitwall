@@ -165,7 +165,7 @@ struct GraphQLFetchTests {
         #expect(await transport.requests.count == 3)
     }
 
-    /// The `ISSUE` search is what GitHub Enterprise Server keeps (D22, D57); preset search on GitHub.com is a separate path.
+    /// The `ISSUE` search is what GitHub Enterprise Server keeps; preset search on GitHub.com is a separate path.
     @Test("organization search asks 100 per page of type ISSUE and stops after three pages")
     func organizationSearchPaging() async throws {
         // Every page claims there is another one, so only the page limit can end the loop.
@@ -223,8 +223,8 @@ struct GraphQLFetchTests {
     }
 }
 
-/// GitHub.com sends each preset's own query to `ISSUE_ADVANCED` search (D31), one item kind per query. Pull requests
-/// come 25 per page because 100 took GitHub ten seconds and ended in 502; issues stay at 100 (D22, D57).
+/// GitHub.com sends each preset's own query to `ISSUE_ADVANCED` search, one item kind per query. Pull requests
+/// come 25 per page because 100 took GitHub ten seconds and ended in 502; issues stay at 100.
 @Suite("Preset search query")
 struct PresetSearchQueryTests {
     @Test("pull requests are searched 25 per page with only the pull request fragment")

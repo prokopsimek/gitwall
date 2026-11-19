@@ -12,7 +12,7 @@ enum GraphQLQueries {
     static let maxSearchPages = 3
     static let maxSearchQueryLength = 256
 
-    /// Paging of ``presetSearch(kind:)`` on GitHub.com (D22, D57). 100 pull requests per page took GitHub 10 s and then
+    /// Paging of ``presetSearch(kind:)`` on GitHub.com. 100 pull requests per page took GitHub 10 s and then
     /// answered 502; 25 took 5–6 s. Issue nodes are lighter and stay at 100.
     static let presetSearchPullRequestPageSize = 25
     static let presetSearchIssuePageSize = 100
@@ -130,7 +130,7 @@ enum GraphQLQueries {
 
     static let search = searchDocument(type: "ISSUE", first: searchPageSize, kinds: [.pullRequest, .issue])
 
-    /// One page of a preset's own query on GitHub.com (D31), for one item kind. It answers in the shape of ``search``,
+    /// One page of a preset's own query on GitHub.com, for one item kind. It answers in the shape of ``search``,
     /// so ``SearchData`` decodes it.
     static func presetSearch(kind: ItemKind) -> String {
         searchDocument(type: "ISSUE_ADVANCED", first: presetSearchPageSize(for: kind), kinds: [kind])

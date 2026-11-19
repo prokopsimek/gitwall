@@ -31,7 +31,7 @@ struct RetryTests {
         #"{"full_name":"\#(fullName)","description":null,"private":false,"archived":false,"pushed_at":"\#(pushedAt)"}"#
     }
 
-    // MARK: Repeated (AC-1.1)
+    // MARK: Repeated
 
     @Test("a REST request answered 502, 503 or 504 succeeds when the repeat gets a good answer", arguments: [502, 503, 504])
     func restRecovers(status: Int) async throws {
@@ -104,7 +104,7 @@ struct RetryTests {
         #expect(await transport.requests.count == 1)
     }
 
-    // MARK: Final at once (AC-1.2)
+    // MARK: Final at once
     //
     // Each failure is followed by a good answer, so a repeat that should not happen would turn the failure into success.
 
