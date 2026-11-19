@@ -58,6 +58,64 @@ struct SyncStatusTests {
         #expect(unexplained.text(now: now) == "Sync failed: GitHub (prokop): rate limited")
     }
 
+    // MARK: - Quiet period
+
+    @Test("accounts riding out an outage show no failure, dated by the oldest last success among them")
+    func quietSeries() {
+        let status = SyncStatus(
+            snapshot: snapshot(minutesAgo: 1, status: [
+                github.id: FetchStatus(state: .ok, lastSuccessAt: now.addingTimeInterval(-10 * 60), consecutiveFailures: 1),
+                gitlab.id: FetchStatus(state: .ok, lastSuccessAt: now.addingTimeInterval(-25 * 60), consecutiveFailures: 2),
+                UUID(): FetchStatus(state: .ok, lastSuccessAt: now.addingTimeInterval(-3 * 3_600), consecutiveFailures: 1),
+            ]),
+            accounts: [github, gitlab],
+            lastError: nil
+        )
+        #expect(!status.isFailure)
+        #expect(status.text(now: now) == "Updated 25 min ago")
+    }
+
+    @Test("an account riding out an outage that never synced leaves the data undated")
+    func quietSeriesNeverSynced() {
+        let status = SyncStatus(
+            snapshot: snapshot(minutesAgo: 1, status: [
+                github.id: FetchStatus(state: .ok, lastSuccessAt: now.addingTimeInterval(-60)),
+                gitlab.id: FetchStatus(state: .ok, lastSuccessAt: nil, consecutiveFailures: 1),
+            ]),
+            accounts: [github, gitlab],
+            lastError: nil
+        )
+        #expect(!status.isFailure)
+        #expect(status.text(now: now) == "Not updated yet")
+    }
+
+    @Test("the third failure in a row shows as a failure, dated by that account's last success")
+    func thirdFailureInARow() {
+        let status = SyncStatus(
+            snapshot: snapshot(minutesAgo: 1, status: [
+                github.id: FetchStatus(state: .error, lastSuccessAt: now.addingTimeInterval(-15 * 60),
+                                       message: "Server error 503: Service Unavailable", consecutiveFailures: 3),
+                gitlab.id: FetchStatus(state: .ok, lastSuccessAt: now.addingTimeInterval(-40 * 60), consecutiveFailures: 1),
+            ]),
+            accounts: [github, gitlab],
+            lastError: nil
+        )
+        #expect(status.isFailure)
+        #expect(status.text(now: now) == "Sync failed: GitHub (prokop): Server error 503: Service Unavailable · updated 15 min ago")
+    }
+
+    @Test("a sync that threw is dated by an account riding out an outage, not by the snapshot")
+    func syncThrewDuringQuietSeries() {
+        let status = SyncStatus(
+            snapshot: snapshot(minutesAgo: 1, status: [
+                github.id: FetchStatus(state: .ok, lastSuccessAt: now.addingTimeInterval(-40 * 60), consecutiveFailures: 2),
+            ]),
+            accounts: [github],
+            lastError: "Offline"
+        )
+        #expect(status.text(now: now) == "Sync failed: Offline · updated 40 min ago")
+    }
+
     @Test("an account that is not in the configuration any more does not count")
     func removedAccount() {
         let status = SyncStatus(snapshot: snapshot(minutesAgo: 1, status: [UUID(): FetchStatus(state: .error)]), accounts: [github], lastError: nil)

@@ -7,8 +7,13 @@ public struct SyncResult: Sendable {
 }
 
 /// Fetches every configured account through its provider and writes the merged snapshot.
-/// Accounts that fail keep their previous items so the widget never goes blank because of one outage.
+/// Accounts that fail keep their previous items so the widget never goes blank because of one outage. A passing outage
+/// (a gateway error or a lost connection) does not even show until it lasts for a third sync in a row; until then the
+/// account keeps what it showed (`ok`, or an error it already had) and only ``FetchStatus/consecutiveFailures`` counts it.
 public actor SyncEngine {
+    /// Failed syncs in a row, for a passing reason, that an account rides out without showing an error.
+    private static let quietFailures = 2
+
     private let providers: [ProviderKind: any GitProvider]
     private let tokens: any TokenReading
     private let configStore: ConfigStore
@@ -109,13 +114,37 @@ public actor SyncEngine {
         let previousItems = previous?.items.filter { $0.accountID == account.id } ?? []
         let previousStatus = previous?.accountStatus[account.id]
 
-        func failure(_ state: FetchState, _ message: String) -> AccountOutcome {
+        func failure(_ state: FetchState, _ message: String?, consecutiveFailures: Int = 0) -> AccountOutcome {
             AccountOutcome(
                 accountID: account.id,
                 items: previousItems,
                 status: FetchStatus(state: state, lastSuccessAt: previousStatus?.lastSuccessAt, message: message,
-                                    projectAccess: previousStatus?.projectAccess)
+                                    projectAccess: previousStatus?.projectAccess, consecutiveFailures: consecutiveFailures)
             )
+        }
+
+        /// A gateway error or a lost connection usually heals by the next sync, so it counts quietly up to
+        /// `quietFailures` and shows from the next one on. Anything else shows at once and ends the series.
+        func failure(for error: any Error) -> AccountOutcome {
+            switch error as? ProviderError {
+            case .unauthorized:
+                return failure(.needsReauth, error.localizedDescription)
+            case .rateLimited:
+                return failure(.rateLimited, error.localizedDescription)
+            case .network, .server(status: 502...504, message: _):
+                let count = (previousStatus?.consecutiveFailures ?? 0) + 1
+                if count > Self.quietFailures {
+                    return failure(.error, error.localizedDescription, consecutiveFailures: count)
+                }
+                // Quiet means unchanged: a healthy account stays ok, and one that already shows an error keeps it,
+                // because the outage says less about the account than the error does.
+                guard let previousStatus, previousStatus.state != .ok else {
+                    return failure(.ok, nil, consecutiveFailures: count)
+                }
+                return failure(previousStatus.state, previousStatus.message, consecutiveFailures: count)
+            default:
+                return failure(.error, error.localizedDescription)
+            }
         }
 
         let token: String?
@@ -150,21 +179,14 @@ public actor SyncEngine {
             // The token may just have expired. Give the reader one chance to refresh it silently.
             do {
                 guard let refreshed = try await tokens.tokenAfterUnauthorized(for: account.id) else {
-                    return failure(.needsReauth, ProviderError.unauthorized.localizedDescription)
+                    return failure(for: ProviderError.unauthorized)
                 }
                 return await succeed(try await provider.fetchItems(account: account, token: refreshed, kinds: kinds), token: refreshed)
-            } catch ProviderError.unauthorized {
-                return failure(.needsReauth, ProviderError.unauthorized.localizedDescription)
             } catch {
-                return failure(.error, error.localizedDescription)
-            }
-        } catch let error as ProviderError {
-            switch error {
-            case .rateLimited: return failure(.rateLimited, error.localizedDescription)
-            default: return failure(.error, error.localizedDescription)
+                return failure(for: error)
             }
         } catch {
-            return failure(.error, error.localizedDescription)
+            return failure(for: error)
         }
     }
 }

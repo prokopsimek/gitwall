@@ -14,18 +14,47 @@ public enum ProjectAccess: String, Codable, Sendable, Hashable {
     case denied
 }
 
-public struct FetchStatus: Codable, Hashable, Sendable {
+public struct FetchStatus: Hashable, Sendable {
     public var state: FetchState
     public var lastSuccessAt: Date?
     public var message: String?
     /// Nil when the provider has no planning boards or the account has not synced since this was added.
     public var projectAccess: ProjectAccess?
+    /// Syncs in a row that failed for a passing reason: a gateway error (502, 503, 504) or a lost connection. The first
+    /// two leave state and message as they were, `ok` without a message for a healthy account, so a short outage neither
+    /// looks like a broken account nor hides an error already shown; from the third on the state is `error`. A success
+    /// or any other failure sets it back to 0. See ``SyncEngine``.
+    public var consecutiveFailures: Int
 
-    public init(state: FetchState, lastSuccessAt: Date? = nil, message: String? = nil, projectAccess: ProjectAccess? = nil) {
+    public init(
+        state: FetchState,
+        lastSuccessAt: Date? = nil,
+        message: String? = nil,
+        projectAccess: ProjectAccess? = nil,
+        consecutiveFailures: Int = 0
+    ) {
         self.state = state
         self.lastSuccessAt = lastSuccessAt
         self.message = message
         self.projectAccess = projectAccess
+        self.consecutiveFailures = consecutiveFailures
+    }
+}
+
+extension FetchStatus: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case state, lastSuccessAt, message, projectAccess, consecutiveFailures
+    }
+
+    /// A status written by a build that did not count failures yet reads as none in a row. Encoding is synthesized
+    /// and writes every key.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        state = try container.decode(FetchState.self, forKey: .state)
+        lastSuccessAt = try container.decodeIfPresent(Date.self, forKey: .lastSuccessAt)
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+        projectAccess = try container.decodeIfPresent(ProjectAccess.self, forKey: .projectAccess)
+        consecutiveFailures = try container.decodeIfPresent(Int.self, forKey: .consecutiveFailures) ?? 0
     }
 }
 

@@ -54,6 +54,49 @@ struct SnapshotCodingTests {
         #expect(decoded == original)
     }
 
+    @Test("an account status written before the failure count existed reads as no failures in a row")
+    func statusWithoutFailureCount() throws {
+        let json = """
+        {
+          "schemaVersion": 1,
+          "fetchedAt": "2026-09-10T06:35:00.000Z",
+          "items": [],
+          "accountStatus": {
+            "8A2F7C1E-1111-2222-3333-444455556666": {
+              "state": "error",
+              "lastSuccessAt": "2026-09-10T06:00:00.000Z",
+              "message": "Server error 503: Service Unavailable",
+              "projectAccess": "granted"
+            }
+          }
+        }
+        """
+        let snapshot = try SnapshotCoding.decode(Snapshot.self, from: Data(json.utf8))
+
+        let account = try #require(UUID(uuidString: "8A2F7C1E-1111-2222-3333-444455556666"))
+        let status = try #require(snapshot.accountStatus[account])
+        #expect(status.consecutiveFailures == 0)
+        #expect(status.state == .error)
+        #expect(status.message == "Server error 503: Service Unavailable")
+        #expect(status.projectAccess == .granted)
+    }
+
+    @Test("the failure count is written and read back")
+    func failureCountRoundTrips() throws {
+        let account = UUID()
+        let snapshot = Snapshot(
+            fetchedAt: Date(timeIntervalSince1970: 1_800_000_000), items: [],
+            accountStatus: [account: FetchStatus(state: .ok, lastSuccessAt: Date(timeIntervalSince1970: 1_799_999_400),
+                                                 consecutiveFailures: 2)]
+        )
+        let encoded = try SnapshotCoding.encode(snapshot)
+
+        #expect(String(decoding: encoded, as: UTF8.self).contains(#""consecutiveFailures" : 2"#))
+        let decoded = try SnapshotCoding.decode(Snapshot.self, from: encoded)
+        #expect(decoded == snapshot)
+        #expect(decoded.accountStatus[account]?.consecutiveFailures == 2)
+    }
+
     @Test("work item id is stable and derived from account, repo, number and kind")
     func workItemID() throws {
         let snapshot = try SnapshotCoding.decode(Snapshot.self, from: Fixtures.data("snapshot.json"))

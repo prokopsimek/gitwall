@@ -13,7 +13,7 @@ public struct SyncStatus: Equatable, Sendable {
     /// A sync that threw explains itself first; otherwise the first configured account whose last fetch failed,
     /// dated by its own last success. Accounts that are no longer configured do not count.
     public init(snapshot: Snapshot?, accounts: [Account], lastError: String?) {
-        updatedAt = snapshot?.fetchedAt
+        updatedAt = Self.dataDate(of: snapshot, accounts: accounts)
         if let lastError {
             failure = lastError
             return
@@ -34,6 +34,17 @@ public struct SyncStatus: Equatable, Sendable {
             return age.map { "Updated \($0)" } ?? "Not updated yet"
         }
         return ["Sync failed: \(failure)", age.map { "updated \($0)" }].compactMap(\.self).joined(separator: " · ")
+    }
+
+    /// When the oldest data on screen was fetched. An account in a series of failed syncs (``FetchStatus/consecutiveFailures``
+    /// above 0, quiet or not) still shows what it had at its last success, so that date counts rather than the snapshot's.
+    /// One that never synced leaves the data undated, "Not updated yet", instead of a misleading recent time.
+    private static func dataDate(of snapshot: Snapshot?, accounts: [Account]) -> Date? {
+        guard let snapshot else { return nil }
+        let failing = accounts.compactMap { snapshot.accountStatus[$0.id] }.filter { $0.consecutiveFailures > 0 }
+        guard !failing.isEmpty else { return snapshot.fetchedAt }
+        let dates = failing.map(\.lastSuccessAt)
+        return dates.contains(nil) ? nil : dates.compactMap(\.self).min()
     }
 
     private static func age(since date: Date, now: Date) -> String {
