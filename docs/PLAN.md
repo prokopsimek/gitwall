@@ -55,7 +55,7 @@ Repozitář je prázdný (žádné commity). Rozhodnutí níže vzešla z rozhov
 | Název | **Gitwall**; bundle `cz.prokopsimek.gitwall`, App Group `ZHU9NYW7PP.cz.prokopsimek.gitwall` (Team-ID style; see AppGroup.swift for why), URL schéma `gitwall://` |
 | Účet Apple | osobní tým Prokop Simek (identity Development i Distribution jsou v Keychainu) |
 | Data | tray app stahuje, widget jen čte snapshot z App Group; JSON soubory + Keychain na tokeny |
-| Rozsah dat | všechny otevřené PR/issues z vybraných rep; filtry se aplikují lokálně |
+| Rozsah dat | GitHub.com: položky presetů, které jsou vidět, hledané na serveru; GitHub Enterprise Server a GitLab: všechny otevřené PR/issues z vybraných rep. O tom, co preset ukáže, vždy rozhoduje místní filtr (`docs/adr/0017`) |
 | Konfigurace widgetu | pojmenované **pohledy (presety)** definované v app; widget si vybere pohled; libovolná kombinace PR + issues z více rep a účtů |
 | Filtry | jednotný model (typ, stav, vztah ke mně, draft, štítky, review, CI, stáří, milestone, text) + volitelný nativní dotaz per účet |
 | API | GraphQL pro seznamy (GitHub i GitLab), REST pro ověření tokenu, discovery rep a OAuth |
@@ -169,7 +169,8 @@ struct ItemFilter: Codable {
 }
 enum NotificationEvent: String, Codable, CaseIterable { case newItem, reviewRequested, approved, changesRequested, ciFailed, merged, closed }
 
-struct Snapshot: Codable { var schemaVersion: Int; var fetchedAt: Date; var items: [WorkItem]; var accountStatus: [UUID: FetchStatus] }
+struct Snapshot: Codable { var schemaVersion: Int; var fetchedAt: Date; var items: [WorkItem]; var accountStatus: [UUID: FetchStatus]
+                         var presetResults: [PresetResult]; var searchedAccounts: Set<UUID> }   // poslední dvě pole od schemaVersion 2 (`docs/adr/0017`)
 ```
 
 Soubory v App Group: `config.json` (účty bez tokenů, pohledy, nastavení), `snapshot.json`, `snapshot.previous.json` (pro diff a zvýraznění nových), `avatars/<hash>.png`. `schemaVersion` + migrace v `ConfigStore`.
@@ -189,7 +190,8 @@ protocol AuthFlow { func signIn() async throws -> Token; func refreshIfNeeded(_ 
 ```
 
 Strategie dotazů:
-- **GitHub**: explicitní repa → jeden GraphQL request s aliasy `r0: repository(owner:,name:){ pullRequests(states: OPEN, first: 50, orderBy: UPDATED_AT DESC) … issues(...) }`, dávky po ~15 repech. Org jako dynamický zdroj → `search(query: "org:X is:pr is:open", type: ISSUE)` stránkovaně (limit 256 znaků dotazu a 1000 výsledků). Pole: `reviewDecision`, `isDraft`, `mergeable`, `commits(last:1){…statusCheckRollup{state}}`, `reviewRequests`, `latestReviews`, `labels`, `comments{totalCount}`, `additions`, `deletions`. Team review requests jen s `read:org` (capability flag).
+- **GitHub.com** (od 2026-11-19): pro každý vybraný preset a druh položky vlastní hledání `search(query:, type: ISSUE_ADVANCED)`, které `PresetSearchQuery` sestaví z presetu a které najde aspoň všechno, co najde místní filtr. Pull requesty po 25 na stránku, issues po 100, nejvýš 1000 výsledků na hledání, dotaz do 4000 bajtů; delší dotaz se rozdělí podle zdrojů nebo rozšíří vynecháním podmínek filtru. Nevybrané presety se stáhnou při otevření. Podrobnosti a ověření v `docs/adr/0017`.
+- **GitHub Enterprise Server** a GitHub.com při synchronizaci bez výběru (dokud app nikdy nepřečetla konfigurace widgetů): explicitní repa → jeden GraphQL request s aliasy `r0: repository(owner:,name:){ pullRequests(states: OPEN, first: 50, orderBy: UPDATED_AT DESC) … issues(...) }`, dávky po ~15 repech. Org jako dynamický zdroj → `search(query: "org:X is:pr is:open", type: ISSUE)` stránkovaně (po 100, nejvýš 3 stránky; `ISSUE` má limit 256 znaků dotazu a nevyhodnocuje `OR` ani závorky). Pole: `reviewDecision`, `isDraft`, `mergeable`, `commits(last:1){…statusCheckRollup{state}}`, `reviewRequests`, `latestReviews`, `labels`, `comments{totalCount}`, `additions`, `deletions`. Team review requests jen s `read:org` (capability flag).
 - **GitLab**: complexity limit je 250 bodů na dotaz pro přihlášeného uživatele a jeden alias `project(fullPath:){ mergeRequests(first: 50) … }` stojí ~43 bodů, takže **max. 4 aliasy projektů na request**, běh s omezenou paralelitou (≤ 3 souběžné). Skupina → `group(fullPath:){ mergeRequests(includeSubgroups: true, state: opened, sort: UPDATED_DESC) }` (jeden dotaz na celou skupinu, preferovaná cesta). Každý dotaz přidává `queryComplexity { score limit }`, test hlídá, že score < 200. Nepoužívat experimentální root `Query.mergeRequests`. Pole: `draft`, `conflicts`, `approved`, `approvedBy`, `reviewers`, `assignees`, `headPipeline{status}`, `detailedMergeStatus`, `labels`, `userNotesCount`, `diffStatsSummary{additions deletions}`, `webUrl`, `updatedAt`, `author{username avatarUrl}` (všechna ověřena v `merge_request_type.rb`).
 - **GitHub** poznámky: `mergeable` vrací `UNKNOWN`, dokud GitHub mergeabilitu nepočítá → `mergeState = .unknown`; `statusCheckRollup` je null bez checků → `ciState = .none`; `reviewDecision` je null, když review není vyžadováno. Vnořené connections s `first: 10`, odhad ~50 bodů na dotaz s 20 aliasy → při 5min intervalu ~600 bodů/h z 5000.
 - Rate limit: čtení hlaviček, při 403/429 exponenciální zpomalení, stav se ukáže v tray a ve snapshotu (`FetchStatus`).
@@ -269,7 +271,7 @@ Strategie dotazů:
 - `Link` s vlastním schématem ve widgetu spustí a aktivuje obsahující app; obsluha musí být v `application(_:open:)`.
 - Interaktivní tlačítko ve widgetu se nemá používat k otevření app; `openAppWhenRun` je v macOS 26 deprecated.
 - App Group: iOS-style `group.` ID, registrace v portálu, v provisioning profilu; extension bez oprávnění je tiše odmítnuta.
-- GitHub search: max. 256 znaků dotazu, 1000 výsledků; alias batching 20 rep je v pořádku (~50 bodů/dotaz).
+- GitHub search: `type: ISSUE` max. 256 znaků dotazu (platí jen pro GHES a synchronizaci bez výběru), `type: ISSUE_ADVANCED` dotaz do 4000 bajtů a `OR` i závorky (ověřeno 2026-11-19, `docs/adr/0017`); obojí max. 1000 výsledků; alias batching 20 rep je v pořádku (~50 bodů/dotaz).
 - GitHub device flow: jen client ID, tokeny OAuth App neexpirují, GHES podporuje s vlastní OAuth App.
 - GitLab PKCE bez secretu s custom schématem funguje (používá i oficiální VS Code extension); access token 2 h, refresh s rotací; device grant až od GitLab 17.9 GA, proto PKCE jako primární.
 - GitLab GraphQL complexity 250 → max. 4 aliasy projektů na dotaz, preferovat skupinové dotazy.

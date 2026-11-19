@@ -302,7 +302,7 @@ The first rows ran over organizations of a real account and are given as counts 
 | `PresetSearchQueryLiveTests` and `ItemStateLiveTests` with a fine-grained token, read-only *Commit statuses*, *Contents*, *Issues*, *Metadata* and *Pull requests*, repository access `prokopsimek/gitwall` only, over the three public repositories of the classic run above (331 s) | every line the same as with the classic token: 46 rows, 42 subsets, none failed, the 12 rows with `@me` and the relations and both milestone rows included. `fetchItemStates`: 150 ids in two batches, all open and of their kind; 11.5 s |
 | The same two suites with the same fine-grained token, over 60 pull requests and 200 issues of `cli/cli` (235 s) | 46 rows, 32 subsets, none failed, both rows with a bot reviewer included. 12 rows kept no local item: the ten `@me` and relation rows that need an open item of the token owner, who has none there, and the two that keep none in the classic run either. 2 skipped, no milestone. `fetchItemStates`: 150 ids, 60 pull requests and 90 issues, in two batches, all open and of their kind; 10.0 s |
 | The same two suites and both `Integration` suites with the same fine-grained token, `GITWALL_GITHUB_REPO=prokopsimek/gitwall` | the identity call, discovery (156 repositories, no organization), the open pull requests of `apple/swift` with their states, and Detail of a public pull request and issue with every part, checks included, passed. `prokopsimek/gitwall` answered with no open item, so the two live suites and the test of the configured repository stopped at their check for data, not at a refusal. Over a public repository of the token's owner with 12 open items that test passed, and the priority lookup answered with no priority and no refusal |
-| The same two suites and the test of the configured repository with the same fine-grained token, its repository access widened to a private repository of the token owner, `GITWALL_GITHUB_REPO` set to that repository | 46 rows, 10 subsets, none failed; 18 rows kept no local item and 18 were skipped. The repository has 21 open pull requests and no issue. The row with kind and state only kept the 21 pull requests locally, and GitHub's answer held the same 21. `fetchItemStates`: 21 pull requests in one batch, all open and of their kind, none closed, missing or unanswered; 2.0 s. The test of the configured repository passed with 21 pull requests, none with a CI state, and no issue. No GraphQL error, no 403 and no "not accessible" in the output |
+| The same two suites and the test of the configured repository with the same fine-grained token, its repository access widened to a private repository of the token owner, `GITWALL_GITHUB_REPO` set to that repository | 46 rows, 10 subsets, none failed; 18 rows kept no local item and 18 were skipped. The repository has 21 open pull requests and no issue. The row with kind and state only kept the 21 pull requests locally, and GitHub's answer held the same 21. `fetchItemStates`: 21 pull requests in one batch, all open and of their kind, none closed, missing or unanswered; 2.0 s. The test of the configured repository passed with 21 pull requests, none with a CI state, and no issue. No request was refused and the tests passed. GraphQL errors beside data would show only in the unified log, which this run did not read, so their absence is not verified. None of the 21 pull requests had a CI state, which this run cannot tell from a missing permission to read checks |
 | `repo:cli/cli (is:pr` / `repo:cli/cli frobnicate:1` | 200, no `errors`, `issueCount` 0 |
 | Six levels of parentheses / a trailing `AND` | 200 with results |
 | A trailing `OR` | 502, twice, after about 11 s each |
@@ -332,8 +332,11 @@ README asks for nothing new. The live runs with a fine-grained token with the RE
 agree: GitHub answered `search(type: ISSUE_ADVANCED)` and `nodes(ids:)` over the repositories of the classic run with
 the same items as for the classic token, and refused no request. On a private repository of the token owner, where the
 token's permissions are what grants access, both answered too: the search found the repository's 21 open pull
-requests, and the lookup read all 21 as open, with no error and no refusal. That repository has no issue, so no issue
-of a private repository was read.
+requests, and the lookup read all 21 as open, with no refusal. The live tests throw only when `data` is missing, so
+GraphQL errors beside data would have shown only in the unified log (the app logs them at error level with their
+types, and an error of a type other than `FORBIDDEN` now fails the search); that log was not read, so this is not
+verified. None of the 21 pull requests had a CI state, so the run does not show whether the token may read checks.
+That repository has no issue, so no issue of a private repository was read.
 
 ## Consequences
 
@@ -385,6 +388,9 @@ Open points, marked NEOVĚŘENO (not verified):
 - NEOVĚŘENO: issues of a private repository with a fine-grained token. With the README's permissions the search and
   the lookup answered for the pull requests of a private repository (see *Checked against GitHub*), but that
   repository has no issue.
+- NEOVĚŘENO: that the README's fine-grained permissions raise no GraphQL error beside data, and that they let the token
+  read the CI state of pull requests. The run over a private repository was not checked against the unified log, and
+  none of its 21 pull requests had a CI state, which a missing permission would also leave empty.
 - NEOVĚŘENO: whether GitHub Enterprise Server accepts `ISSUE_ADVANCED`, which would let it search per preset too.
 - NEOVĚŘENO: what makes WidgetKit drop the configuration of a removed widget (see *What a sync fetches*). Quitting and
   opening Gitwall did not, and neither did a restart of chronod at 19:08; a new login or a restart of the Mac has not

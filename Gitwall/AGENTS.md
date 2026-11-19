@@ -46,6 +46,25 @@ SwiftUI `Settings` scene or on `onOpenURL`. Every window is an `NSWindowControll
 - `AppEnvironment.items(for:)` answers from `FilterCache` (GitwallCore): one answer per saved preset, for the minute,
   emptied when the snapshot or anything but the walls changes. A preset that differs from the saved one, as the
   editor's copy does, is filtered every time. A write that changes only walls reloads no widget.
+- **Loading on demand.** A preset that a regular sync did not fetch is fetched when a window shows it
+  (`docs/adr/0017`). `AppEnvironment.fetchOnOpen(_:)` takes the presets a window opens and fetches those whose result
+  is missing or older than the sync interval (`PresetFreshness.presetsToFetchOnOpen`), once each while a fetch runs
+  (`fetchingPresetIDs`). A failure goes to the log only and never to the account's `FetchStatus`; the last result stays
+  on screen. `retryFetch(of:)` is the manual "Try Again" and skips the age check, so a click never waits for the
+  interval. Who calls it: the popover and the main window for the shown preset (`fetchSelectedPresetOnOpen`, which does
+  nothing unless `isPopoverShown` or `isMainWindowVisible` says one is on screen); the Walls window for the presets
+  of the wall it shows (`WallsModel.fetchShownPresets`, when the window opens, leaves the Dock, or another wall or tile
+  comes up; `shownWallID` also tells a regular sync which wall is on screen); the Settings preset editor, one second
+  after the last change of `selectionFingerprint`. A new caller goes through `fetchOnOpen`, never to
+  `SyncEngine.syncPresets` directly.
+- A list of a preset with no count never says "Nothing here". `ListState.fetching` is a spinner while its fetch on
+  open runs; otherwise `EmptyStateKind.waitingForSync` ("Try Again") or, after a refused query, `.queryFailed`
+  (`PresetCountPresentation.listPlaceholder`). A preset that has a count lists its items, also after a later failure.
+- A fetch on open goes through `AppEnvironment.take(_:from:)` like a sync, so it diffs, routes notifications and adds
+  its items to the "new" dots. `SnapshotCarry` keeps the dots and the previous snapshot of the last sync (a click on
+  a "Closed or merged" notification looks the item up there) instead of replacing them. `SyncEngine.syncPresets`
+  waits for a running sync or fetch and returns nil when, after the wait, nothing was left to fetch; then `take` is
+  not called.
 - `OAuthCoordinator` owns only the window-bound parts (device code display, `ASWebAuthenticationSession`).
   The protocol work is in GitwallAuth.
 - `AppEnvironment.start` registers the app as a login item when `AppConfig.shouldRegisterAtLogin` says so, and

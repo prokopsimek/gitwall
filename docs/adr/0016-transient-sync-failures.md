@@ -80,12 +80,15 @@ the log.
 
 The preset search on GitHub.com (`GraphQLQueries.presetSearch(kind:)`, `search(type: ISSUE_ADVANCED)`) asks for 25
 pull requests or 100 issues per page, and its paging stops at GitHub's cap of 1000 results
-(`maxPresetSearchResults`). The document and its constants are in `GraphQL.swift`; the request that sends it comes
-with a later change.
+(`maxPresetSearchResults`). The document and its constants are in `GraphQL.swift`; `GitHubProvider.fetchPresetItems`
+sends it ([ADR 0017](0017-github-presets-are-searched-on-the-server.md)).
 
-The `ISSUE` search of organization sources (`GraphQLQueries.search`), which GitHub Enterprise Server keeps, stays at
-100 per page and three pages (`searchPageSize`, `maxSearchPages`). With 25 per page and the same three pages, GHES
-would silently drop from 300 to 75 pull requests per organization, and the 502 was measured on GitHub.com only.
+The `ISSUE` search of organization sources (`GraphQLQueries.search`) stays at 100 per page and three pages
+(`searchPageSize`, `maxSearchPages`). GitHub Enterprise Server sends it in every sync. GitHub.com sends it only in a
+sync without a selection, that is while the app has never read the widget configurations
+(`AppEnvironment.syncSelection()`); with a selection GitHub.com sends the preset search alone. With 25 per page and
+the same three pages, GHES would silently drop from 300 to 75 pull requests per organization, and the 502 was
+measured on GitHub.com only.
 
 ## Alternatives considered
 
@@ -116,7 +119,7 @@ GitHub client, `NotJSONSyncTests`, and the log lines by `SyncEngineQuietFailureT
 ## Consequences
 
 - An outage that lasts into a third sync in a row shows on that sync with the same message as before. At the default
-  interval of 5 minutes (`AppConfig.refreshIntervalMinutes`) that is about ten minutes after the first failed sync.
+  interval of 5 minutes (`AppSettings.refreshIntervalMinutes`) that is about ten minutes after the first failed sync.
   Until then the account looks healthy and only the age in "Updated …" grows.
 - A failing request takes longer to fail. The waits add 3 s, and each repeat takes as long as the attempt it repeats.
   The search measured above failed after about 10 s, so three attempts and the waits come to more than 30 s. An answer
@@ -126,6 +129,7 @@ GitHub client, `NotJSONSyncTests`, and the log lines by `SyncEngineQuietFailureT
 - The unified log tells a quiet sync from a healthy one: a line per account that failed quietly, and `failed accounts`
   in the line of every sync. Neither holds anything but counts, kinds and the provider, and both are written at the
   notice level.
-- Organization sources on GitHub.com still send the `ISSUE` search with 100 per page, the query measured above. Until
-  they use a smaller page, the retry and the quiet period are what keep its 502 off the screen.
+- The `ISSUE` search with 100 per page, the query measured above, still goes to GitHub Enterprise Server in every sync
+  and to GitHub.com in a sync without a selection. There the retry and the quiet period are what keep its 502 off the
+  screen. With a selection GitHub.com sends only the preset search, 25 pull requests or 100 issues per page.
 - The numbers are two constants, `GitHubClient.retryDelays` and `SyncEngine.quietFailures`.
