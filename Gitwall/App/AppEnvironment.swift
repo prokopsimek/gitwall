@@ -813,11 +813,12 @@ final class AppEnvironment {
         guard containerAvailable else { return .empty(.containerUnavailable) }
         guard !needsOnboarding else { return .empty(.noAccounts) }
         guard let preset else { return .empty(.noPresets) }
+        // A preset that waits shows its loading indicator while its fetch on open runs, also when another of its parts,
+        // as from GitLab, has items, as the widget and the wall do; any other shows its last items.
+        if fetchingPresetIDs.contains(preset.id), presetCount(for: preset).isWaitingForSync { return .fetching }
         let items = items(for: preset)
         if !items.isEmpty { return .items(items) }
         if snapshot == nil || isRefreshing { return .empty(.loading) }
-        // A preset never fetched has nothing to show while its fetch on open runs; any other shows its last items.
-        if fetchingPresetIDs.contains(preset.id), presetCount(for: preset).isWaitingForSync { return .fetching }
         // An account that watches nothing fetches nothing and still syncs fine, so say which one it is.
         switch config.emptiness(of: preset) {
         case .nothingWatched(let account): return .empty(.noRepositories(account: account))

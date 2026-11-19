@@ -7,7 +7,9 @@ import Foundation
 /// part of the preset. The part of an account in ``Snapshot/searchedAccounts`` goes by the preset's result there
 /// (``Snapshot/result(for:account:)``, so a result of another selection counts as none): its items, its fetch time,
 /// whether it is complete and its query failure. Every other account fetches all its items with each of its syncs, so
-/// its part is dated by the account's ``FetchStatus/lastSuccessAt`` and is never fetched on open.
+/// its part is dated by the account's ``FetchStatus/lastSuccessAt`` and is never fetched on open. A preset waits, with
+/// neither a count nor a time, while one of its searched parts has no result, or, without a searched part, until one of
+/// its parts was fetched.
 public enum PresetFreshness {
     /// The items `preset` shows: the items of its results in the searched accounts and every item of the other
     /// accounts, filtered and sorted by ``FilterEngine`` as the preset says.
@@ -29,12 +31,14 @@ public enum PresetFreshness {
     ) -> PresetCountDisplay {
         let parts = parts(of: preset, in: snapshot, accounts: accounts)
         let times = parts.compactMap(\.fetchedAt)
-        // A preset without a part, scoped to an account that is gone, has nothing to wait for.
-        let isWaiting = !parts.isEmpty && times.isEmpty
+        // A searched part without a result keeps the whole preset waiting: a count of the other parts alone would read
+        // as the count of the preset. Without a searched part it waits until some part was fetched, and a preset without
+        // a part, scoped to an account that is gone, has nothing to wait for.
+        let isWaiting = parts.contains { $0.isSearched && $0.fetchedAt == nil } || (!parts.isEmpty && times.isEmpty)
         return PresetCountDisplay(
             count: isWaiting ? nil : itemCount,
             isCapped: parts.contains(where: \.isCapped),
-            fetchedAt: times.min(),
+            fetchedAt: isWaiting ? nil : times.min(),
             failure: parts.compactMap(\.failure).max { $0.at < $1.at },
             isWaitingForSync: isWaiting
         )
@@ -104,17 +108,18 @@ public enum PresetFreshness {
 /// What the count of one preset shows, from ``PresetFreshness``. Data only: the popover, the main window's sidebar,
 /// Settings › Presets, onboarding and the widget turn it into words through the String Catalog.
 public struct PresetCountDisplay: Hashable, Sendable {
-    /// How many items ``PresetFreshness/items(for:in:accounts:now:)`` gives; nil shows "–", because no part of the
-    /// preset was fetched yet.
+    /// How many items ``PresetFreshness/items(for:in:accounts:now:)`` gives; nil shows "–" while the preset waits
+    /// (``isWaitingForSync``).
     public var count: Int?
     /// Shows "+" after the count: a search of the preset stopped before the end of what its provider counted, as a
     /// GitHub search does above 1000 results.
     public var isCapped: Bool
-    /// The oldest fetch time among the parts that were fetched, for the tooltip; nil while none was.
+    /// The oldest fetch time among the parts that were fetched, for the tooltip; nil while the preset waits.
     public var fetchedAt: Date?
     /// The latest query failure among the searched parts, shown as "Query failed". ``count`` and ``fetchedAt`` still
     /// describe what the parts fetched before it.
     public var failure: PresetQueryFailure?
-    /// No part of the preset was fetched yet: a widget shows "Waiting for sync" and a window its loading indicator.
+    /// A searched part of the preset has no result yet, or, without a searched part, no part was fetched yet: a widget
+    /// shows "Waiting for sync" and a window its loading indicator.
     public var isWaitingForSync: Bool
 }

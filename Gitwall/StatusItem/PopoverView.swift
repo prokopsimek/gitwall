@@ -21,7 +21,7 @@ struct PopoverView: View {
         .onChange(of: environment.selectedPreset?.id) { environment.fetchSelectedPresetOnOpen() }
     }
 
-    /// The count of the preset on screen, for its failed query.
+    /// The count of the preset on screen, for its failed query and the preset picker's tooltip.
     private var selectedCount: PresetCountPresentation? {
         environment.selectedPreset.map { PresetCountPresentation(environment.presetCount(for: $0), now: Date()) }
     }
@@ -44,6 +44,8 @@ struct PopoverView: View {
                 }
                 .labelsHidden()
                 .frame(maxWidth: 240)
+                // The selected preset's fetch time, as the sidebar shows it beside each count.
+                .help(selectedCount?.help ?? "")
                 .accessibilityIdentifier("preset-picker")
             }
             Spacer()

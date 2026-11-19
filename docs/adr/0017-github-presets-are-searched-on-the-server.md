@@ -54,7 +54,8 @@ rotation. It fetches only the presets for which `PresetFreshness.needsFetchOnOpe
 searching account in the preset's scope has no result for its current selection, or last asked GitHub longer ago than
 the sync interval. The time asked is the later of the last fetch and the last refused query, so a refused query is
 tried again at most once per interval. Meanwhile the window shows the last result with its fetch time. Only a preset
-that was never fetched shows a spinner, and a widget shows "Waiting for sync".
+that waits (see *A result per preset and account*) shows a spinner, also when its GitLab part has items, and a widget
+shows "Waiting for sync".
 
 ### Who searches
 
@@ -150,11 +151,14 @@ migration.
   left the screen keeps its last result and its items.
 - What a preset shows comes from `PresetFreshness`: in each searched account the items of its own result, in every
   other account all items, then `FilterEngine`. Its count is the length of that list (`PresetCountDisplay`). It shows
-  "+" when a search stopped before GitHub's count and "–" before any part was fetched. After a refused query it shows
-  "Query failed" with the time of the last result. A preset over GitHub.com and GitLab is dated by its older part. The
-  app reads it through `AppEnvironment.presetCount(for:)` in the popover, the main window's sidebar, Settings ›
-  Presets, onboarding and the Walls window. The widget reads the same snapshot and learns from `searchedAccounts`
-  which accounts search. It does not look at the provider kind.
+  "+" when a search stopped before GitHub's count. After a refused query it shows "Query failed" with the time of the
+  last result. A preset waits, with "–" and no fetch time, while any of its searched parts has no result for its current
+  selection; a preset without a searched part waits until one of its accounts first synced. A preset over GitHub.com and
+  GitLab therefore shows "–" until its GitHub.com part has a result, because a count of the GitLab part alone would look
+  like the count of the whole preset. From then on it is dated by its older part. The app reads it through
+  `AppEnvironment.presetCount(for:)` in the popover, the main window's sidebar, Settings › Presets, onboarding and the
+  Walls window. The widget reads the same snapshot and learns from `searchedAccounts` which accounts search. It does
+  not look at the provider kind.
 
 ### Items that leave a result
 
@@ -294,9 +298,9 @@ README asks for nothing new.
   a selection on a real configuration sent 6 searches and 14 requests and kept 355 items.
 - The searches of an account run one after another. On 2026-11-19 a regular sync with 14–17 requests in a row took
   90–102 s (4–8 s per request), within the default interval of 5 minutes.
-- Presets that are not selected show their last known count, with its time in the tooltip, and "–" before their first
-  fetch. "+" shows in the popover, the sidebar, Settings › Presets and onboarding; widgets and wall tiles show the
-  plain count, because `TileView` takes one.
+- Presets that are not selected show their last known count, with its time in the tooltip, and "–" until every
+  searched part has its first result. "+" shows in the popover, the sidebar, Settings › Presets and onboarding; widgets
+  and wall tiles show the plain count, because `TileView` takes one.
 - The first sync after the update replaces the downloaded items of GitHub.com accounts with preset results. It reports
   nothing, and items that no selected preset holds leave without a notification.
 - Editing a preset's filter, kinds, scopes or sort shows it as never fetched until its next search. Its old result and

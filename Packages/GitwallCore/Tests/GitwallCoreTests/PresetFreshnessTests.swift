@@ -159,12 +159,69 @@ struct PresetFreshnessTests {
             == PresetCountDisplay(count: nil, isCapped: false, fetchedAt: nil, failure: nil, isWaitingForSync: true))
     }
 
-    @Test("a preset of both accounts whose GitHub part was never fetched shows the GitLab items with the GitLab time")
+    @Test("a preset of both accounts whose GitHub part was never fetched waits, with no count and no time")
     func mixedWithGitLabOnly() {
         let snapshot = snapshot([item(1, github), item(2, gitlab)], gitlabSyncedAt: minutes(-2))
 
         #expect(display(docs, snapshot)
+            == PresetCountDisplay(count: nil, isCapped: false, fetchedAt: nil, failure: nil, isWaitingForSync: true))
+    }
+
+    @Test("a preset of both accounts whose GitHub result is of another selection waits like one never fetched")
+    func mixedWithOtherSelection() {
+        let one = item(1, github), two = item(2, gitlab)
+        var stale = result(docs, holding: [one], fetchedAt: minutes(-3))
+        stale.selection = "an edited filter"
+        let snapshot = snapshot([one, two], results: [stale], gitlabSyncedAt: minutes(-2))
+
+        #expect(display(docs, snapshot)
+            == PresetCountDisplay(count: nil, isCapped: false, fetchedAt: nil, failure: nil, isWaitingForSync: true))
+    }
+
+    @Test("a preset of both accounts counts every part and is dated by the older one once its GitHub part has a result")
+    func mixedAfterGitHubResult() {
+        let one = item(1, github), two = item(2, gitlab)
+        let waiting = snapshot([one, two], gitlabSyncedAt: minutes(-2))
+        let fetched = snapshot([one, two], results: [result(docs, holding: [one], fetchedAt: minutes(-4))],
+                               gitlabSyncedAt: minutes(-2))
+
+        #expect(display(docs, waiting).isWaitingForSync)
+        #expect(display(docs, fetched)
+            == PresetCountDisplay(count: 2, isCapped: false, fetchedAt: minutes(-4), failure: nil, isWaitingForSync: false))
+    }
+
+    @Test("a GitLab preset counts once its account synced, whatever presets of the searching account have no result")
+    func gitlabPresetBesideSearchingAccount() {
+        let snapshot = snapshot([item(1, github), item(2, gitlab)], gitlabSyncedAt: minutes(-2))
+
+        #expect(display(gitlabDocs, snapshot)
             == PresetCountDisplay(count: 1, isCapped: false, fetchedAt: minutes(-2), failure: nil, isWaitingForSync: false))
+    }
+
+    @Test("a preset of two searching accounts waits while one of them has no result")
+    func twoSearchingAccountsOneWithoutResult() {
+        let second = Account(kind: .github, baseURL: URL(string: "https://github.com")!, displayName: "Second",
+                             me: UserRef(login: "carol"))
+        let one = item(1, github), two = item(2, second)
+        let status = [github.id: FetchStatus(state: .ok, lastSuccessAt: minutes(-1)),
+                      second.id: FetchStatus(state: .ok, lastSuccessAt: minutes(-1))]
+        func snapshot(_ results: [PresetResult]) -> Snapshot {
+            Snapshot(fetchedAt: minutes(-1), items: [one, two], accountStatus: status, presetResults: results,
+                     searchedAccounts: [github.id, second.id])
+        }
+        let first = result(docs, holding: [one], fetchedAt: minutes(-3))
+        var other = first
+        other.accountID = second.id
+        other.itemIDs = [two.id]
+        other.fetchedAt = minutes(-7)
+        func display(_ snapshot: Snapshot) -> PresetCountDisplay {
+            PresetFreshness.display(for: docs, in: snapshot, accounts: [github, second], now: now)
+        }
+
+        #expect(display(snapshot([first]))
+            == PresetCountDisplay(count: nil, isCapped: false, fetchedAt: nil, failure: nil, isWaitingForSync: true))
+        #expect(display(snapshot([first, other]))
+            == PresetCountDisplay(count: 2, isCapped: false, fetchedAt: minutes(-7), failure: nil, isWaitingForSync: false))
     }
 
     @Test("a preset of both accounts with both parts fetched is dated by the older part")
