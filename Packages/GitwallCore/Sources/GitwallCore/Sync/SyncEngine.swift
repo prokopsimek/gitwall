@@ -142,17 +142,22 @@ public actor SyncEngine {
     /// It waits while a sync or another on-demand fetch runs. Requests that wait at the same time run as one fetch of
     /// all their presets, and each of them gets that fetch's result. What ran during the wait may have fetched those
     /// presets already, so a fetch that had to wait fetches only the ones that, by the snapshot it starts from, still
-    /// need it (``PresetFreshness/needsFetchOnOpen(_:in:accounts:now:interval:)``). Each fetch writes one line of counts
+    /// need it (``PresetFreshness/needsFetchOnOpen(_:in:accounts:now:interval:)``). The presets in `force` are the
+    /// exception: they are fetched whatever the snapshot says, and a request that joins a waiting fetch adds its `force`
+    /// to that fetch's. Each fetch writes one line of counts
     /// to the unified log, marked as on demand.
+    /// - Parameter force: The presets of `presetIDs` to fetch even after a wait that left them looking fresh, for a
+    ///   request that must not be dropped, such as a click on "Try Again".
     /// - Returns: Nil when the fetch waited and none of its presets was left to fetch: no provider was asked and neither
     ///   the snapshot nor the log was written.
-    public func syncPresets(_ presetIDs: [UUID]) async throws -> SyncResult? {
+    public func syncPresets(_ presetIDs: [UUID], force: Set<UUID> = []) async throws -> SyncResult? {
         callCount += 1
         if pendingFetch != nil {
             pendingFetch?.presetIDs.formUnion(presetIDs)
+            pendingFetch?.forced.formUnion(force)
             return try await withCheckedThrowingContinuation { pendingFetch?.callers.append($0) }
         }
-        pendingFetch = PendingFetch(presetIDs: Set(presetIDs))
+        pendingFetch = PendingFetch(presetIDs: Set(presetIDs), forced: force)
         let waited = await takeTurn()
         defer { endTurn() }
         // From here on a new request waits for the next turn instead of joining this fetch.
@@ -161,7 +166,7 @@ public actor SyncEngine {
 
         let result: Result<SyncResult?, any Error>
         do {
-            result = .success(try await fetchPresets(fetch.presetIDs, waited: waited))
+            result = .success(try await fetchPresets(fetch.presetIDs, forced: fetch.forced, waited: waited))
         } catch {
             result = .failure(error)
         }
@@ -171,9 +176,11 @@ public actor SyncEngine {
 
     // MARK: - Turns
 
-    /// An on-demand fetch waiting for its turn: every preset asked for so far, and the requests that joined it.
+    /// An on-demand fetch waiting for its turn: every preset asked for so far, the ones among them that are fetched
+    /// whatever the snapshot says, and the requests that joined it.
     private struct PendingFetch {
         var presetIDs: Set<UUID>
+        var forced: Set<UUID>
         var callers: [CheckedContinuation<SyncResult?, any Error>] = []
     }
 
@@ -199,9 +206,9 @@ public actor SyncEngine {
 
     // MARK: - Internals
 
-    /// See ``syncPresets(_:)``. Without a wait nothing is left out: the presets were picked by the same rule right
+    /// See ``syncPresets(_:force:)``. Without a wait nothing is left out: the presets were picked by the same rule right
     /// before, and nothing ran since.
-    private func fetchPresets(_ presetIDs: Set<UUID>, waited: Bool) async throws -> SyncResult? {
+    private func fetchPresets(_ presetIDs: Set<UUID>, forced: Set<UUID>, waited: Bool) async throws -> SyncResult? {
         let clock = ContinuousClock()
         let start = clock.now
         let config = try configStore.load()
@@ -211,7 +218,7 @@ public actor SyncEngine {
         var presets = config.presets.filter { presetIDs.contains($0.id) }
         if waited, let previous {
             presets = presets.filter {
-                PresetFreshness.needsFetchOnOpen($0, in: previous, accounts: config.accounts, now: timestamp,
+                forced.contains($0.id) || PresetFreshness.needsFetchOnOpen($0, in: previous, accounts: config.accounts, now: timestamp,
                                                  interval: config.settings.refreshInterval)
             }
             guard !presets.isEmpty else { return nil }

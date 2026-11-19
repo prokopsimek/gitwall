@@ -415,22 +415,24 @@ final class AppEnvironment {
     }
 
     /// "Try again" on a list that has nothing fetched: fetches `preset` now, whatever its last failure says.
-    /// ``fetchOnOpen(_:)`` leaves a refused query alone until the sync interval has passed; a click must not wait.
+    /// ``fetchOnOpen(_:)`` leaves a refused query alone until the sync interval has passed; a click must not wait. The
+    /// preset is forced: even when the click has to wait for a sync or another fetch, it is fetched whatever the snapshot
+    /// that wait leaves says.
     func retryFetch(of preset: Preset) {
         guard !usesSampleContent, syncEngine != nil, snapshot != nil, !fetchingPresetIDs.contains(preset.id) else { return }
-        fetch([preset.id])
+        fetch([preset.id], force: [preset.id])
     }
 
     /// The fetch of `ids` that ``fetchOnOpen(_:)`` and ``retryFetch(of:)`` share, with the in-flight bookkeeping the
     /// lists read their spinner from.
-    private func fetch(_ ids: [UUID]) {
+    private func fetch(_ ids: [UUID], force: Set<UUID> = []) {
         guard let syncEngine else { return }
         fetchingPresetIDs.formUnion(ids)
         Task {
             defer { self.fetchingPresetIDs.subtract(ids) }
             do {
                 // Nil: a sync that ran first left nothing to fetch, and there is nothing new to take.
-                if let result = try await syncEngine.syncPresets(ids) {
+                if let result = try await syncEngine.syncPresets(ids, force: force) {
                     await self.take(result, from: .fetchOnOpen)
                 }
             } catch {

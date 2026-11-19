@@ -292,4 +292,125 @@ extension SyncEngineTests {
         #expect(env.githubProvider.presetSearches.map(\.search) == [search(review)])
         #expect(fetched.snapshot.result(for: review, account: env.github.id)?.fetchedAt == later)
     }
+
+    // MARK: - A forced fetch is never left out
+
+    /// GitHub searched presets and the last search of `presets` was refused a minute before `env.now`, which is well
+    /// inside the sync interval, so ``PresetFreshness`` counts each of them as asked just now.
+    func prepareRefused(_ env: Env, presets: [Preset]) throws {
+        let refused = presets.map {
+            PresetResult(presetID: $0.id, accountID: env.github.id, itemIDs: [], fetchedAt: nil, totalCount: 0,
+                         isComplete: false, selection: $0.selectionFingerprint,
+                         failure: PresetQueryFailure(code: "422", at: env.minutes(-1)))
+        }
+        try preparePresetSearch(env, presets: presets, results: refused, searched: [env.github.id])
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        env.gitlabProvider.results[env.gitlab.id] = .success([env.item(2, account: env.gitlab)])
+    }
+
+    @Test("a forced fetch that waited for a sync searches its preset although the query was refused a minute ago",
+          .timeLimit(.minutes(1)))
+    func forcedFetchSearchesRefusedPreset() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review
+        try prepareRefused(env, presets: [review])
+        env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
+        let selection = try showing([], env: env)
+        let gate = Gate()
+        let engine = engine(env, holding: .fetchItems, of: .gitlab, until: gate)
+
+        async let syncing = engine.sync(selection: selection)
+        await calls(1, to: engine)
+        async let fetching = engine.syncPresets([review.id], force: [review.id])
+        await calls(2, to: engine)
+        await gate.open()
+        _ = try await syncing
+        let fetched = try #require(try await fetching)
+
+        #expect(env.githubProvider.presetSearches.map(\.search) == [search(review)])
+        #expect(fetched.snapshot.result(for: review, account: env.github.id)?.fetchedAt == env.now)
+        #expect(fetched.snapshot.items.contains { $0.number == 3 })
+    }
+
+    @Test("a forced fetch that joined another caller's waiting fetch of the same preset searches it for both",
+          .timeLimit(.minutes(1)))
+    func forcedFetchJoinsPendingFetch() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review
+        try prepareRefused(env, presets: [review])
+        env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
+        let selection = try showing([], env: env)
+        let gate = Gate()
+        let engine = engine(env, holding: .fetchItems, of: .gitlab, until: gate)
+
+        async let syncing = engine.sync(selection: selection)
+        await calls(1, to: engine)
+        async let first = engine.syncPresets([review.id])
+        await calls(2, to: engine)
+        async let second = engine.syncPresets([review.id], force: [review.id])
+        await calls(3, to: engine)
+        await gate.open()
+        _ = try await syncing
+        let one = try #require(try await first)
+        let other = try #require(try await second)
+
+        #expect(env.githubProvider.presetSearches.map(\.search) == [search(review)])
+        #expect(one.snapshot == other.snapshot)
+        #expect(one.snapshot.result(for: review, account: env.github.id)?.fetchedAt == env.now)
+    }
+
+    @Test("a fetch that is not forced still drops a preset whose query was refused a minute ago after waiting",
+          .timeLimit(.minutes(1)))
+    func unforcedFetchDropsRefusedPreset() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review
+        try prepareRefused(env, presets: [review])
+        let selection = try showing([], env: env)
+        let gate = Gate()
+        let engine = engine(env, holding: .fetchItems, of: .gitlab, until: gate)
+
+        async let syncing = engine.sync(selection: selection)
+        await calls(1, to: engine)
+        async let fetching = engine.syncPresets([review.id])
+        await calls(2, to: engine)
+        await gate.open()
+        _ = try await syncing
+        let fetched = try await fetching
+
+        #expect(fetched == nil)
+        #expect(env.githubProvider.presetSearches.isEmpty)
+    }
+
+    @Test("in one joined fetch only the preset that is not forced and not in need of a fetch is dropped",
+          .timeLimit(.minutes(1)))
+    func forcedAndUnforcedInOneFetch() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review, docs = docs
+        try prepareRefused(env, presets: [review, docs])
+        env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
+        env.githubProvider.presetFetches[search(docs)] = found([env.item(4, account: env.github)])
+        let selection = try showing([], env: env)
+        let gate = Gate()
+        let engine = engine(env, holding: .fetchItems, of: .gitlab, until: gate)
+
+        async let syncing = engine.sync(selection: selection)
+        await calls(1, to: engine)
+        async let first = engine.syncPresets([docs.id])
+        await calls(2, to: engine)
+        async let second = engine.syncPresets([review.id], force: [review.id])
+        await calls(3, to: engine)
+        await gate.open()
+        _ = try await syncing
+        let one = try #require(try await first)
+        let other = try #require(try await second)
+
+        #expect(env.githubProvider.presetSearches.map(\.search) == [search(review)])
+        #expect(one.snapshot == other.snapshot)
+        #expect(one.snapshot.result(for: review, account: env.github.id)?.fetchedAt == env.now)
+        #expect(one.snapshot.result(for: docs, account: env.github.id)?.fetchedAt == nil)
+    }
 }
