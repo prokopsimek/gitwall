@@ -176,6 +176,98 @@ struct RetryTests {
         #expect(await transport.count == 1)
         #expect(await waits.delays.isEmpty)
     }
+
+    // MARK: A body that is not JSON
+    //
+    // GitHub once answered a GraphQL request with 200 after about 12 s and a body that was not JSON. Such an answer is
+    // repeated like a gateway error. JSON of an unexpected shape would fail the same way again, so it is final at once.
+
+    /// Bodies that cannot be read as JSON at all: none, an HTML page and a document cut off in the middle.
+    private static let notJSON = ["", "<html><body>Unicorn!</body></html>", #"{"data":{"r0":{"nameWith"#]
+
+    @Test("a REST answer of 200 whose body is not JSON succeeds when the repeat gets a good answer", arguments: notJSON)
+    func restNotJSONRecovers(body: String) async throws {
+        let transport = StubTransport([.json(body), try Self.user()])
+        let waits = SleepRecorder()
+
+        _ = try await GitHubProvider(transport: transport, sleep: waits.sleep).verify(baseURL: github, token: "t")
+
+        #expect(await transport.requestURLs == [userURL, userURL])
+        #expect(await waits.delays == [.seconds(1)])
+    }
+
+    @Test("a GraphQL answer of 200 whose body is not JSON succeeds when the repeat gets a good answer", arguments: notJSON)
+    func graphQLNotJSONRecovers(body: String) async throws {
+        let transport = StubTransport([.json(body), Self.noPullRequests])
+        let waits = SleepRecorder()
+
+        let items = try await GitHubProvider(transport: transport, sleep: waits.sleep)
+            .fetchItems(account: account, token: "t", kinds: [.pullRequest])
+
+        #expect(items.isEmpty)
+        #expect(await transport.requests.count == 2)
+        let first = try await transport.graphQLQuery(at: 0)
+        let repeated = try await transport.graphQLQuery(at: 1)
+        #expect(repeated == first)
+        #expect(await waits.delays == [.seconds(1)])
+    }
+
+    @Test("a body that stays not JSON fails as a passing failure after three attempts and two waits")
+    func notJSONOutlastsRepeats() async throws {
+        let transport = StubTransport(Self.notJSON.map { .json($0) } + [try Self.user()])
+        let waits = SleepRecorder()
+
+        do {
+            _ = try await GitHubProvider(transport: transport, sleep: waits.sleep).verify(baseURL: github, token: "t")
+            Issue.record("Expected the answer that is not JSON to fail the request")
+        } catch ProviderError.network(let message) {
+            #expect(message == "GitHub sent an answer that could not be read.")
+        }
+        #expect(await transport.requests.count == 3)
+        #expect(await waits.delays == [.seconds(1), .seconds(2)])
+    }
+
+    @Test("a sync cancelled while the client waits after a body that is not JSON sends nothing more")
+    func cancelledWhileWaitingAfterNotJSON() async throws {
+        let transport = StubTransport([.json("<html>"), Self.noPullRequests])
+        // The sync is cancelled during the wait, and the wait returns as if it had not noticed.
+        let provider = GitHubProvider(transport: transport, sleep: { _ in withUnsafeCurrentTask { $0?.cancel() } })
+        let account = account
+
+        let sync = Task { try await provider.fetchItems(account: account, token: "t", kinds: [.pullRequest]) }
+
+        await #expect(throws: CancellationError.self) { try await sync.value }
+        #expect(await transport.requests.count == 1)
+    }
+
+    @Test("a REST answer of JSON in an unexpected shape fails at once as an unexpected response",
+          arguments: [#"{"unexpected":true}"#, "[]", #""text""#, "42", "null"])
+    func restWrongShapeIsFinal(body: String) async throws {
+        let transport = StubTransport([.json(body), try Self.user()])
+        let waits = SleepRecorder()
+
+        do {
+            _ = try await GitHubProvider(transport: transport, sleep: waits.sleep).verify(baseURL: github, token: "t")
+            Issue.record("Expected an unexpected response")
+        } catch ProviderError.invalidResponse {}
+        #expect(await transport.requests.count == 1)
+        #expect(await waits.delays.isEmpty)
+    }
+
+    @Test("a GraphQL answer of JSON in an unexpected shape fails at once as an unexpected response")
+    func graphQLWrongShapeIsFinal() async throws {
+        let wrongShape = StubTransport.Response.json(#"{"data":{"r0":{"nameWithOwner":7,"pullRequests":[]}}}"#)
+        let transport = StubTransport([wrongShape, Self.noPullRequests])
+        let waits = SleepRecorder()
+
+        do {
+            _ = try await GitHubProvider(transport: transport, sleep: waits.sleep)
+                .fetchItems(account: account, token: "t", kinds: [.pullRequest])
+            Issue.record("Expected an unexpected response")
+        } catch ProviderError.invalidResponse {}
+        #expect(await transport.requests.count == 1)
+        #expect(await waits.delays.isEmpty)
+    }
 }
 
 /// Passes every request on to the real transport and counts them.

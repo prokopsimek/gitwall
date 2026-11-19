@@ -8,12 +8,16 @@ public struct SyncResult: Sendable {
     public let searches: SearchFindings
     /// The counts this sync wrote to the log; nil for a sync without a selection, which writes none.
     let report: SyncReport?
+    /// The accounts this sync could not fetch but left showing what they showed, as it logged them. None for an
+    /// on-demand fetch, which changes no account's status.
+    let quietFailures: [QuietFailure]
 }
 
 /// Fetches every configured account through its provider and writes the merged snapshot.
 /// Accounts that fail keep their previous items so the widget never goes blank because of one outage. A passing outage
-/// (a gateway error or a lost connection) does not even show until it lasts for a third sync in a row; until then the
-/// account keeps what it showed (`ok`, or an error it already had) and only ``FetchStatus/consecutiveFailures`` counts it.
+/// (a gateway error, a lost connection or an answer that could not be read) does not even show until it lasts for a
+/// third sync in a row; until then the account keeps what it showed (`ok`, or an error it already had), only
+/// ``FetchStatus/consecutiveFailures`` counts it, and the unified log gets a line about it.
 /// Preset results carry over from the previous snapshot, except those of deleted presets and removed accounts, and so do
 /// the items they hold. With a ``SyncSelection``, an account whose provider searches presets on the server searches only
 /// the selected presets, asks the provider what became of the items that left those results, and reports what it
@@ -24,7 +28,7 @@ public struct SyncResult: Sendable {
 /// back, and the actor alone would let another one start during those waits and lose what the first one wrote.
 public actor SyncEngine {
     /// Failed syncs in a row, for a passing reason, that an account rides out without showing an error.
-    private static let quietFailures = 2
+    static let quietFailures = 2
 
     private let providers: [ProviderKind: any GitProvider]
     private let tokens: any TokenReading
@@ -76,7 +80,7 @@ public actor SyncEngine {
     ///
     /// The searching accounts become the snapshot's ``Snapshot/searchedAccounts``; a sync without a selection names none.
     /// It waits while another sync or an on-demand fetch runs. Each sync with a selection writes one line of counts to
-    /// the unified log.
+    /// the unified log, failed accounts included, and every sync writes one line per account that failed quietly.
     public func sync(selection: SyncSelection? = nil) async throws -> SyncResult {
         callCount += 1
         await takeTurn()
@@ -102,13 +106,17 @@ public actor SyncEngine {
             searchedAccounts: merged.findings.accounts
         )
         try snapshotStore.save(snapshot)
+        let quietFailures = outcomes.compactMap(\.quietFailure)
+        for failure in quietFailures { failure.write() }
         let report = selection.map { selection in
-            SyncReport(selection: selection, searches: outcomes.reduce(0) { $0 + $1.searches },
+            SyncReport(selection: selection, failedAccounts: outcomes.filter(\.failed).count,
+                       searches: outcomes.reduce(0) { $0 + $1.searches },
                        requests: outcomes.reduce(0) { $0 + $1.requests }, items: snapshot.items.count,
                        duration: clock.now - start)
         }
         report?.write()
-        return SyncResult(snapshot: snapshot, previous: previous, searches: merged.findings, report: report)
+        return SyncResult(snapshot: snapshot, previous: previous, searches: merged.findings, report: report,
+                          quietFailures: quietFailures)
     }
 
     /// Fetches `presetIDs` now, for a window that opens them, and writes the snapshot.
@@ -208,7 +216,8 @@ public actor SyncEngine {
             items: snapshot.items.count, duration: clock.now - start
         )
         report.write()
-        return SyncResult(snapshot: snapshot, previous: previous, searches: merged.findings, report: report)
+        return SyncResult(snapshot: snapshot, previous: previous, searches: merged.findings, report: report,
+                          quietFailures: [])
     }
 
     /// How an account is fetched in one sync.
@@ -330,6 +339,8 @@ public actor SyncEngine {
         var searched = false
         /// Whether an account error stopped the fetch, its token could not be read included.
         var failed = false
+        /// The line for the log when an account error stopped the fetch and the account rides it out unseen.
+        var quietFailure: QuietFailure?
         /// Items held by a result fetched now whose pair had an earlier result of the same selection.
         var compared: Set<String> = []
         /// What the provider said about the items that left a fresh result.
@@ -376,7 +387,8 @@ public actor SyncEngine {
         }
 
         /// A gateway error or a lost connection usually heals by the next sync, so it counts quietly up to
-        /// `quietFailures` and shows from the next one on. Anything else shows at once and ends the series.
+        /// `quietFailures` and shows from the next one on. Anything else shows at once and ends the series. A provider
+        /// reports an answer it could not read as a network error, so such an answer counts the same way.
         func failed(by error: any Error) -> FetchStatus {
             switch error as? ProviderError {
             case .unauthorized:
@@ -509,6 +521,12 @@ public actor SyncEngine {
         func failure(_ status: FetchStatus) -> AccountOutcome {
             AccountOutcome(accountID: account.id, items: before.items, status: status, failed: true)
         }
+        func failure(by error: any Error) -> AccountOutcome {
+            let status = before.failed(by: error)
+            var outcome = failure(status)
+            outcome.quietFailure = Self.quietFailure(of: account, by: error, leaving: status)
+            return outcome
+        }
 
         let token: String
         switch await readToken(for: account, before: before) {
@@ -534,15 +552,25 @@ public actor SyncEngine {
             // The token may just have expired. Give the reader one chance to refresh it silently.
             do {
                 guard let refreshed = try await tokens.tokenAfterUnauthorized(for: account.id) else {
-                    return failure(before.failed(by: ProviderError.unauthorized))
+                    return failure(by: ProviderError.unauthorized)
                 }
                 return await succeed(try await provider.fetchItems(account: account, token: refreshed, kinds: kinds), token: refreshed)
             } catch {
-                return failure(before.failed(by: error))
+                return failure(by: error)
             }
         } catch {
-            return failure(before.failed(by: error))
+            return failure(by: error)
         }
+    }
+
+    /// What the log gets when `error` left `account` with `status`: a quiet failure while the account rides it out,
+    /// nothing when the failure shows or is no passing one.
+    private static func quietFailure(
+        of account: Account, by error: any Error, leaving status: FetchStatus
+    ) -> QuietFailure? {
+        // Only a passing failure counts, and it shows once the count passes `quietFailures`.
+        guard (1...quietFailures).contains(status.consecutiveFailures) else { return nil }
+        return QuietFailure(provider: account.kind, error: error, failure: status.consecutiveFailures)
     }
 
     /// One preset search, with its error as a value so the caller can tell a refused query from a failed account.
@@ -641,9 +669,11 @@ public actor SyncEngine {
             let fresh = Self.keepingPriorities(on: found, from: before.items)
             let items = fresh + before.items.filter { !foundIDs.contains($0.id) }
             // Nothing is looked up: the account failed, and it keeps every item it had anyway.
-            return AccountOutcome(accountID: account.id, items: items, status: before.failed(by: accountError),
+            let status = before.failed(by: accountError)
+            let quiet = Self.quietFailure(of: account, by: accountError, leaving: status)
+            return AccountOutcome(accountID: account.id, items: items, status: status,
                                   presets: presets, searches: searches, requests: requests, searched: true,
-                                  failed: true, compared: compared)
+                                  failed: true, quietFailure: quiet, compared: compared)
         }
         // Searches refused on their own say nothing about the account.
         guard fetchedAny else {

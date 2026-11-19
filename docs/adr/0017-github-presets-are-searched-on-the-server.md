@@ -117,13 +117,14 @@ so excluding either on the server could hide what the preset shows.
 ### Length, paging and sources
 
 - Gitwall keeps a query within 4000 characters (`GraphQLQueries.maxPresetSearchQueryLength`, counted in UTF-8 bytes);
-  GitHub accepted and fully evaluated one of 4273. A query that does not fit is split by its sources into several
-  searches. When the filter does not fit beside even the longest source alone, its longest top-level terms are left
-  out until it does. A long preset therefore still syncs and downloads more. The limit of 256 characters stays for the
-  `ISSUE` search.
+  GitHub accepted and fully evaluated one of 4273, and answered 500 to a later one over 4000. A query that does not fit
+  is split by its sources into several searches. When the filter does not fit beside even the longest source alone,
+  its longest top-level terms are left out until it does. A long preset therefore still syncs and downloads more. The
+  limit of 256 characters stays for the `ISSUE` search.
 - Pages hold 25 pull requests or 100 issues (ADR 0016), up to GitHub's cap of 1000 results
   (`maxPresetSearchResults`). A result is complete when GitHub had no further page and counted no more than 1000.
-  Above that the unified log gets a warning and the count shows "+".
+  Above that the unified log gets a warning and the count shows "+". At the cap GitHub itself stops: the tenth page
+  of 100 says there is no next page, and a request with its cursor returns no nodes.
 - Only items from the search's own sources are kept. When GitHub knows none of the sources of the OR group, it drops
   the group and searches all of GitHub.
 - Review requests addressed to a team are resolved once per `fetchPresetItems`, as `fetchItems` does once per fetch.
@@ -178,13 +179,16 @@ Accounts that download everything keep the old rules of the diff.
 
 ### Failures
 
-- An account error (a refused token, a rate limit, a gateway error after the retries, no connection) stops the
-  account's remaining searches in this sync. A refused token first gets one silent refresh per sync and the search is
-  sent again, as in a full fetch. The account keeps every item and result, no priorities are read, and its
-  `FetchStatus` follows the quiet period of ADR 0016.
+- An account error (a refused token, a rate limit, a gateway error or an answer that is not JSON after the repeats, no
+  connection) stops the account's remaining searches in this sync. A refused token first gets one silent refresh per
+  sync and the search is sent again, as in a full fetch. The account keeps every item and result, no priorities are
+  read, and its `FetchStatus` follows the quiet period of ADR 0016.
 - A search GitHub refuses on its own, GraphQL errors in a 200 answer or a status of 400 or 422
   (`PresetSearchFailure`), stays with its preset as a query failure, and the next search runs. It never changes the
-  account's `FetchStatus`.
+  account's `FetchStatus`. GitHub does not refuse a malformed query with an error: an unclosed parenthesis or an
+  unknown qualifier comes back as 200 with no results (see *Checked against GitHub*). So "Query failed" comes only
+  from GraphQL errors, 400 or 422. Gitwall never sends such a query anyway, because `SearchQuery.parse` rejects it,
+  the preset matches nothing, and `PresetSearchQuery` sends none of an unreadable query.
 - The account is `ok` with a new `lastSuccessAt` once at least one search succeeded and none ended in an account
   error. When only refused searches ran, or none of its presets was selected, it keeps the status it had.
 - After the searches, the project priorities ([ADR 0012](0012-priority-comes-from-a-projects-field-then-labels.md))
@@ -199,8 +203,9 @@ an account look broken. One sync or on-demand fetch runs at a time. Fetch reques
 one fetch.
 
 Each sync with a selection and each on-demand fetch writes one line to the unified log (`SyncReport`, category `sync`)
-with the presets per source, the searches, requests and items, and the duration. Queries carry logins, so no query,
-login or name ever goes to the log.
+with the presets per source, the searches, requests and items, and the duration, and with the accounts an account error
+stopped (a sync with a selection only when there were any; see ADR 0016 for the line of a quiet failure). Queries carry
+logins, so no query, login or name ever goes to the log.
 
 ### What a change must keep
 
@@ -258,6 +263,17 @@ The first rows ran over organizations of a real account and are given as counts 
 | `is:pr -is:pr` | every item, so `is:` chooses kind and state for the whole search |
 | `-author:` with a login GitHub does not know | 0, the whole search comes back empty |
 | `PresetSearchQueryLiveTests` with a token, over 60 pull requests and 200 issues of `cli/cli` (311 s) | 35 rows of the translation table. In 32 the local filter's result is a subset of GitHub's answer, 3 skipped (one row with `@me`, two with a milestone the repository lacks), none failed |
+| A preset search for pull requests, `first: 25` / for issues, `first: 100` | `rateLimit.cost` 1, about 5.7 s / cost 2, about 5 s |
+| `nodes(ids:)` with 100 ids, 80 issues and 20 pull requests of `cli/cli` | cost 5, 3.5 s, no node null |
+| `repo:cli/cli (is:pr` / `repo:cli/cli frobnicate:1` | 200, no `errors`, `issueCount` 0 |
+| Six levels of parentheses / a trailing `AND` | 200 with results |
+| A trailing `OR` | 502, twice, after about 11 s each |
+| A query over 4000 characters | 500 |
+| `is:issue is:open archived:false repo:microsoft/vscode` (`issueCount` 18496) in pages of 100 | pages 1–10 hold 100 nodes each, page 10 has `hasNextPage` false, an 11th request with its cursor returns 200 and 0 nodes |
+
+`ISSUE_ADVANCED` accepted six levels of parentheses where `SearchQuery` allows five, so the local parser is the stricter
+one. Gitwall sends none of the malformed queries above, and no query over 4000 characters (see *Failures* and *Length,
+paging and sources*).
 
 Paging, splitting, merging, selection, the lookup and the diff are covered by `PresetSearchQueryTests`,
 `PresetFetchTests`, `ItemStateTests`, `SyncSelectionTests`, `PresetResultMergeTests`, `PresetFreshnessTests`,
@@ -276,6 +292,8 @@ README asks for nothing new.
 - A sync on GitHub.com sends, for each selected preset, one search per kind (more when a query is split), and one
   lookup per account when items left a result. A preset nobody sees costs nothing until it opens. The first sync with
   a selection on a real configuration sent 6 searches and 14 requests and kept 355 items.
+- The searches of an account run one after another. On 2026-11-19 a regular sync with 14–17 requests in a row took
+  90–102 s (4–8 s per request), within the default interval of 5 minutes.
 - Presets that are not selected show their last known count, with its time in the tooltip, and "–" before their first
   fetch. "+" shows in the popover, the sidebar, Settings › Presets and onboarding; widgets and wall tiles show the
   plain count, because `TileView` takes one.
@@ -298,11 +316,10 @@ README asks for nothing new.
 
 Open points, marked NEOVĚŘENO (not verified):
 
-- NEOVĚŘENO: which HTTP status GitHub uses to reject a malformed `ISSUE_ADVANCED` query. Gitwall takes 200 with
-  GraphQL errors, 400 and 422 as a refused query; any other status counts against the whole account.
-- NEOVĚŘENO: what GitHub answers for the 40th page of pull requests at the cap of 1000.
-- NEOVĚŘENO: the GraphQL rate-limit cost of a full preset search, of a `nodes(ids:)` batch and of the team lookup that
-  each preset fetch runs once.
+- NEOVĚŘENO: the cap of 1000 with pull requests in pages of 25, at the 40th page. It was checked with issues in pages
+  of 100 (see *Checked against GitHub*).
+- NEOVĚŘENO: the GraphQL rate-limit cost of the team lookup that each preset fetch runs once. A preset search and a
+  `nodes(ids:)` batch were measured (see *Checked against GitHub*).
 - NEOVĚŘENO: a sync cancelled while it waits for a retry writes `error` with a cancellation message for the account,
   as a sync cancelled during a request did before; whether this ever shows on screen.
 - NEOVĚŘENO: `totalCount` adds up the counts of a split search. When its source groups overlap, such as an

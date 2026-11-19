@@ -80,7 +80,8 @@ struct HTTPErrorMappingTests {
 
     @Test("Undecodable success body → invalidResponse")
     func invalidBody() async throws {
-        let error = try await verifyError(.json("not json at all"))
+        // JSON of the wrong shape. A body that is not JSON at all is repeated first (see RetryTests).
+        let error = try await verifyError(.json(#"{"unexpected":true}"#))
         guard case .invalidResponse = error else {
             Issue.record("Expected invalidResponse, got \(error)")
             return

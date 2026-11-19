@@ -11,40 +11,64 @@ GitHub itself was slow. An organization's pull request search with 100 nodes per
 side and then answered 502; with 25 per page it took 5–6 s (see *Checked against GitHub*). Issue nodes are lighter,
 because the `Issue` fragment asks for no review requests, reviews, merge state or checks.
 
-One such answer was enough to break the account. `GitHubClient` threw at the first 502, and `SyncEngine` wrote
-`error` with the message into the account's `FetchStatus` at the first failed sync. Settings › Accounts, Settings ›
-General, the popover, the main window and the widget all take an account's health from `FetchStatus.state`, directly
-or through `AppEnvironment`.
+One such answer was enough to break the account. `GitHubClient` threw at the first 502, and `SyncEngine` wrote `error`
+with the message into the account's `FetchStatus` at the first failed sync. Later the same day GitHub answered a GraphQL
+request of the installed build with 200 after about 12 s and a body that was not JSON. The client threw
+`invalidResponse` ("corrupted data at : The given data was not valid JSON."), which counted as any other error, so the
+account showed it at once, with no repeat and no quiet period. Settings › Accounts, Settings › General, the popover, the
+main window and the widget all take an account's health from `FetchStatus.state`, directly or through `AppEnvironment`.
 
 ## Decision
 
-### Repeat a gateway error, and only that
+### Repeat a gateway error or an answer that is not JSON, and only those
 
-`GitHubClient.send(_:)` is the one place every GitHub REST and GraphQL request goes through: lists, discovery, the
-priority lookup and Detail. A request answered with 502, 503 or 504 is sent again after 1 s and, if it fails the same
-way, after another 2 s (`retryDelays`), so it gets at most three attempts. After each wait the client checks for
-cancellation, so a sync cancelled meanwhile sends nothing more. The gateway error of the third attempt is thrown as
-before.
+`GitHubClient.send(_:decoding:)` is the one place every GitHub REST and GraphQL request goes through: lists, discovery,
+the priority lookup and Detail. It decodes the answer too, so one loop decides about every repeat. A request answered
+with 502, 503 or 504 is sent again after 1 s and, if it fails the same way, after another 2 s (`retryDelays`), so it
+gets at most three attempts. After each wait the client checks for cancellation, so a sync cancelled meanwhile sends
+nothing more. The gateway error of the third attempt is thrown as before.
 
-Nothing else is repeated. A 401, a rate limit (403 with the limit exhausted, or 429), any other 4xx or 5xx and GraphQL
-errors in a 200 answer would fail the same way again. Network errors are left to the sync. `URLSessionTransport`
-turns every `URLError` but a cancellation into `ProviderError.network`, and the quiet period below covers it. The
-GitLab client repeats nothing, because GitLab did not show the problem.
+A 2xx answer whose body is not JSON at all is repeated the same way, with the same waits. Not JSON means that
+`JSONSerialization` refuses the body, an empty one included; GitHub's answer of 2026-11-19 was such a body. When the
+third attempt gets one too, the client throws `ProviderError.network` with "GitHub sent an answer that could not be
+read.", so the quiet period below counts it like a lost connection. JSON of the wrong shape, a missing key or a type
+mismatch, stays `invalidResponse` and shows at once, because it would fail the same way again. Each repeat writes one
+info line with the status and, for a body that is not JSON, its size in bytes.
+
+Nothing else is repeated. A 401, a rate limit (403 with the limit exhausted, or 429), any other 4xx or 5xx, GraphQL
+errors in a 200 answer and JSON of the wrong shape would fail the same way again. Network errors are left to the sync.
+`URLSessionTransport` turns every `URLError` but a cancellation into `ProviderError.network`, and the quiet period below
+covers it. The GitLab client repeats nothing, because GitLab did not show the problem.
 
 ### Two failed syncs in a row stay quiet
 
 `FetchStatus.consecutiveFailures` counts syncs in a row that failed with 502, 503, 504 or a network error, for both
-providers. The first and the second leave the account as it was. A healthy account stays `ok` with no message and its
-previous `lastSuccessAt`. An account that already shows an error (sign in again, rate limited, error) keeps that state
-and message, so an outage never hides or replaces a problem that is already on screen. The third failure and every
-one after it writes `error` with the message, as before. A success, or any other failure, sets the count back to 0,
-and a 401 or a rate limit shows at once, as it always did. The account keeps its previous items throughout.
+providers. An answer that was still not JSON after the repeats reaches the sync as a network error and counts too. The
+first and the second leave the account as it was. A healthy account stays `ok` with no message and its previous
+`lastSuccessAt`. An account that already shows an error (sign in again, rate limited, error) keeps that state and
+message, so an outage never hides or replaces a problem that is already on screen. The third failure and every one after
+it writes `error` with the message, as before. A success, or any other failure, sets the count back to 0, and a 401 or a
+rate limit shows at once, as it always did. The account keeps its previous items throughout.
 
 The count lives in `FetchStatus` because every reader listed above takes the account's health from
 `FetchStatus.state`, so a state left unchanged there hides the outage everywhere at once. `SyncStatus` dates the data
 by the oldest `lastSuccessAt` among accounts in a series, which keeps "Updated …" true while an account rides out an
 outage. An account in a series that never succeeded leaves the data undated ("Not updated yet"). Snapshots written
 before this change have no `consecutiveFailures` and load with 0.
+
+### A quiet failure is written to the log
+
+A failure that stays quiet leaves nothing on screen, so the unified log is where it shows. Each regular sync writes one
+info line (category `sync`, `QuietFailure`) for every account it rides out, with the provider, the kind of error and the
+failure's place in the series, such as `A github account failed quietly (server 502), 1 of 2`. The line holds no
+message, because a message can carry a URL or a login. The third failure writes `error` and shows on screen, so it gets
+no such line. An on-demand fetch ([ADR 0017](0017-github-presets-are-searched-on-the-server.md)) changes no status and
+writes none.
+
+The line of a sync with a selection ("Synced presets of widgets …", `SyncReport`) gets `failed accounts N` when an
+account error stopped one or more accounts, a quiet one included; the line of an on-demand fetch always had the count.
+A sync in which every account worked writes its line as before. Until now a quietly failed sync read as a success in
+the log.
 
 ### Page sizes of the two searches
 
@@ -78,8 +102,10 @@ On 2026-11-19 with `gh api graphql`, against GitHub.com:
 | Pull request search over one organization, 100 nodes per page | 9.6–10.7 s, then 502 |
 | The same search, 25 nodes per page | 5–6 s |
 
-The repeats are covered by `RetryTests`, the quiet period by `SyncEngineTests` and `SyncStatusTests`, all with
-scripted answers.
+The answer that was not JSON came from the unified log of the installed build on the same day: 200 after 11.9 s.
+
+The repeats are covered by `RetryTests`, the quiet period by `SyncEngineTests`, `SyncStatusTests` and, through the real
+GitHub client, `NotJSONSyncTests`, and the log lines by `SyncEngineQuietFailureTests`, all with scripted answers.
 
 ## Consequences
 
@@ -87,7 +113,12 @@ scripted answers.
   interval of 5 minutes (`AppConfig.refreshIntervalMinutes`) that is about ten minutes after the first failed sync.
   Until then the account looks healthy and only the age in "Updated …" grows.
 - A failing request takes longer to fail. The waits add 3 s, and each repeat takes as long as the attempt it repeats.
-  The search measured above failed after about 10 s, so three attempts and the waits come to more than 30 s.
+  The search measured above failed after about 10 s, so three attempts and the waits come to more than 30 s. An answer
+  that is not JSON after about 12 s costs as much.
+- An answer that stays not JSON into a third sync shows as "Network error: GitHub sent an answer that could not be
+  read." instead of the decoding error it showed before.
+- The unified log tells a quiet sync from a healthy one: a line per account that failed quietly, and `failed accounts`
+  in the line of a sync with a selection. Neither holds anything but counts, kinds and the provider.
 - Organization sources on GitHub.com still send the `ISSUE` search with 100 per page, the query measured above. Until
   they use a smaller page, the retry and the quiet period are what keep its 502 off the screen.
 - The numbers are two constants, `GitHubClient.retryDelays` and `SyncEngine.quietFailures`.
