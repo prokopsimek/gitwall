@@ -97,6 +97,71 @@ struct SnapshotCodingTests {
         #expect(decoded.accountStatus[account]?.consecutiveFailures == 2)
     }
 
+    // MARK: - Preset results
+
+    static let presetA = UUID(uuidString: "00000000-0000-0000-0000-0000000000A1")!
+    static let presetB = UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
+    static let accountA = UUID(uuidString: "00000000-0000-0000-0000-0000000000A2")!
+    static let accountB = UUID(uuidString: "00000000-0000-0000-0000-0000000000B2")!
+
+    @Test("a snapshot written before preset results existed loads with none")
+    func versionOneWithoutResults() throws {
+        let json = """
+        {
+          "schemaVersion": 1,
+          "fetchedAt": "2026-09-10T06:35:00.000Z",
+          "items": [],
+          "accountStatus": {}
+        }
+        """
+        let snapshot = try SnapshotCoding.decode(Snapshot.self, from: Data(json.utf8))
+
+        #expect(snapshot.schemaVersion == 1)
+        #expect(snapshot.presetResults.isEmpty)
+    }
+
+    @Test("preset results are written under schema version 2 and read back unchanged")
+    func resultsRoundTrip() throws {
+        let fetched = PresetResult(
+            presetID: Self.presetA, accountID: Self.accountA,
+            itemIDs: ["\(Self.accountA.uuidString)/acme/app#1/pullRequest", "\(Self.accountA.uuidString)/acme/app#2/issue"],
+            fetchedAt: Date(timeIntervalSince1970: 1_800_000_000), totalCount: 1_200, isComplete: false,
+            selection: "selection-a",
+            failure: PresetQueryFailure(code: "validation", at: Date(timeIntervalSince1970: 1_800_000_300))
+        )
+        let neverFetched = PresetResult(
+            presetID: Self.presetB, accountID: Self.accountA, itemIDs: [], fetchedAt: nil, totalCount: 0,
+            isComplete: false, selection: "selection-b",
+            failure: PresetQueryFailure(code: "validation", at: Date(timeIntervalSince1970: 1_800_000_300))
+        )
+        let snapshot = Snapshot(fetchedAt: Date(timeIntervalSince1970: 1_800_000_300), items: [],
+                                presetResults: [fetched, neverFetched])
+
+        let encoded = try SnapshotCoding.encode(snapshot)
+
+        #expect(String(decoding: encoded, as: UTF8.self).contains(#""schemaVersion" : 2"#))
+        #expect(try SnapshotCoding.decode(Snapshot.self, from: encoded) == snapshot)
+    }
+
+    @Test("preset results are written in the order of preset, then account")
+    func resultsOrder() throws {
+        func result(_ preset: UUID, _ account: UUID) -> PresetResult {
+            PresetResult(presetID: preset, accountID: account, itemIDs: [], fetchedAt: nil, totalCount: 0,
+                         isComplete: false, selection: "s")
+        }
+        let snapshot = Snapshot(fetchedAt: Date(timeIntervalSince1970: 1_800_000_000), items: [], presetResults: [
+            result(Self.presetB, Self.accountB), result(Self.presetA, Self.accountB),
+            result(Self.presetB, Self.accountA), result(Self.presetA, Self.accountA),
+        ])
+
+        let decoded = try SnapshotCoding.decode(Snapshot.self, from: SnapshotCoding.encode(snapshot))
+
+        #expect(decoded.presetResults.map { [$0.presetID, $0.accountID] } == [
+            [Self.presetA, Self.accountA], [Self.presetA, Self.accountB],
+            [Self.presetB, Self.accountA], [Self.presetB, Self.accountB],
+        ])
+    }
+
     @Test("work item id is stable and derived from account, repo, number and kind")
     func workItemID() throws {
         let snapshot = try SnapshotCoding.decode(Snapshot.self, from: Fixtures.data("snapshot.json"))

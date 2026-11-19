@@ -10,6 +10,8 @@ public struct SyncResult: Sendable {
 /// Accounts that fail keep their previous items so the widget never goes blank because of one outage. A passing outage
 /// (a gateway error or a lost connection) does not even show until it lasts for a third sync in a row; until then the
 /// account keeps what it showed (`ok`, or an error it already had) and only ``FetchStatus/consecutiveFailures`` counts it.
+/// Preset results carry over from the previous snapshot, except those of deleted presets and removed accounts, and so do
+/// the items they hold.
 public actor SyncEngine {
     /// Failed syncs in a row, for a passing reason, that an account rides out without showing an error.
     private static let quietFailures = 2
@@ -56,10 +58,18 @@ public actor SyncEngine {
             status[outcome.accountID] = outcome.status
         }
 
+        let presetIDs = Set(config.presets.map(\.id))
+        let accountIDs = Set(config.accounts.map(\.id))
+        let presetResults = (previous?.presetResults ?? []).filter {
+            presetIDs.contains($0.presetID) && accountIDs.contains($0.accountID)
+        }
+        let kept = Self.items(items, keepingFrom: previous?.items ?? [], heldBy: presetResults)
+
         let snapshot = Snapshot(
             fetchedAt: timestamp,
-            items: FilterEngine.sort(items, by: .lastActivity),
-            accountStatus: status
+            items: FilterEngine.sort(kept, by: .lastActivity),
+            accountStatus: status,
+            presetResults: presetResults
         )
         try snapshotStore.save(snapshot)
         return SyncResult(snapshot: snapshot, previous: previous)
@@ -99,6 +109,30 @@ public actor SyncEngine {
             let kept = Dictionary(previous.map { ($0.id, $0.projectPriority) }, uniquingKeysWith: { first, _ in first })
             return (setting { kept[$0.id] ?? nil }, previousAccess)
         }
+    }
+
+    /// `fresh` and every previous item that one of `results` still holds although no account fetch returned it this
+    /// time. A preset this sync did not search keeps its result, so the snapshot must keep the items that result
+    /// names. An item is matched by its account and id together; an item in both lists is the fresh copy, once.
+    static func items(
+        _ fresh: [WorkItem], keepingFrom previous: [WorkItem], heldBy results: [PresetResult]
+    ) -> [WorkItem] {
+        let held = Set(results.flatMap { result in
+            result.itemIDs.map { ItemKey(accountID: result.accountID, itemID: $0) }
+        })
+        guard !held.isEmpty else { return fresh }
+        var present = Set(fresh.map { ItemKey(accountID: $0.accountID, itemID: $0.id) })
+        var items = fresh
+        for item in previous {
+            let key = ItemKey(accountID: item.accountID, itemID: item.id)
+            if held.contains(key), present.insert(key).inserted { items.append(item) }
+        }
+        return items
+    }
+
+    private struct ItemKey: Hashable {
+        let accountID: UUID
+        let itemID: String
     }
 
     /// Union of kinds requested by presets that can see the account; both kinds when no preset narrows it.

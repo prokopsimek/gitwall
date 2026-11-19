@@ -572,6 +572,117 @@ struct SyncEngineTests {
         #expect(gitlab?.consecutiveFailures == 0)
     }
 
+    // MARK: - Preset results
+
+    /// A result fetched five minutes before `env.now` that holds `items`.
+    func presetResult(_ presetID: UUID, _ account: Account, holding items: [WorkItem], env: Env) -> PresetResult {
+        PresetResult(presetID: presetID, accountID: account.id, itemIDs: items.map(\.id), fetchedAt: env.minutes(-5),
+                     totalCount: items.count, isComplete: true, selection: "selection")
+    }
+
+    /// Saves `presets` into the configuration and a previous snapshot with `items` and `results`.
+    func prepare(_ env: Env, presets: [Preset], items: [WorkItem], results: [PresetResult]) throws {
+        var config = try env.configStore.load()
+        config.presets = presets
+        try env.configStore.save(config)
+        try env.snapshotStore.save(Snapshot(fetchedAt: env.minutes(-5), items: items, presetResults: results))
+    }
+
+    @Test("results are carried into the new snapshot, except those of a deleted preset or a removed account")
+    func resultsCarriedForward() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let removed = Account(kind: .github, baseURL: URL(string: "https://github.com")!, displayName: "Old",
+                              me: UserRef(login: "me"))
+        let kept = [presetResult(review.id, env.github, holding: [], env: env),
+                    presetResult(review.id, env.gitlab, holding: [], env: env)].sorted(by: PresetResult.precedes)
+        try prepare(env, presets: [review], items: [], results: kept + [
+            presetResult(UUID(), env.github, holding: [], env: env),
+            presetResult(review.id, removed, holding: [], env: env),
+        ])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.presetResults == kept)
+        #expect(try env.snapshotStore.load()?.presetResults == kept)
+    }
+
+    @Test("an item a kept result holds stays although the account fetch did not return it; an item nobody holds goes")
+    func heldItemStays() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let held = env.item(1, account: env.github)
+        try prepare(env, presets: [review], items: [held, env.item(2, account: env.github)],
+                    results: [presetResult(review.id, env.github, holding: [held], env: env)])
+        env.githubProvider.results[env.github.id] = .success([env.item(3, account: env.github)])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.map(\.number).sorted() == [1, 3])
+    }
+
+    @Test("an item held only by the result of a deleted preset goes with it")
+    func itemOfDeletedPresetGoes() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let orphan = env.item(2, account: env.github)
+        try prepare(env, presets: [review], items: [orphan],
+                    results: [presetResult(UUID(), env.github, holding: [orphan], env: env)])
+        env.githubProvider.results[env.github.id] = .success([env.item(3, account: env.github)])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.map(\.number) == [3])
+    }
+
+    @Test("an item that is both fetched and held appears once, as fetched")
+    func fetchedCopyWins() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        var stale = env.item(1, account: env.github)
+        stale.title = "Old title"
+        try prepare(env, presets: [review], items: [stale],
+                    results: [presetResult(review.id, env.github, holding: [stale], env: env)])
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.map(\.title) == ["PR 1"])
+    }
+
+    @Test("a failed account keeps its items once, including those a result holds")
+    func failedAccountKeepsHeldItemsOnce() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let held = env.item(1, account: env.github)
+        try prepare(env, presets: [review], items: [held, env.item(2, account: env.github)],
+                    results: [presetResult(review.id, env.github, holding: [held], env: env)])
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 500, message: "boom"))
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.map(\.number).sorted() == [1, 2])
+    }
+
+    @Test("a result holds an item of its own account only")
+    func heldItemMatchesAccount() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let githubItem = env.item(1, account: env.github)
+        try prepare(env, presets: [review], items: [githubItem],
+                    results: [presetResult(review.id, env.gitlab, holding: [githubItem], env: env)])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.isEmpty)
+    }
+
     @Test("an account that never synced stays quiet on a gateway error and has no date yet")
     func neverSyncedAccountIsQuiet() async throws {
         let env = try Env()

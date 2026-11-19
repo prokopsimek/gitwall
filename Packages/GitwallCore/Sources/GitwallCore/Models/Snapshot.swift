@@ -46,8 +46,9 @@ extension FetchStatus: Codable {
         case state, lastSuccessAt, message, projectAccess, consecutiveFailures
     }
 
-    /// A status written by a build that did not count failures yet reads as none in a row. Encoding is synthesized
-    /// and writes every key.
+    /// A status written by a build that did not count failures yet reads as none in a row. Encoding is synthesized from
+    /// the same keys: it always writes `state` and `consecutiveFailures`, and leaves out `lastSuccessAt`, `message` and
+    /// `projectAccess` while they are nil.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         state = try container.decode(FetchState.self, forKey: .state)
@@ -60,29 +61,35 @@ extension FetchStatus: Codable {
 
 /// Everything the widget needs, written by the app into the App Group container.
 public struct Snapshot: Hashable, Sendable {
-    public static let currentSchemaVersion = 1
+    /// 2 added ``presetResults``. A snapshot of version 1 has none and loads as it is, without a migration.
+    public static let currentSchemaVersion = 2
 
     public var schemaVersion: Int
     public var fetchedAt: Date
     public var items: [WorkItem]
     public var accountStatus: [UUID: FetchStatus]
+    /// The last search per preset and account, for accounts that fetch each preset with its own search. Written in the
+    /// order of preset, then account. Read one through ``result(for:account:)``, which applies the selection check.
+    public var presetResults: [PresetResult]
 
     public init(
         schemaVersion: Int = Snapshot.currentSchemaVersion,
         fetchedAt: Date,
         items: [WorkItem],
-        accountStatus: [UUID: FetchStatus] = [:]
+        accountStatus: [UUID: FetchStatus] = [:],
+        presetResults: [PresetResult] = []
     ) {
         self.schemaVersion = schemaVersion
         self.fetchedAt = fetchedAt
         self.items = items
         self.accountStatus = accountStatus
+        self.presetResults = presetResults
     }
 }
 
 extension Snapshot: Codable {
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, fetchedAt, items, accountStatus
+        case schemaVersion, fetchedAt, items, accountStatus, presetResults
     }
 
     public init(from decoder: Decoder) throws {
@@ -102,6 +109,7 @@ extension Snapshot: Codable {
             status[id] = value
         }
         accountStatus = status
+        presetResults = try container.decodeIfPresent([PresetResult].self, forKey: .presetResults) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -111,5 +119,40 @@ extension Snapshot: Codable {
         try container.encode(items, forKey: .items)
         let raw = Dictionary(uniqueKeysWithValues: accountStatus.map { ($0.key.uuidString, $0.value) })
         try container.encode(raw, forKey: .accountStatus)
+        try container.encode(presetResults.sorted(by: PresetResult.precedes), forKey: .presetResults)
+    }
+}
+
+extension Snapshot {
+    /// The result of `preset` in `account`, or nil when this pair has none or it was fetched for another selection of
+    /// the preset. An edited filter, kinds, scopes or sort make the old items say nothing about the preset, so such a
+    /// result reads as never fetched for every reader, until a sync searches the preset again and replaces it. A result
+    /// that is returned can still be empty and without ``PresetResult/fetchedAt``, when every search of this selection
+    /// failed; its ``PresetResult/failure`` says so.
+    public func result(for preset: Preset, account: UUID) -> PresetResult? {
+        result(presetID: preset.id, account: account, selection: preset.selectionFingerprint)
+    }
+
+    /// The items `preset` shows, before ``FilterEngine`` runs over them. An account in `searchedAccounts` fetches the
+    /// preset with a search of its own, so only the items of that pair's result count, and none while it has no
+    /// result for the preset's selection. Every other account fetches all its items, and they all stay in, as before
+    /// preset results. The items keep the order of ``items``.
+    public func items(for preset: Preset, searchedAccounts: Set<UUID>) -> [WorkItem] {
+        guard !searchedAccounts.isEmpty else { return items }
+        let selection = preset.selectionFingerprint
+        var found: [UUID: Set<String>] = [:]
+        for account in searchedAccounts {
+            found[account] = Set(result(presetID: preset.id, account: account, selection: selection)?.itemIDs ?? [])
+        }
+        return items.filter { item in
+            guard let ids = found[item.accountID] else { return true }
+            return ids.contains(item.id)
+        }
+    }
+
+    private func result(presetID: UUID, account: UUID, selection: String) -> PresetResult? {
+        guard let result = presetResults.first(where: { $0.presetID == presetID && $0.accountID == account }),
+              result.selection == selection else { return nil }
+        return result
     }
 }
