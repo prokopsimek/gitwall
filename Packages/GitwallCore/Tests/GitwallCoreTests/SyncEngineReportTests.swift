@@ -51,7 +51,7 @@ extension SyncEngineTests {
         env.githubProvider.presetFetches[search(docs)] = found([], requests: 1)
         env.githubProvider.itemStates = [left.id: .closed]
 
-        let result = try await env.engine().syncPresets([review.id, docs.id, UUID()])
+        let result = try #require(try await env.engine().syncPresets([review.id, docs.id, UUID()]))
 
         let report = try #require(result.report)
         #expect(report.origin == .onDemand(presets: 2, failedAccounts: 0))
@@ -68,7 +68,7 @@ extension SyncEngineTests {
         try preparePresetSearch(env, presets: [review])
         env.githubProvider.presetFetches[search(review)] = .failure(.server(status: 502, message: "Bad Gateway"))
 
-        let result = try await env.engine().syncPresets([review.id])
+        let result = try #require(try await env.engine().syncPresets([review.id]))
 
         #expect(result.report?.origin == .onDemand(presets: 1, failedAccounts: 1))
         #expect(result.report?.requests == 0)

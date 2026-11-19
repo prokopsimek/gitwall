@@ -135,24 +135,28 @@ public actor SyncEngine {
     /// - ``Snapshot/fetchedAt`` stays as it was, and ``Snapshot/searchedAccounts`` gains the accounts that searched.
     ///
     /// It waits while a sync or another on-demand fetch runs. Requests that wait at the same time run as one fetch of
-    /// all their presets, and each of them gets that fetch's result. Each fetch writes one line of counts to the
-    /// unified log, marked as on demand.
-    public func syncPresets(_ presetIDs: [UUID]) async throws -> SyncResult {
+    /// all their presets, and each of them gets that fetch's result. What ran during the wait may have fetched those
+    /// presets already, so a fetch that had to wait fetches only the ones that, by the snapshot it starts from, still
+    /// need it (``PresetFreshness/needsFetchOnOpen(_:in:accounts:now:interval:)``). Each fetch writes one line of counts
+    /// to the unified log, marked as on demand.
+    /// - Returns: Nil when the fetch waited and none of its presets was left to fetch: no provider was asked and neither
+    ///   the snapshot nor the log was written.
+    public func syncPresets(_ presetIDs: [UUID]) async throws -> SyncResult? {
         callCount += 1
         if pendingFetch != nil {
             pendingFetch?.presetIDs.formUnion(presetIDs)
             return try await withCheckedThrowingContinuation { pendingFetch?.callers.append($0) }
         }
         pendingFetch = PendingFetch(presetIDs: Set(presetIDs))
-        await takeTurn()
+        let waited = await takeTurn()
         defer { endTurn() }
         // From here on a new request waits for the next turn instead of joining this fetch.
         guard let fetch = pendingFetch else { preconditionFailure("The fetch waiting for its turn was taken by another") }
         pendingFetch = nil
 
-        let result: Result<SyncResult, any Error>
+        let result: Result<SyncResult?, any Error>
         do {
-            result = .success(try await fetchPresets(fetch.presetIDs))
+            result = .success(try await fetchPresets(fetch.presetIDs, waited: waited))
         } catch {
             result = .failure(error)
         }
@@ -165,16 +169,18 @@ public actor SyncEngine {
     /// An on-demand fetch waiting for its turn: every preset asked for so far, and the requests that joined it.
     private struct PendingFetch {
         var presetIDs: Set<UUID>
-        var callers: [CheckedContinuation<SyncResult, any Error>] = []
+        var callers: [CheckedContinuation<SyncResult?, any Error>] = []
     }
 
-    /// Returns once nothing else runs, in the order the calls came.
-    private func takeTurn() async {
+    /// Returns once nothing else runs, in the order the calls came: true when another call ran first and this one waited.
+    @discardableResult
+    private func takeTurn() async -> Bool {
         guard isRunning else {
             isRunning = true
-            return
+            return false
         }
         await withCheckedContinuation { waiting.append($0) }
+        return true
     }
 
     /// Hands the turn straight to the next waiting call, so that nothing can start in between.
@@ -188,15 +194,23 @@ public actor SyncEngine {
 
     // MARK: - Internals
 
-    /// See ``syncPresets(_:)``.
-    private func fetchPresets(_ presetIDs: Set<UUID>) async throws -> SyncResult {
+    /// See ``syncPresets(_:)``. Without a wait nothing is left out: the presets were picked by the same rule right
+    /// before, and nothing ran since.
+    private func fetchPresets(_ presetIDs: Set<UUID>, waited: Bool) async throws -> SyncResult? {
         let clock = ContinuousClock()
         let start = clock.now
         let config = try configStore.load()
         let previous = try snapshotStore.load()
         let timestamp = now()
 
-        let presets = config.presets.filter { presetIDs.contains($0.id) }
+        var presets = config.presets.filter { presetIDs.contains($0.id) }
+        if waited, let previous {
+            presets = presets.filter {
+                PresetFreshness.needsFetchOnOpen($0, in: previous, accounts: config.accounts, now: timestamp,
+                                                 interval: config.settings.refreshInterval)
+            }
+            guard !presets.isEmpty else { return nil }
+        }
         let plans = config.accounts.compactMap { account in onDemandPlan(for: account, presets: presets).map { (account, $0) } }
         let outcomes = await outcomes(of: plans, previous: previous, timestamp: timestamp)
         let merged = Merged(outcomes, config: config, previous: previous, timestamp: timestamp)

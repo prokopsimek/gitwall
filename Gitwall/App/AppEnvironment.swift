@@ -410,8 +410,10 @@ final class AppEnvironment {
         Task {
             defer { self.fetchingPresetIDs.subtract(ids) }
             do {
-                let result = try await syncEngine.syncPresets(ids)
-                await self.take(result, from: .fetchOnOpen)
+                // Nil: a sync that ran first left nothing to fetch, and there is nothing new to take.
+                if let result = try await syncEngine.syncPresets(ids) {
+                    await self.take(result, from: .fetchOnOpen)
+                }
             } catch {
                 log.error("Fetch on open of \(ids.count) presets failed: \(String(describing: type(of: error)), privacy: .public)")
             }

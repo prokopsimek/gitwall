@@ -49,7 +49,7 @@ extension SyncEngineTests {
         try preparePresetSearch(env, presets: [review, docs, blockers, gitlabOnly], items: gitlabItems)
         env.githubProvider.presetFetches[search(docs)] = found([env.item(1, account: env.github)])
 
-        let result = try await env.engine().syncPresets([gitlabOnly.id, docs.id, UUID(), review.id])
+        let result = try #require(try await env.engine().syncPresets([gitlabOnly.id, docs.id, UUID(), review.id]))
 
         #expect(env.githubProvider.presetSearches == [
             .init(accountID: env.github.id, token: "gh", search: search(review)),
@@ -76,7 +76,7 @@ extension SyncEngineTests {
         try preparePresetSearch(env, presets: [review, gitlabOnly], items: items,
                                 results: [earlierResult(review, holding: [items[0]], env: env)])
 
-        let result = try await env.engine().syncPresets([gitlabOnly.id])
+        let result = try #require(try await env.engine().syncPresets([gitlabOnly.id]))
 
         #expect(env.githubProvider.presetSearches.isEmpty)
         #expect(env.githubProvider.priorityTokens.isEmpty)
@@ -97,7 +97,7 @@ extension SyncEngineTests {
         env.githubProvider.presetFetches[search(review)] = found([env.item(1, account: env.github)])
         env.githubProvider.priorityLookup = .found([:])
 
-        let result = try await env.engine().syncPresets([review.id])
+        let result = try #require(try await env.engine().syncPresets([review.id]))
 
         #expect(result.snapshot.accountStatus == status)
         #expect(result.snapshot.presetResults == [fetchedResult(review, holding: [env.item(1, account: env.github)], env: env)])
@@ -116,7 +116,7 @@ extension SyncEngineTests {
         try preparePresetSearch(env, presets: [review], items: [held, unheld], results: results, status: status)
         env.githubProvider.presetFetches[search(review)] = .failure(error)
 
-        let result = try await env.engine().syncPresets([review.id])
+        let result = try #require(try await env.engine().syncPresets([review.id]))
 
         #expect(result.snapshot.accountStatus == status)
         #expect(result.snapshot.presetResults == results)
@@ -135,7 +135,7 @@ extension SyncEngineTests {
         try preparePresetSearch(env, presets: [review], items: [held], results: [earlier], status: status)
         env.githubProvider.presetFetches[search(review)] = .failure(.server(status: 422, message: "Validation Failed"))
 
-        let result = try await env.engine().syncPresets([review.id])
+        let result = try #require(try await env.engine().syncPresets([review.id]))
 
         var failed = earlier
         failed.failure = PresetQueryFailure(code: "422", at: env.now)
@@ -155,7 +155,7 @@ extension SyncEngineTests {
         env.githubProvider.presetFetches[search(review)] = found([kept])
         env.githubProvider.itemStates = [gone.id: .closed]
 
-        let result = try await env.engine().syncPresets([review.id])
+        let result = try #require(try await env.engine().syncPresets([review.id]))
 
         #expect(env.githubProvider.itemStateLookups == [lookup([gone], env: env)])
         #expect(result.snapshot.presetResults == [fetchedResult(review, holding: [kept], env: env)])
@@ -173,13 +173,13 @@ extension SyncEngineTests {
         try preparePresetSearch(env, presets: [review], status: [env.github.id: FetchStatus(state: .ok, lastSuccessAt: env.minutes(-5))])
         env.githubProvider.presetFetches[search(review)] = found([one])
 
-        let first = try await env.engine().syncPresets([review.id])
+        let first = try #require(try await env.engine().syncPresets([review.id]))
 
         #expect(first.searches == SearchFindings(accounts: [env.github.id], closedItemIDs: [], comparedItemIDs: []))
         #expect(events(first, env: env).isEmpty)
 
         env.githubProvider.presetFetches[search(review)] = found([one, two])
-        let second = try await env.engine(at: env.minutes(5)).syncPresets([review.id])
+        let second = try #require(try await env.engine(at: env.minutes(5)).syncPresets([review.id]))
 
         #expect(events(second, env: env) == [2: [.newItem]])
     }
@@ -191,7 +191,7 @@ extension SyncEngineTests {
         let review = review
         try preparePresetSearch(env, presets: [review])
 
-        let result = try await env.engine().syncPresets([review.id])
+        let result = try #require(try await env.engine().syncPresets([review.id]))
 
         #expect(result.snapshot.searchedAccounts == [env.github.id])
         #expect(result.snapshot.fetchedAt == env.minutes(-5))
@@ -207,7 +207,7 @@ extension SyncEngineTests {
         previous.searchedAccounts = [env.github.id, UUID()]
         try env.snapshotStore.save(previous)
 
-        let result = try await env.engine().syncPresets([gitlabOnly.id])
+        let result = try #require(try await env.engine().syncPresets([gitlabOnly.id]))
 
         #expect(env.githubProvider.presetSearches.isEmpty)
         #expect(result.snapshot.searchedAccounts == [env.github.id])

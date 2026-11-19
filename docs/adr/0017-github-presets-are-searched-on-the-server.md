@@ -221,7 +221,8 @@ nothing, a closed item included.
 sync. A change found on open is reported as a sync would report it, and a preset's first result reports nothing. It
 changes no account's `FetchStatus` and leaves `Snapshot.fetchedAt` as it was, because opening a window must not make
 an account look broken. One sync or on-demand fetch runs at a time. Fetch requests that wait at the same time run as
-one fetch.
+one fetch. A fetch that had to wait fetches only the presets that, by the snapshot it starts from, still need a fetch on
+open, because what ran first may have fetched them; with none left it asks no provider and writes nothing.
 
 Each sync with a selection and each on-demand fetch writes one line to the unified log (`SyncReport`, category `sync`)
 with the presets per source, the searches, requests and items, and the duration, and with the accounts an account error

@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import GitwallCore
 
@@ -46,16 +47,39 @@ extension SyncEngineTests {
         }
     }
 
-    /// An engine whose GitHub provider holds every `held` call until `gate` opens.
-    func engine(_ env: Env, holding held: HeldProvider.Call, until gate: Gate) -> SyncEngine {
+    /// An engine whose provider of `kind` holds every `held` call until `gate` opens, and whose clock reads `clock`,
+    /// or `env.now` throughout without one.
+    func engine(
+        _ env: Env, holding held: HeldProvider.Call, of kind: ProviderKind = .github, until gate: Gate,
+        clock: (@Sendable () -> Date)? = nil
+    ) -> SyncEngine {
         let time = env.now
+        let scripted = switch kind {
+        case .github: env.githubProvider
+        case .gitlab: env.gitlabProvider
+        }
+        var providers: [ProviderKind: any GitProvider] = [.github: env.githubProvider, .gitlab: env.gitlabProvider]
+        providers[kind] = HeldProvider(scripted: scripted, held: held, gate: gate)
         return SyncEngine(
-            providers: [.github: HeldProvider(scripted: env.githubProvider, held: held, gate: gate), .gitlab: env.gitlabProvider],
+            providers: providers,
             tokens: StaticTokens(tokens: [env.github.id: "gh", env.gitlab.id: "gl"]),
             configStore: env.configStore,
             snapshotStore: env.snapshotStore,
-            now: { time }
+            now: clock ?? { time }
         )
+    }
+
+    /// A clock that reads `start` and then one minute later on every further reading, so that a turn which runs after
+    /// another one writes different times even when it fetches the same, and a snapshot it wrote shows.
+    func steppingClock(from start: Date) -> @Sendable () -> Date {
+        let readings = OSAllocatedUnfairLock(initialState: 0)
+        return {
+            let earlier = readings.withLock { count in
+                defer { count += 1 }
+                return count
+            }
+            return start.addingTimeInterval(Double(earlier) * 60)
+        }
     }
 
     /// Returns once `engine` has seen `count` calls, each of them running or waiting.
@@ -79,16 +103,18 @@ extension SyncEngineTests {
         let review = review
         try prepareTurns(env, presets: [review])
         env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
+        // A sync that selects no preset leaves the preset waiting for a fetch; GitLab downloads everything meanwhile.
+        let selection = try showing([], env: env)
         let gate = Gate()
-        let engine = engine(env, holding: .fetchItems, until: gate)
+        let engine = engine(env, holding: .fetchItems, of: .gitlab, until: gate)
 
-        async let syncing = engine.sync()
+        async let syncing = engine.sync(selection: selection)
         await calls(1, to: engine)
         async let fetching = engine.syncPresets([review.id])
         await calls(2, to: engine)
         await gate.open()
         let synced = try await syncing
-        let fetched = try await fetching
+        let fetched = try #require(try await fetching)
 
         #expect(fetched.previous == synced.snapshot)
         #expect(fetched.snapshot.items.map(\.number).sorted() == [2, 3])
@@ -109,7 +135,7 @@ extension SyncEngineTests {
         async let syncing = engine.sync()
         await calls(2, to: engine)
         await gate.open()
-        let fetched = try await fetching
+        let fetched = try #require(try await fetching)
         let synced = try await syncing
 
         #expect(synced.previous == fetched.snapshot)
@@ -142,10 +168,12 @@ extension SyncEngineTests {
         defer { env.cleanup() }
         let review = review, docs = docs
         try prepareTurns(env, presets: [review, docs])
+        // A sync that selects no preset leaves both waiting for a fetch; GitLab downloads everything meanwhile.
+        let selection = try showing([], env: env)
         let gate = Gate()
-        let engine = engine(env, holding: .fetchItems, until: gate)
+        let engine = engine(env, holding: .fetchItems, of: .gitlab, until: gate)
 
-        async let syncing = engine.sync()
+        async let syncing = engine.sync(selection: selection)
         await calls(1, to: engine)
         async let first = engine.syncPresets([docs.id])
         await calls(2, to: engine)
@@ -153,8 +181,8 @@ extension SyncEngineTests {
         await calls(3, to: engine)
         await gate.open()
         let synced = try await syncing
-        let one = try await first
-        let other = try await second
+        let one = try #require(try await first)
+        let other = try #require(try await second)
 
         #expect(env.githubProvider.presetSearches.map(\.search) == [search(review), search(docs)])
         #expect(one.previous == synced.snapshot)
@@ -162,5 +190,106 @@ extension SyncEngineTests {
         #expect(one.snapshot == other.snapshot)
         #expect(Set(one.snapshot.presetResults.map(\.presetID)) == [review.id, docs.id])
         #expect(one.searches == other.searches)
+    }
+
+    // MARK: - What a fetch that waited still fetches
+
+    @Test("an on-demand fetch that waited for a sync asks nothing for a preset that sync searched, writes nothing and returns nil",
+          .timeLimit(.minutes(1)))
+    func fetchAfterSyncSkipsWhatItSearched() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review
+        try prepareTurns(env, presets: [review])
+        env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
+        let selection = try showing([review], env: env)
+        let gate = Gate()
+        let engine = engine(env, holding: .fetchPresetItems, until: gate, clock: steppingClock(from: env.now))
+
+        async let syncing = engine.sync(selection: selection)
+        await calls(1, to: engine)
+        async let fetching = engine.syncPresets([review.id])
+        await calls(2, to: engine)
+        await gate.open()
+        let synced = try await syncing
+        let fetched = try await fetching
+
+        #expect(fetched == nil)
+        #expect(env.githubProvider.presetSearches.map(\.search) == [search(review)])
+        #expect(try env.snapshotStore.load() == synced.snapshot)
+    }
+
+    @Test("an on-demand fetch that waited for a sync searches only the presets that sync left in need of a fetch",
+          .timeLimit(.minutes(1)))
+    func fetchAfterSyncSearchesTheRest() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review, docs = docs
+        try prepareTurns(env, presets: [review, docs])
+        env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
+        env.githubProvider.presetFetches[search(docs)] = found([env.item(4, account: env.github)])
+        let selection = try showing([review], env: env)
+        let gate = Gate()
+        let engine = engine(env, holding: .fetchPresetItems, until: gate, clock: steppingClock(from: env.now))
+
+        async let syncing = engine.sync(selection: selection)
+        await calls(1, to: engine)
+        async let fetching = engine.syncPresets([review.id, docs.id])
+        await calls(2, to: engine)
+        await gate.open()
+        let synced = try await syncing
+        let fetched = try #require(try await fetching)
+
+        #expect(env.githubProvider.presetSearches.map(\.search) == [search(review), search(docs)])
+        #expect(fetched.previous == synced.snapshot)
+        #expect(fetched.snapshot.result(for: review, account: env.github.id)?.fetchedAt == env.now)
+        #expect(fetched.snapshot.result(for: docs, account: env.github.id)?.fetchedAt == env.minutes(1))
+        #expect(fetched.report?.origin == .onDemand(presets: 1, failedAccounts: 0))
+    }
+
+    @Test("requests that joined a waiting fetch with nothing left to fetch get nil as well", .timeLimit(.minutes(1)))
+    func joinedRequestsGetNil() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review
+        try prepareTurns(env, presets: [review])
+        let selection = try showing([review], env: env)
+        let gate = Gate()
+        let engine = engine(env, holding: .fetchPresetItems, until: gate, clock: steppingClock(from: env.now))
+
+        async let syncing = engine.sync(selection: selection)
+        await calls(1, to: engine)
+        async let first = engine.syncPresets([review.id])
+        await calls(2, to: engine)
+        async let second = engine.syncPresets([review.id])
+        await calls(3, to: engine)
+        await gate.open()
+        _ = try await syncing
+        let one = try await first
+        let other = try await second
+
+        #expect(one == nil)
+        #expect(other == nil)
+        #expect(env.githubProvider.presetSearches.map(\.search) == [search(review)])
+    }
+
+    @Test("an on-demand fetch that did not wait searches every preset it is given, even one whose result is fresh",
+          .timeLimit(.minutes(1)))
+    func fetchWithoutWaitSearchesFreshPresets() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review
+        try preparePresetSearch(env, presets: [review], results: [fetchedResult(review, holding: [], env: env)],
+                                searched: [env.github.id])
+        env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
+        let later = env.minutes(1)
+        let snapshot = try #require(try env.snapshotStore.load())
+        #expect(!PresetFreshness.needsFetchOnOpen(review, in: snapshot, accounts: [env.github, env.gitlab], now: later,
+                                                  interval: AppSettings().refreshInterval))
+
+        let fetched = try #require(try await env.engine(at: later).syncPresets([review.id]))
+
+        #expect(env.githubProvider.presetSearches.map(\.search) == [search(review)])
+        #expect(fetched.snapshot.result(for: review, account: env.github.id)?.fetchedAt == later)
     }
 }

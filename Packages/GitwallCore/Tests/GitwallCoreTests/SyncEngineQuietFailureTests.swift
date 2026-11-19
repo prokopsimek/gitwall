@@ -91,7 +91,7 @@ extension SyncEngineTests {
         try preparePresetSearch(env, presets: [review])
         env.githubProvider.presetFetches[search(review)] = .failure(.server(status: 502, message: "Bad Gateway"))
 
-        let result = try await env.engine().syncPresets([review.id])
+        let result = try #require(try await env.engine().syncPresets([review.id]))
 
         #expect(result.quietFailures.isEmpty)
     }
