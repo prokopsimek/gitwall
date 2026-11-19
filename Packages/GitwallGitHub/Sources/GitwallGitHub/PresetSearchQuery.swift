@@ -13,7 +13,8 @@ import GitwallCore
 /// Where GitHub's search differs from the local reading, checked on github.com in November 2026:
 /// - A GitHub App is `app/<slug>`; GraphQL, and so the snapshot, gives its login as the bare slug, and
 ///   `reviewed-by:<slug>` finds nothing. Every login is therefore sent in both forms.
-/// - `involves:` covers the author and assignees, but neither reviewers, requested reviewers nor app authors.
+/// - `involves:` covers the author and assignees of a person, but neither reviewers, requested reviewers nor the
+///   items an app authored or was assigned, so `involves:x` also sends `author:` and `assignee:` in both forms.
 /// - `is:` and `type:` choose which kind and state of item GitHub searches instead of filtering: `is:issue is:draft`
 ///   answers with draft pull requests, `-is:open` with closed items. Each query already is one kind and open, so these
 ///   terms are decided here and never sent, except `is:draft`, which GitHub does filter within pull requests.
@@ -199,13 +200,17 @@ enum PresetSearchQuery {
         return .or([.term("\(qualifier):\(login)"), .term("\(qualifier):app/\(login)")])
     }
 
-    /// Locally `involves:` is the author, the assignees, the reviewers and the requested reviewers.
+    /// Locally `involves:` is the author, the assignees, the reviewers and the requested reviewers. GitHub's `involves:`
+    /// misses the reviewers and, for an app, also the authored and assigned items, so `author:` and `assignee:` are sent
+    /// beside it, each in both forms: an item that only an app wrote or was assigned must still be downloaded.
+    private static let involvesQualifiers = ["involves", "author", "assignee", "reviewed-by", "review-requested"]
+
     private static func involves(_ login: String?) -> Node {
         guard let login else { return .always }
         guard login != "@me" else {
-            return .or(["involves", "reviewed-by", "review-requested"].map { .term("\($0):@me") })
+            return .or(involvesQualifiers.map { .term("\($0):@me") })
         }
-        return .or(["involves", "reviewed-by", "review-requested"].map { self.login(login, $0, negated: false) })
+        return .or(involvesQualifiers.map { self.login(login, $0, negated: false) })
     }
 
     /// Labels and milestones are names that may hold spaces, so they are always quoted. GitHub has no way to escape a

@@ -116,11 +116,14 @@ struct PresetSearchQueryTests {
         .query("assignee @me", "assignee:@me", ["assignee:@me"]),
         .query("reviewed-by", "reviewed-by:alice", ["(reviewed-by:alice OR reviewed-by:app/alice)"]),
         .query("review-requested", "review-requested:alice", ["(review-requested:alice OR review-requested:app/alice)"]),
-        // Locally involves also covers reviewers and requested reviewers; GitHub's involves covers neither, nor apps.
+        // Locally involves is the author, the assignees, the reviewers and the requested reviewers. GitHub's involves
+        // misses reviewers and every app, so author and assignee are sent in both forms next to it.
         .query("involves", "involves:alice", [
-            "(involves:alice OR involves:app/alice OR reviewed-by:alice OR reviewed-by:app/alice OR review-requested:alice OR review-requested:app/alice)",
+            "(involves:alice OR involves:app/alice OR author:alice OR author:app/alice OR assignee:alice OR assignee:app/alice OR reviewed-by:alice OR reviewed-by:app/alice OR review-requested:alice OR review-requested:app/alice)",
         ]),
-        .query("involves @me", "involves:@me", ["(involves:@me OR reviewed-by:@me OR review-requested:@me)"]),
+        .query("involves @me", "involves:@me", [
+            "(involves:@me OR author:@me OR assignee:@me OR reviewed-by:@me OR review-requested:@me)",
+        ]),
         .query("label", "label:bug", [#"label:"bug""#]),
         .query("label with a space", #"label:"needs review""#, [#"label:"needs review""#]),
         .query("label with parentheses", #"label:"area (ui)""#, [#"label:"area (ui)""#]),
@@ -597,6 +600,7 @@ private struct RepositoryData {
         addQuery("query review-requested:", needs: "requested reviewer", requested.map { "review-requested:\($0)" })
         addQuery("query involves:, person", needs: "reviewer", reviewer.map { "involves:\($0)" })
         addQuery("query involves:, bot reviewer", needs: "bot reviewer", botReviewer.map { "involves:\($0)" })
+        addQuery("query involves:, bot author", needs: "bot author", botAuthor.map { "involves:\($0)" })
         addQuery("query repo: and org:", "repo:\(repo) org:\(owner)")
         addQuery("query is:draft", "is:draft")
         addQuery("query -is:draft", "-is:draft")

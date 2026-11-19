@@ -103,7 +103,7 @@ The preset's fields become top-level AND terms:
 | `updatedWithinDays` | `updated:>=` the day before the cutoff's UTC date |
 | `milestone` | `milestone:"x"` |
 | `author:`, `assignee:`, `reviewed-by:`, `review-requested:` in the query | the login in both forms, `x` and `app/x` |
-| `involves:x` in the query | `involves:`, `reviewed-by:` and `review-requested:` for `x`, each in both forms, as one OR group |
+| `involves:x` in the query | `involves:`, `author:`, `assignee:`, `reviewed-by:` and `review-requested:` for `x`, each in both forms, as one OR group |
 | `label:`, `milestone:`, `repo:`, `org:` in the query | as written, labels and milestones quoted |
 | `is:draft`, `-is:draft` in the query of a pull request search | as written |
 
