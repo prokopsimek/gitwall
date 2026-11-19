@@ -48,6 +48,15 @@ Before each sync `AppEnvironment.syncSelection()` reads the widget configuration
 the configurations it read last in this run. When it never could, it syncs without a selection, and every account
 downloads everything as before.
 
+A widget removed from the desktop can stay in WidgetKit's configurations after it is gone. On 2026-11-19 a large widget
+removed with Remove Widget at 17:31 left the desktop at once: its render session ended, and both the desktop's list of
+widgets and chronod's stored host configuration named only the seven that were left. Yet `getCurrentConfigurations`
+kept returning it and WidgetKit kept asking the extension for its timeline after every reload, still at 19:06 (95
+minutes later), also after Gitwall was quit and opened again. `WidgetInfo` says nothing about whether a widget is on
+screen, so the app cannot tell such a configuration from a placed widget. Until macOS lets go of it, its preset is
+searched in every sync (at least one search per kind) and counted under widgets in the log line, which then reads one
+more than the desktop shows.
+
 Every other preset is fetched when a window opens it. `AppEnvironment.fetchOnOpen(_:)` runs when the popover or the
 main window opens or switches preset, when the Walls window opens and when another wall comes up, by hand or by
 rotation. It fetches only the presets for which `PresetFreshness.needsFetchOnOpen` holds. That is the case when a
@@ -339,3 +348,5 @@ Open points, marked NEOVĚŘENO (not verified):
 - NEOVĚŘENO: a search and a lookup with a fine-grained token. The documentation above does not cover GraphQL
   `ISSUE_ADVANCED` or `nodes(ids:)` by name. A live call of both with a fine-grained token settles it.
 - NEOVĚŘENO: whether GitHub Enterprise Server accepts `ISSUE_ADVANCED`, which would let it search per preset too.
+- NEOVĚŘENO: what makes WidgetKit drop the configuration of a removed widget (see *What a sync fetches*). Quitting and
+  opening Gitwall did not; a restart of chronod or a new login has not been tried.
