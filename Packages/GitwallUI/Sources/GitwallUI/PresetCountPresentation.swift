@@ -47,6 +47,25 @@ public struct PresetCountPresentation: Equatable, Sendable {
         }
     }
 
+    /// What a window's list shows in place of the items of a preset.
+    public enum ListPlaceholder: Equatable, Sendable {
+        /// Nothing of the preset was fetched yet and a fetch runs: a spinner.
+        case fetching
+        /// Nothing of the preset was fetched yet and none runs: "Waiting for sync", with a way to try again.
+        case waitingForSync
+        /// The query failed before the preset was ever fetched: "Query failed", with a way to try again.
+        case queryFailed
+    }
+
+    /// What the list of a preset shows instead of its items: nil when the preset has a count, so its items are listed,
+    /// also after a failed query that follows a result. A preset without a count lists nothing, even when one of its
+    /// parts has items (a preset over GitLab and GitHub), as a widget and a wall tile do.
+    public static func listPlaceholder(_ display: PresetCountDisplay, isFetching: Bool) -> ListPlaceholder? {
+        guard display.count == nil else { return nil }
+        if isFetching { return .fetching }
+        return display.failure != nil ? .queryFailed : .waitingForSync
+    }
+
     /// What the preset editor's header says about the preset.
     public enum EditorSummary: Equatable, Sendable {
         /// "12 items match now", "1000+ items match now".

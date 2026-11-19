@@ -23,7 +23,16 @@
       "comment" : "Tooltip of a preset's count. The argument says when the preset was fetched, as in 5 min ago."
     },
     "Waiting for sync" : {
-      "comment" : "A widget or wall tile of a preset that was never fetched."
+      "comment" : "A widget or wall tile of a preset that was never fetched. Also the title of the popover's and the main window's list for it."
+    },
+    "This preset has not been fetched yet." : {
+      "comment" : "Message of the list of a preset that was never fetched, while no fetch runs."
+    },
+    "The provider refused this preset's query, so nothing was fetched. Check the query in Settings › Presets or try again." : {
+      "comment" : "Message of the list of a preset whose query was refused before it was ever fetched."
+    },
+    "Try Again" : {
+      "comment" : "Button of the list of a preset that was never fetched, which fetches it now."
     }
   },
   "version" : "1.0"

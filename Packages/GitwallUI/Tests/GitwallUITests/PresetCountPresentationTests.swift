@@ -107,6 +107,36 @@ struct PresetCountPresentationTests {
         #expect(PresetCountPresentation.fetchedAt(undated, snapshotFetchedAt: nil) == nil)
     }
 
+    // MARK: - List placeholder
+
+    @Test("a counted preset lists its items, whether or not a fetch runs")
+    func listPlaceholderCounted() {
+        let counted = display(count: 12, fetchedAt: minutes(-5))
+
+        #expect(PresetCountPresentation.listPlaceholder(counted, isFetching: false) == nil)
+        #expect(PresetCountPresentation.listPlaceholder(counted, isFetching: true) == nil)
+        // A failed query after a result keeps the last items on screen.
+        #expect(PresetCountPresentation.listPlaceholder(
+            display(count: 12, fetchedAt: minutes(-20), failedAt: minutes(-1)), isFetching: false) == nil)
+        #expect(PresetCountPresentation.listPlaceholder(display(count: 0, fetchedAt: minutes(-5)), isFetching: false) == nil)
+    }
+
+    @Test("a preset never fetched shows a spinner while its fetch runs, and waiting for sync otherwise")
+    func listPlaceholderWaiting() {
+        let waiting = display(count: 0, fetchedAt: nil, hasResult: false)
+
+        #expect(PresetCountPresentation.listPlaceholder(waiting, isFetching: true) == .fetching)
+        #expect(PresetCountPresentation.listPlaceholder(waiting, isFetching: false) == .waitingForSync)
+    }
+
+    @Test("a query that failed before any result says so, and shows a spinner while a retry runs")
+    func listPlaceholderFailed() {
+        let failed = display(count: 0, fetchedAt: nil, failedAt: minutes(-1))
+
+        #expect(PresetCountPresentation.listPlaceholder(failed, isFetching: false) == .queryFailed)
+        #expect(PresetCountPresentation.listPlaceholder(failed, isFetching: true) == .fetching)
+    }
+
     // MARK: - Editor summary
 
     @Test("the editor says how many items match now for a fetched preset, with a plus at the provider's cap")

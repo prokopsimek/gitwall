@@ -406,6 +406,20 @@ final class AppEnvironment {
             interval: config.settings.refreshInterval, inFlight: fetchingPresetIDs
         )
         guard !ids.isEmpty else { return }
+        fetch(ids)
+    }
+
+    /// "Try again" on a list that has nothing fetched: fetches `preset` now, whatever its last failure says.
+    /// ``fetchOnOpen(_:)`` leaves a refused query alone until the sync interval has passed; a click must not wait.
+    func retryFetch(of preset: Preset) {
+        guard !usesSampleContent, syncEngine != nil, snapshot != nil, !fetchingPresetIDs.contains(preset.id) else { return }
+        fetch([preset.id])
+    }
+
+    /// The fetch of `ids` that ``fetchOnOpen(_:)`` and ``retryFetch(of:)`` share, with the in-flight bookkeeping the
+    /// lists read their spinner from.
+    private func fetch(_ ids: [UUID]) {
+        guard let syncEngine else { return }
         fetchingPresetIDs.formUnion(ids)
         Task {
             defer { self.fetchingPresetIDs.subtract(ids) }
@@ -815,9 +829,14 @@ final class AppEnvironment {
         guard containerAvailable else { return .empty(.containerUnavailable) }
         guard !needsOnboarding else { return .empty(.noAccounts) }
         guard let preset else { return .empty(.noPresets) }
-        // A preset that waits shows its loading indicator while its fetch on open runs, also when another of its parts,
-        // as from GitLab, has items, as the widget and the wall do; any other shows its last items.
-        if fetchingPresetIDs.contains(preset.id), presetCount(for: preset).isWaitingForSync { return .fetching }
+        // A preset without a count shows a spinner while its fetch runs and otherwise why it has nothing, also when
+        // another of its parts, as from GitLab, has items, as the widget and the wall do; any other shows its last items.
+        switch PresetCountPresentation.listPlaceholder(presetCount(for: preset), isFetching: fetchingPresetIDs.contains(preset.id)) {
+        case .fetching: return .fetching
+        case .waitingForSync: return .empty(.waitingForSync(presetID: preset.id))
+        case .queryFailed: return .empty(.queryFailed(presetID: preset.id))
+        case nil: break
+        }
         let items = items(for: preset)
         if !items.isEmpty { return .items(items) }
         if snapshot == nil || isRefreshing { return .empty(.loading) }
