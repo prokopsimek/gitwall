@@ -28,12 +28,13 @@ struct SnapshotDiffSearchTests {
         SearchFindings(accounts: [github.id], closedItemIDs: Set(closed.map(\.id)), comparedItemIDs: Set(compared.map(\.id)))
     }
 
+    /// - Parameter previousSearched: The accounts that searched presets in the sync that wrote the previous snapshot.
     private func events(
         _ previous: [WorkItem], _ current: [WorkItem], _ searches: SearchFindings,
-        previousResults: [PresetResult] = [], currentResults: [PresetResult] = []
+        previousResults: [PresetResult] = [], currentResults: [PresetResult] = [], previousSearched: Set<UUID> = []
     ) -> [Int: [NotificationEvent]] {
         let changes = SnapshotDiff.changes(
-            from: Snapshot(fetchedAt: now, items: previous, presetResults: previousResults),
+            from: Snapshot(fetchedAt: now, items: previous, presetResults: previousResults, searchedAccounts: previousSearched),
             to: Snapshot(fetchedAt: now, items: current, presetResults: currentResults),
             accounts: [github, gitlab, enterprise], searches: searches
         )
@@ -97,5 +98,15 @@ struct SnapshotDiffSearchTests {
         let results = [PresetResult(presetID: UUID(), accountID: github.id, itemIDs: current.map(\.id), fetchedAt: now,
                                     totalCount: 3, isComplete: true, selection: "s")]
         #expect(events(previous, current, searched(), currentResults: results).isEmpty)
+    }
+
+    @Test("the first full download after an account searched brings nothing new and closes nothing; its kept items and other accounts count as always")
+    func fullDownloadAfterSearch() {
+        // The previous snapshot held what the searches found, up to 1000 per preset; the full download has the open
+        // items it reaches. An item in one and not the other may be new, closed or merely out of the other's reach.
+        let previous = [item(1), item(6), item(3, in: gitlab), item(7, in: gitlab)]
+        let current = [item(1, review: .approved), item(2, requested: ["me"]), item(3, in: gitlab), item(4, in: gitlab)]
+        #expect(events(previous, current, .none, previousSearched: [github.id])
+            == [1: [.approved], 4: [.newItem], 7: [.closed]])
     }
 }

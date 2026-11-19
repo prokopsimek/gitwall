@@ -316,6 +316,28 @@ extension SyncEngineTests {
         #expect(events(result, env: env).isEmpty)
     }
 
+    @Test("a sync without a selection after one with a selection sends nothing for what the full download brought or left out")
+    func fullSyncAfterSearchIsQuiet() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review
+        let held = env.item(1, account: env.github), unreached = env.item(3, account: env.github)
+        try preparePresetSearch(env, presets: [review], items: [held, unreached],
+                                results: [earlierResult(review, holding: [held, unreached], env: env)],
+                                searched: [env.github.id])
+        var approved = held
+        approved.reviewState = .approved
+        var asked = env.item(2, account: env.github)
+        asked.requestedReviewers = [UserRef(login: "me")]
+        env.githubProvider.results[env.github.id] = .success([approved, asked])
+        env.gitlabProvider.results[env.gitlab.id] = .success([env.item(5, account: env.gitlab)])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.map(\.number).sorted() == [1, 2, 5])
+        #expect(events(result, env: env) == [1: [.approved], 5: [.newItem]])
+    }
+
     @Test("a preset this sync did not search keeps its items and sends nothing")
     func unsearchedPresetIsQuiet() async throws {
         let env = try Env()

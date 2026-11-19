@@ -158,8 +158,9 @@ migration.
   fetched until it is searched again. A field added to `ItemFilter` is part of the fingerprint without a change there,
   so after such an update every preset reads as never fetched once.
 - Results of deleted presets and removed accounts are dropped when the next sync writes the snapshot.
-- An item stays in the snapshot while a search of this sync returned it or some result still holds it. A preset that
-  left the screen keeps its last result and its items.
+- An item of an account that searched in this sync stays in the snapshot while a search returned it or some result
+  still holds it; an account that downloaded everything keeps only what it downloaded. A preset that left the screen
+  keeps its last result and its items.
 - What a preset shows comes from `PresetFreshness`: in each searched account the items of its own result, in every
   other account all items, then `FilterEngine`. Its count is the length of that list (`PresetCountDisplay`). It shows
   "+" when a search stopped before GitHub's count. After a refused query it shows "Query failed" with the time of the
@@ -190,7 +191,9 @@ lists, and answers with an `ItemState`:
 that left the snapshot is `.closed` only when the lookup confirmed it. An item that joined is news only when a result
 fetched now had an earlier result of the same selection. The first result of a pair, the first sync after this change
 and the first search after a preset was edited are a baseline. They send no notification and set no "new" dot.
-Accounts that download everything keep the old rules of the diff.
+Accounts that download everything keep the old rules of the diff, except that the first full download after searching
+is a baseline too: it reaches neither all nor only what the searches found, so what it adds or leaves out reports
+nothing, a closed item included.
 
 ### Failures
 

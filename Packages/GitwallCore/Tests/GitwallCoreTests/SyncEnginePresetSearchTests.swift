@@ -4,17 +4,18 @@ import Testing
 
 /// A sync with a selection, for an account whose provider searches each preset on the server.
 extension SyncEngineTests {
-    /// Lets the GitHub account search presets, saves `presets` into the configuration and a previous snapshot.
+    /// Lets the GitHub account search presets, saves `presets` into the configuration and a previous snapshot, written
+    /// by a sync in which the accounts of `searched` searched presets.
     func preparePresetSearch(
         _ env: Env, presets: [Preset], items: [WorkItem] = [], results: [PresetResult] = [],
-        status: [UUID: FetchStatus] = [:]
+        status: [UUID: FetchStatus] = [:], searched: Set<UUID> = []
     ) throws {
         env.githubProvider.presetSearchAccounts = [env.github.id]
         var config = try env.configStore.load()
         config.presets = presets
         try env.configStore.save(config)
         try env.snapshotStore.save(Snapshot(fetchedAt: env.minutes(-5), items: items, accountStatus: status,
-                                            presetResults: results))
+                                            presetResults: results, searchedAccounts: searched))
     }
 
     /// The selection of a sync in which a desktop widget shows each of `presets`.
@@ -165,6 +166,24 @@ extension SyncEngineTests {
         let result = try await env.engine().sync(selection: try showing([review], env: env))
 
         #expect(result.snapshot.items.map(\.number).sorted() == [2, 5])
+    }
+
+    @Test("a sync without a selection after one with a selection keeps what the account downloaded, not what results still hold")
+    func fullSyncAfterSearch() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review, docs = docs
+        let closed = env.item(1, account: env.github), open = env.item(2, account: env.github)
+        let results = [earlierResult(review, holding: [closed, open], env: env), earlierResult(docs, holding: [closed], env: env)]
+            .sorted(by: PresetResult.precedes)
+        try preparePresetSearch(env, presets: [review, docs], items: [closed, open], results: results, searched: [env.github.id])
+        env.githubProvider.results[env.github.id] = .success([open, env.item(3, account: env.github)])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.map(\.number).sorted() == [2, 3])
+        // Neither preset was searched, so both keep their results for the next sync that searches them.
+        #expect(result.snapshot.presetResults == results)
     }
 
     // MARK: - Failures

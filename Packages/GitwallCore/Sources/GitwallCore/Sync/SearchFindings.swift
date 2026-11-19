@@ -6,7 +6,9 @@ import Foundation
 /// nothing to compare with. Items are named by ``WorkItem/id``, which carries its account.
 public struct SearchFindings: Hashable, Sendable {
     /// Accounts that fetched through preset searches in the sync, whatever came of the searches. Every other account
-    /// downloaded all its items and keeps the plain rules of ``SnapshotDiff``.
+    /// keeps the plain rules of ``SnapshotDiff``, unless the previous snapshot names it in
+    /// ``Snapshot/searchedAccounts``: a full download reaches neither all nor only the items its searches had found, so
+    /// what joined or left it since is a baseline and reports nothing.
     public var accounts: Set<UUID>
     /// Items that left a fresh result and that the provider then confirmed closed or merged.
     public var closedItemIDs: Set<String>

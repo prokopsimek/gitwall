@@ -18,11 +18,12 @@ public struct SyncResult: Sendable {
 /// (a gateway error, a lost connection or an answer that could not be read) does not even show until it lasts for a
 /// third sync in a row; until then the account keeps what it showed (`ok`, or an error it already had), only
 /// ``FetchStatus/consecutiveFailures`` counts it, and the unified log gets a line about it.
-/// Preset results carry over from the previous snapshot, except those of deleted presets and removed accounts, and so do
-/// the items they hold. With a ``SyncSelection``, an account whose provider searches presets on the server searches only
-/// the selected presets, asks the provider what became of the items that left those results, and reports what it
-/// learned in ``SyncResult/searches``; see ``sync(selection:)``. ``syncPresets(_:)`` fetches presets a window opens
-/// the same way, between syncs.
+/// Preset results carry over from the previous snapshot, except those of deleted presets and removed accounts. In an
+/// account that searched presets in the sync, so do the items they hold; an account that downloaded everything keeps
+/// only what it downloaded. With a ``SyncSelection``, an account whose provider searches presets on the server
+/// searches only the selected presets, asks the provider what became of the items that left those results, and
+/// reports what it learned in ``SyncResult/searches``; see ``sync(selection:)``. ``syncPresets(_:)`` fetches presets
+/// a window opens the same way, between syncs.
 ///
 /// One sync or on-demand fetch runs at a time. Each reads the snapshot, waits for its providers and writes the snapshot
 /// back, and the actor alone would let another one start during those waits and lose what the first one wrote.
@@ -317,9 +318,12 @@ public actor SyncEngine {
             results = PresetResult.merged(carried, with: presetOutcomes, at: timestamp).map {
                 SyncEngine.removing(gone, from: $0)
             }
-            // A refreshed item takes the place of its previous copy, and stays only where a result still holds it.
+            // A refreshed item takes the place of its previous copy, and stays only where a result still holds it. Only
+            // the results of an account that searched now hold items: one that downloaded everything returned every
+            // item it still has, and one that was asked nothing kept all of them above.
             let earlier = (previous?.items ?? []).map { refreshed[$0.id] ?? $0 }
-            items = FilterEngine.sort(SyncEngine.items(fresh, keepingFrom: earlier, heldBy: results), by: .lastActivity)
+            let holding = results.filter { findings.accounts.contains($0.accountID) }
+            items = FilterEngine.sort(SyncEngine.items(fresh, keepingFrom: earlier, heldBy: holding), by: .lastActivity)
             self.findings = findings
         }
     }

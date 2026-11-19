@@ -664,13 +664,14 @@ struct SyncEngineTests {
     func heldItemStays() async throws {
         let env = try Env()
         defer { env.cleanup() }
-        let review = Preset(name: "Waiting for my review")
+        let review = Preset(name: "Waiting for my review"), docs = docs
         let held = env.item(1, account: env.github)
-        try prepare(env, presets: [review], items: [held, env.item(2, account: env.github)],
-                    results: [presetResult(review.id, env.github, holding: [held], env: env)])
-        env.githubProvider.results[env.github.id] = .success([env.item(3, account: env.github)])
+        try preparePresetSearch(env, presets: [review, docs], items: [held, env.item(2, account: env.github)],
+                                results: [presetResult(review.id, env.github, holding: [held], env: env)])
+        env.githubProvider.presetFetches[search(docs)] = found([env.item(3, account: env.github)])
 
-        let result = try await env.engine().sync()
+        // Only the account's searches hold items, so the account searches one preset and keeps the other's result.
+        let result = try await env.engine().sync(selection: try showing([docs], env: env))
 
         #expect(result.snapshot.items.map(\.number).sorted() == [1, 3])
     }
@@ -681,11 +682,11 @@ struct SyncEngineTests {
         defer { env.cleanup() }
         let review = Preset(name: "Waiting for my review")
         let orphan = env.item(2, account: env.github)
-        try prepare(env, presets: [review], items: [orphan],
-                    results: [presetResult(UUID(), env.github, holding: [orphan], env: env)])
-        env.githubProvider.results[env.github.id] = .success([env.item(3, account: env.github)])
+        try preparePresetSearch(env, presets: [review], items: [orphan],
+                                results: [presetResult(UUID(), env.github, holding: [orphan], env: env)])
+        env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
 
-        let result = try await env.engine().sync()
+        let result = try await env.engine().sync(selection: try showing([review], env: env))
 
         #expect(result.snapshot.items.map(\.number) == [3])
     }
@@ -694,14 +695,14 @@ struct SyncEngineTests {
     func fetchedCopyWins() async throws {
         let env = try Env()
         defer { env.cleanup() }
-        let review = Preset(name: "Waiting for my review")
+        let review = Preset(name: "Waiting for my review"), docs = docs
         var stale = env.item(1, account: env.github)
         stale.title = "Old title"
-        try prepare(env, presets: [review], items: [stale],
-                    results: [presetResult(review.id, env.github, holding: [stale], env: env)])
-        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        try preparePresetSearch(env, presets: [review, docs], items: [stale],
+                                results: [presetResult(review.id, env.github, holding: [stale], env: env)])
+        env.githubProvider.presetFetches[search(docs)] = found([env.item(1, account: env.github)])
 
-        let result = try await env.engine().sync()
+        let result = try await env.engine().sync(selection: try showing([docs], env: env))
 
         #expect(result.snapshot.items.map(\.title) == ["PR 1"])
     }

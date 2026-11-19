@@ -23,21 +23,27 @@ public enum SnapshotDiff {
     /// me), and an item in both gets an event for each change it went through. For the items of an account in
     /// ``SearchFindings/accounts`` two of these rules are narrower, because its searches return only the open items that
     /// match: an item that left is `.closed` only when it is in ``SearchFindings/closedItemIDs``, and one that joined is
-    /// news only when it is in ``SearchFindings/comparedItemIDs``. Closed and merged are both `.closed`.
+    /// news only when it is in ``SearchFindings/comparedItemIDs``. An account in the previous snapshot's
+    /// ``Snapshot/searchedAccounts`` that did not search now has a baseline instead: it downloaded the open items its
+    /// download reaches, which are neither all nor only those its searches had found, so neither an item that joined
+    /// it nor one that left it says anything. Closed and merged are both `.closed`.
     public static func changes(
         from previous: Snapshot?, to current: Snapshot, accounts: [Account], searches: SearchFindings = .none
     ) -> [ItemChange] {
         guard let previous else { return [] }
         let identities = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0.me) })
         let previousByID = Dictionary(uniqueKeysWithValues: previous.items.map { ($0.id, $0) })
+        let stoppedSearching = previous.searchedAccounts.subtracting(searches.accounts)
         var changes: [ItemChange] = []
 
         for item in current.items {
             let me = identities[item.accountID] ?? nil
             let requestedNow = isRequested(me, in: item)
             guard let old = previousByID[item.id] else {
-                // The first result of a pair, or of an edited preset, is the baseline its later results are compared to.
+                // The first result of a pair, or of an edited preset, is the baseline its later results are compared
+                // to, and so is the first full download after the account searched.
                 if searches.accounts.contains(item.accountID), !searches.comparedItemIDs.contains(item.id) { continue }
+                if stoppedSearching.contains(item.accountID) { continue }
                 changes.append(ItemChange(item: item, event: .newItem))
                 if requestedNow { changes.append(ItemChange(item: item, event: .reviewRequested)) }
                 continue
@@ -58,8 +64,10 @@ public enum SnapshotDiff {
 
         let currentIDs = Set(current.items.map(\.id))
         for old in previous.items where !currentIDs.contains(old.id) {
-            // It may only have stopped matching, or belong to a preset this sync did not search.
+            // It may only have stopped matching, or belong to a preset this sync did not search, or lie beyond the
+            // reach of the first full download after the account searched.
             if searches.accounts.contains(old.accountID), !searches.closedItemIDs.contains(old.id) { continue }
+            if stoppedSearching.contains(old.accountID) { continue }
             changes.append(ItemChange(item: old, event: .closed))
         }
         return changes
