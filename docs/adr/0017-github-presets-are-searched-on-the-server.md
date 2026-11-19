@@ -321,7 +321,7 @@ counts as "local 0", not as passed. Both print counts only.
 Paging, splitting, merging, selection, the lookup and the diff are covered by `PresetSearchQueryTests`,
 `PresetFetchTests`, `ItemStateTests`, `SyncSelectionTests`, `PresetResultMergeTests`, `PresetFreshnessTests`,
 `SyncEnginePresetSearchTests`, `SyncEngineItemStateTests`, `SyncEngineTurnTests` and `SnapshotDiffSearchTests`, with
-scripted answers and fixtures that use invented names.
+scripted answers and with fixtures captured on 2026-11-19 from the public repository `prokopsimek/gitwall`: a search page of issues and one of pull requests, and a `nodes(ids:)` answer with closed issues, merged pull requests and an id that names nothing (`NOT_FOUND` at `["nodes", 2]`, a null node). That repository has nothing open, no team review request and no item outside the account's sources, so tests that need one of these change only the matching fields of a captured node and say so in their names.
 
 Token permissions were checked against GitHub's documentation on 2026-11-19. `GET /search/issues` is in the list of
 REST endpoints available to fine-grained personal access tokens, and the list of permissions per endpoint names no

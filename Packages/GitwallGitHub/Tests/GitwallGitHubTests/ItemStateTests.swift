@@ -8,37 +8,57 @@ private let github = URL(string: "https://github.com")!
 @Suite("Item states")
 struct ItemStateTests {
     let account = Account(kind: .github, baseURL: github, displayName: "GitHub", me: UserRef(login: "bob"),
-                          sources: [.organization(login: "acme")])
+                          sources: [.organization(login: Captured.owner)])
 
     /// Only the team lookup has it; `viewer {` alone also matches `requestedReviewer {` in the pull request fragment.
     private static let teamLookup = "teams(first: 100, role: MEMBER)"
-    private static let teams = #"{"data":{"viewer":{"organizations":{"nodes":[{"login":"acme","teams":{"nodes":[{"slug":"platform"}]}}]}}}}"#
+    private static let teams = #"{"data":{"viewer":{"organizations":{"nodes":[{"login":"\#(Captured.owner)","teams":{"nodes":[{"slug":"platform"}]}}]}}}}"#
+    private static var teamRequests: Captured.Object { Captured.teamReviewRequests(team: "platform", user: "carol") }
 
     /// The copy of an item the snapshot held before it left a result: old title, nothing else that matters.
     private func stale(_ number: Int, _ kind: ItemKind, nodeID: String?) -> WorkItem {
         let path = kind == .pullRequest ? "pull" : "issues"
-        return WorkItem(accountID: account.id, kind: kind, repoFullName: "acme/app", number: number, title: "Old title",
-                        url: URL(string: "https://github.com/acme/app/\(path)/\(number)")!, author: UserRef(login: "heidi"),
+        return WorkItem(accountID: account.id, kind: kind, repoFullName: Captured.repository, number: number, title: "Old title",
+                        url: URL(string: "https://github.com/\(Captured.repository)/\(path)/\(number)")!, author: UserRef(login: "heidi"),
                         createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0), nodeID: nodeID)
     }
 
-    /// The items the captured answer is for, one per node it holds.
-    private var capturedItems: [WorkItem] {
-        [
-            stale(12, .pullRequest, nodeID: "PR_kwDOAcme0012"), stale(13, .pullRequest, nodeID: "PR_kwDOAcme0013"),
-            stale(14, .pullRequest, nodeID: "PR_kwDOAcme0014"), stale(99, .pullRequest, nodeID: "PR_kwDOAcme0099"),
-            stale(30, .issue, nodeID: "I_kwDOAcme0030"), stale(31, .issue, nodeID: "I_kwDOAcme0031"),
-        ]
+    /// The items the captured answer is for, one per node it holds, in its order: two closed issues, the id that names
+    /// nothing, two merged pull requests.
+    private func capturedItems() throws -> [WorkItem] {
+        try Captured.stateNodes().map { node in
+            guard let node = node as? Captured.Object, let number = node["number"] as? Int, let id = node["id"] as? String,
+                  let typename = node["__typename"] as? String else {
+                return stale(9, .issue, nodeID: Captured.missingNodeID)
+            }
+            return stale(number, typename == "PullRequest" ? .pullRequest : .issue, nodeID: id)
+        }
     }
 
     private func nodesTransport(_ answer: StubTransport.Response) -> RoutingTransport {
         RoutingTransport([("nodes(ids:", answer), (Self.teamLookup, .json(Self.teams))])
     }
 
-    /// What the preset search makes of the same nodes, from its captured fixtures.
-    private func searchHits() async throws -> [Int: WorkItem] {
+    /// The captured item-state answer with some of its nodes open, which the account has no item of in the
+    /// public repository: only `state` changes, and the requests of a team and a user for the pull request that has them.
+    private func answer(open numbers: Set<Int>, reviewRequests: Captured.Object? = nil) throws -> StubTransport.Response {
+        let nodes: [Any] = try Captured.stateNodes().map { node in
+            guard let node = node as? Captured.Object, let number = node["number"] as? Int, numbers.contains(number) else { return node }
+            var changes: Captured.Object = ["state": "OPEN"]
+            if node["__typename"] as? String == "PullRequest", let reviewRequests { changes["reviewRequests"] = reviewRequests }
+            return Captured.with(node, changes)
+        }
+        return .json(try Captured.stateAnswer(nodes: nodes))
+    }
+
+    /// What the preset search makes of the same nodes, from the captured fixtures; the pull requests may carry the
+    /// requests of a team and a user, as in ``answer(open:reviewRequests:)``.
+    private func searchHits(reviewRequests: Captured.Object? = nil) async throws -> [Int: WorkItem] {
+        let prs = try Captured.searchNodes("graphql_preset_search_prs.json").map { node in
+            reviewRequests.map { Captured.with(node, ["reviewRequests": $0]) } ?? node
+        }
         let transport = RoutingTransport([
-            ("fragment PR on PullRequest", .json(try Fixtures.data("graphql_preset_search_prs.json"))),
+            ("fragment PR on PullRequest", .json(try Captured.searchAnswer("graphql_preset_search_prs.json", nodes: prs))),
             ("fragment Issue on Issue", .json(try Fixtures.data("graphql_preset_search_issues.json"))),
             (Self.teamLookup, .json(Self.teams)),
         ])
@@ -49,50 +69,85 @@ struct ItemStateTests {
         return Dictionary(uniqueKeysWithValues: fetch.items.map { ($0.number, $0) })
     }
 
-    @Test("each node's state comes from the fragment: open, closed and merged pull requests, open and closed issues, a null node")
+    @Test("the captured answer: closed issues, merged pull requests, and the null node GitHub answers with NOT_FOUND at its place")
     func statesFromTheCapturedShape() async throws {
         let transport = nodesTransport(.json(try Fixtures.data("graphql_item_states.json")))
-        let items = capturedItems
+        let items = try capturedItems()
 
         let states = try await GitHubProvider(transport: transport).fetchItemStates(account: account, token: "t", items: items)
 
-        let hits = try await searchHits()
-        let byNumber = Dictionary(uniqueKeysWithValues: items.map { ($0.number, $0.id) })
         #expect(states == [
-            try #require(byNumber[12]): .open(try #require(hits[12])),
-            try #require(byNumber[13]): .closed,
-            try #require(byNumber[14]): .merged,
-            try #require(byNumber[99]): .notFound,
-            try #require(byNumber[30]): .open(try #require(hits[30])),
-            try #require(byNumber[31]): .closed,
+            items[0].id: .closed,
+            items[1].id: .closed,
+            items[2].id: .notFound,
+            items[3].id: .merged,
+            items[4].id: .merged,
         ])
         let queries = await transport.queries.filter { $0.contains("nodes(ids:") }
         #expect(queries.count == 1)
         let query = try #require(queries.first)
-        #expect(query.contains(#"nodes(ids: ["I_kwDOAcme0030", "I_kwDOAcme0031", "PR_kwDOAcme0012", "PR_kwDOAcme0013", "PR_kwDOAcme0014", "PR_kwDOAcme0099"])"#))
+        // The code asks in sorted order, and the answer was captured in that order.
+        let ids = items.compactMap(\.nodeID).sorted().map { "\"\($0)\"" }.joined(separator: ", ")
+        #expect(items.compactMap(\.nodeID) == items.compactMap(\.nodeID).sorted())
+        #expect(query.contains("nodes(ids: [\(ids)])"))
         #expect(query.contains("__typename ... on PullRequest { state ...PR } ... on Issue { state ...Issue }"))
         #expect(query.contains("fragment PR on PullRequest {"))
         #expect(query.contains("fragment Issue on Issue {"))
         #expect(!query.contains("search("))
     }
 
-    @Test("an open item maps exactly like a search hit: fresh data, team review requests resolved to me, one team lookup")
-    func openMapsLikeASearchHit() async throws {
-        let transport = nodesTransport(.json(try Fixtures.data("graphql_item_states.json")))
-        let pull = stale(12, .pullRequest, nodeID: "PR_kwDOAcme0012")
+    @Test("the captured answer: the error names the null node by its path and the type NOT_FOUND")
+    func capturedErrorShape() throws {
+        let root = try Captured.object("graphql_item_states.json")
+        let errors = try #require(root["errors"] as? [Captured.Object])
+        let error = try #require(errors.first)
+        let nodes = try Captured.stateNodes()
+        let index = try #require(nodes.firstIndex { $0 is NSNull })
 
-        let states = try await GitHubProvider(transport: transport).fetchItemStates(account: account, token: "t", items: capturedItems)
+        #expect(errors.count == 1)
+        #expect(error["type"] as? String == "NOT_FOUND")
+        #expect((error["path"] as? [Any])?.count == 2)
+        #expect((error["path"] as? [Any])?.first as? String == "nodes")
+        #expect((error["path"] as? [Any])?.last as? Int == index)
+        #expect((error["message"] as? String)?.contains(Captured.missingNodeID) == true)
+    }
+
+    @Test("derived from the captured answer with an issue and a pull request open: each maps like its search hit")
+    func openNodesMapLikeSearchHits() async throws {
+        let transport = nodesTransport(try answer(open: [1, 24]))
+        let items = try capturedItems()
+
+        let states = try await GitHubProvider(transport: transport).fetchItemStates(account: account, token: "t", items: items)
+
+        let hits = try await searchHits()
+        #expect(states == [
+            items[0].id: .open(try #require(hits[1])),
+            items[1].id: .closed,
+            items[2].id: .notFound,
+            items[3].id: .merged,
+            items[4].id: .open(try #require(hits[24])),
+        ])
+    }
+
+    @Test("derived with a pull request open that a team and a user asked: fresh data, the team request resolved to me, one team lookup")
+    func openMapsLikeASearchHit() async throws {
+        let transport = nodesTransport(try answer(open: [24], reviewRequests: Self.teamRequests))
+        let items = try capturedItems()
+        let pull = items[4]
+
+        let states = try await GitHubProvider(transport: transport).fetchItemStates(account: account, token: "t", items: items)
 
         guard case .open(let fresh)? = states[pull.id] else {
             Issue.record("expected an open item, got \(String(describing: states[pull.id]))")
             return
         }
-        #expect(fresh == (try await searchHits())[12])
+        #expect(fresh == (try await searchHits(reviewRequests: Self.teamRequests))[24])
         #expect(fresh.id == pull.id)
-        #expect(fresh.title == "Rotate signing keys")
+        let captured = try #require(try Captured.searchNodes("graphql_preset_search_prs.json").first { $0["number"] as? Int == 24 })
+        #expect(fresh.title == captured["title"] as? String)
         #expect(fresh.requestedReviewers.map(\.login) == ["bob", "carol"])
         #expect(fresh.ciState == .success)
-        #expect(fresh.nodeID == "PR_kwDOAcme0012")
+        #expect(fresh.nodeID == pull.nodeID)
         let queries = await transport.queries
         #expect(queries.count == 2)
         #expect(queries.filter { $0.contains(Self.teamLookup) }.count == 1)

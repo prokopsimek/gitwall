@@ -16,7 +16,7 @@ private func search(
     PresetSearch(filter: filter, repositories: repositories, sort: sort, kinds: kinds)
 }
 
-/// Answers in the shape GitHub gives a `search`, as in the captured fixtures, for tests that page or split.
+/// Answers in the shape GitHub gives a `search`, in the shape of the captured fixtures, scripted for tests that page or split.
 private enum SearchAnswer {
     static func page(_ nodes: [String], issueCount: Int, endCursor: String? = nil, hasNextPage: Bool = false) -> StubTransport.Response {
         let cursor = endCursor.map { "\"\($0)\"" } ?? "null"
@@ -415,74 +415,145 @@ struct PresetFetchPagingTests {
 struct PresetFetchItemsTests {
     /// Only the team lookup has it; `viewer {` alone also matches `requestedReviewer {` in the pull request fragment.
     private static let teamLookup = "teams(first: 100, role: MEMBER)"
-    private static let teams = #"{"data":{"viewer":{"organizations":{"nodes":[{"login":"acme","teams":{"nodes":[{"slug":"platform"}]}}]}}}}"#
+    private static let teams = #"{"data":{"viewer":{"organizations":{"nodes":[{"login":"\#(Captured.owner)","teams":{"nodes":[{"slug":"platform"}]}}]}}}}"#
 
-    private func transport() throws -> RoutingTransport {
+    private func transport(prs: String, issues: String) throws -> RoutingTransport {
         RoutingTransport([
-            ("fragment PR on PullRequest", .json(try Fixtures.data("graphql_preset_search_prs.json"))),
-            ("fragment Issue on Issue", .json(try Fixtures.data("graphql_preset_search_issues.json"))),
+            ("fragment PR on PullRequest", .json(prs)),
+            ("fragment Issue on Issue", .json(issues)),
             (Self.teamLookup, .json(Self.teams)),
         ])
     }
 
-    @Test("items from repositories outside the sources are dropped; an organisation matches its owner in any case")
-    func strangersAreDropped() async throws {
-        let transport = try transport()
+    /// The captured pages with some nodes moved to other repositories, which the public repository has none of: the
+    /// first two pull requests and the first two issues go to a repository of the same owner in other letter case, to a
+    /// source that is a single repository, to a repository that is nobody's source; the rest stay.
+    private func moved() throws -> (prs: String, issues: String, prNumbers: [Int], issueNumbers: [Int]) {
+        let prNodes = try Captured.searchNodes("graphql_preset_search_prs.json")
+        let issueNodes = try Captured.searchNodes("graphql_preset_search_issues.json")
+        let prRepositories = ["PROKOPSIMEK/api", "elsewhere/site", "elsewhere/other", "unrelated/tools"]
+        let issueRepositories = ["elsewhere/site", "unrelated/tools"]
+        let prs = prNodes.enumerated().map { index, node in
+            index < prRepositories.count ? Captured.with(node, ["repository": Captured.repository(named: prRepositories[index])]) : node
+        }
+        let issues = issueNodes.enumerated().map { index, node in
+            index < issueRepositories.count ? Captured.with(node, ["repository": Captured.repository(named: issueRepositories[index])]) : node
+        }
+        return (try Captured.searchAnswer("graphql_preset_search_prs.json", nodes: prs),
+                try Captured.searchAnswer("graphql_preset_search_issues.json", nodes: issues),
+                prNodes.compactMap { $0["number"] as? Int }, issueNodes.compactMap { $0["number"] as? Int })
+    }
+
+    @Test("the captured pages: every item is kept, as a source of its owner, with GitHub's count")
+    func capturedPagesAreKept() async throws {
+        let transport = try transport(prs: try Fixtures.string("graphql_preset_search_prs.json"),
+                                      issues: try Fixtures.string("graphql_preset_search_issues.json"))
         let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
-            account: account([.organization(login: "acme"), .repository(fullName: "octo-org/site")]), token: "t",
-            search: search([.pullRequest])
+            account: account([.organization(login: Captured.owner)]), token: "t", search: search([.pullRequest, .issue])
         )
 
-        // octo-org/other is not a source, only octo-org/site; globex/tools is nobody's.
-        #expect(fetch.items.map(\.repoFullName) == ["acme/app", "ACME/api", "octo-org/site"])
-        // GitHub's own count, strangers and all.
-        #expect(fetch.totalCount == 5)
+        let prs = try Captured.searchNodes("graphql_preset_search_prs.json")
+        let issues = try Captured.searchNodes("graphql_preset_search_issues.json")
+        #expect(fetch.items.count == prs.count + issues.count)
+        #expect(Set(fetch.items.map(\.repoFullName)) == [Captured.repository])
+        #expect(fetch.totalCount == prs.count + issues.count)
         #expect(fetch.isComplete)
     }
 
-    @Test("a scope keeps only its repositories, even when GitHub answers with more")
-    func scopeKeepsItsRepositories() async throws {
-        let scoped = account([.organization(login: "acme")])
-        let fetch = try await GitHubProvider(transport: try transport()).fetchPresetItems(
-            account: scoped, token: "t", search: search([.issue], repositories: ["octo-org/site"])
+    @Test("derived from the captured pages with items moved to other repositories: strangers are dropped; an organisation matches its owner in any case")
+    func strangersAreDropped() async throws {
+        let moved = try moved()
+        let fetch = try await GitHubProvider(transport: try transport(prs: moved.prs, issues: moved.issues)).fetchPresetItems(
+            account: account([.organization(login: Captured.owner), .repository(fullName: "elsewhere/site")]), token: "t",
+            search: search([.pullRequest])
         )
 
-        // acme/app is the account's, but not the scope's.
-        #expect(fetch.items.map(\.id) == [WorkItem.makeID(accountID: scoped.id, repoFullName: "octo-org/site", number: 4, kind: .issue)])
+        // Only the first four pull requests moved: the other repository of the owner in capital letters and elsewhere/site
+        // stay; elsewhere/other and unrelated/tools are nobody's.
+        let kept = Set(moved.prNumbers.prefix(2)).union(moved.prNumbers.dropFirst(4))
+        #expect(Set(fetch.items.map(\.number)) == kept)
+        #expect(fetch.items.contains { $0.repoFullName == "PROKOPSIMEK/api" })
+        #expect(fetch.items.contains { $0.repoFullName == "elsewhere/site" })
+        #expect(!fetch.items.contains { $0.repoFullName == "elsewhere/other" || $0.repoFullName == "unrelated/tools" })
+        // GitHub's own count, strangers and all.
+        #expect(fetch.totalCount == moved.prNumbers.count)
+        #expect(fetch.isComplete)
     }
 
-    @Test("nodes map as in the organization search: team review requests resolve to me, issues carry no pull request fields")
+    @Test("derived with an issue in another repository: a scope keeps only its repositories, even when GitHub answers with more")
+    func scopeKeepsItsRepositories() async throws {
+        let moved = try moved()
+        let scoped = account([.organization(login: Captured.owner)])
+        let fetch = try await GitHubProvider(transport: try transport(prs: moved.prs, issues: moved.issues)).fetchPresetItems(
+            account: scoped, token: "t", search: search([.issue], repositories: ["elsewhere/site"])
+        )
+
+        // The owner's repository is the account's, but not the scope's.
+        let number = try #require(moved.issueNumbers.first)
+        #expect(fetch.items.map(\.id) == [WorkItem.makeID(accountID: scoped.id, repoFullName: "elsewhere/site", number: number, kind: .issue)])
+    }
+
+    @Test("the captured nodes map as in the organization search: a pull request keeps its pull request fields, an issue carries none")
     func mapsLikeTheSearch() async throws {
-        let transport = try transport()
-        let me = account([.organization(login: "acme"), .repository(fullName: "octo-org/site")])
+        let prs = try Captured.searchNodes("graphql_preset_search_prs.json")
+        let issues = try Captured.searchNodes("graphql_preset_search_issues.json")
+        let transport = try transport(prs: try Fixtures.string("graphql_preset_search_prs.json"),
+                                      issues: try Fixtures.string("graphql_preset_search_issues.json"))
+        let me = account([.organization(login: Captured.owner)])
         let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
             account: me, token: "t", search: search([.pullRequest, .issue])
         )
 
         #expect(fetch.items.allSatisfy { $0.accountID == me.id })
-        let keys = try #require(fetch.items.first { $0.number == 12 })
-        #expect(keys.kind == .pullRequest)
-        #expect(keys.requestedReviewers.map(\.login) == ["bob", "carol"])
-        #expect(keys.reviewState == .pending)
-        #expect(keys.ciState == .success)
-        #expect(keys.labels.map(\.name) == ["security"])
-        #expect(keys.additions == 212)
-        #expect(keys.nodeID == "PR_kwDOAcme0012")
-        let audit = try #require(fetch.items.first { $0.number == 7 })
-        #expect(audit.isDraft)
-        #expect(audit.mergeState == .conflict)
-        #expect(audit.ciState == .failure)
-        let login = try #require(fetch.items.first { $0.number == 30 })
-        #expect(login.kind == .issue)
-        #expect(login.reviewState == nil && login.ciState == nil)
-        #expect(login.milestone == "1.4")
-        #expect(login.assignees.map(\.login) == ["bob"])
-        #expect(fetch.items.first { $0.number == 4 }?.author.login == "ghost")
-        #expect(Set(fetch.items.map(\.number)) == [12, 7, 3, 30, 4])
+        let node = try #require(prs.first { $0["number"] as? Int == 24 })
+        let pull = try #require(fetch.items.first { $0.number == 24 && $0.kind == .pullRequest })
+        #expect(pull.title == node["title"] as? String)
+        #expect(pull.nodeID == node["id"] as? String)
+        #expect(pull.additions == node["additions"] as? Int)
+        #expect(pull.deletions == node["deletions"] as? Int)
+        #expect(pull.requestedReviewers.isEmpty)
+        #expect(pull.ciState == .success)
+        #expect(!pull.isDraft)
+        let issue = try #require(fetch.items.first { $0.number == 1 && $0.kind == .issue })
+        let issueNode = try #require(issues.first { $0["number"] as? Int == 1 })
+        #expect(issue.title == issueNode["title"] as? String)
+        #expect(issue.reviewState == nil && issue.ciState == nil)
+        #expect(issue.author.login == Captured.owner)
+        #expect(Set(fetch.items.map(\.number)).isSuperset(of: [1, 2, 3, 4, 24]))
 
-        // One search per kind and one look at my teams.
+        // One search per kind, and no team request among the captured nodes, so no look at my teams.
         let queries = await transport.queries
-        #expect(queries.count == 3)
+        #expect(queries.count == 2)
+        #expect(queries.filter { $0.contains(Self.teamLookup) }.isEmpty)
+        #expect(fetch.requests == 2)
+    }
+
+    @Test("derived with a draft that conflicts and fails its checks, a deleted author and a team request: mapped, the team resolved to me, one team lookup")
+    func mapsVariants() async throws {
+        let prNodes = try Captured.searchNodes("graphql_preset_search_prs.json")
+        let issueNodes = try Captured.searchNodes("graphql_preset_search_issues.json")
+        let requested = Captured.with(try #require(prNodes.first { $0["number"] as? Int == 24 }),
+                                      ["reviewRequests": Captured.teamReviewRequests(team: "platform", user: "carol")])
+        let draft = Captured.with(try #require(prNodes.first { $0["number"] as? Int == 20 }), [
+            "isDraft": true, "mergeable": "CONFLICTING",
+            "commits": ["nodes": [["commit": ["statusCheckRollup": ["state": "FAILURE"]]]]],
+        ])
+        let ghost = Captured.with(try #require(issueNodes.first { $0["number"] as? Int == 3 }), ["author": NSNull()])
+        let transport = try transport(prs: try Captured.searchAnswer("graphql_preset_search_prs.json", nodes: [requested, draft]),
+                                      issues: try Captured.searchAnswer("graphql_preset_search_issues.json", nodes: [ghost]))
+        let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
+            account: account([.organization(login: Captured.owner)]), token: "t", search: search([.pullRequest, .issue])
+        )
+
+        let team = try #require(fetch.items.first { $0.number == 24 })
+        #expect(team.requestedReviewers.map(\.login) == ["bob", "carol"])
+        let conflict = try #require(fetch.items.first { $0.number == 20 })
+        #expect(conflict.isDraft)
+        #expect(conflict.mergeState == .conflict)
+        #expect(conflict.ciState == .failure)
+        #expect(fetch.items.first { $0.number == 3 }?.author.login == "ghost")
+        #expect(Set(fetch.items.map(\.number)) == [24, 20, 3])
+        let queries = await transport.queries
         #expect(queries.filter { $0.contains(Self.teamLookup) }.count == 1)
         #expect(fetch.requests == 3)
     }

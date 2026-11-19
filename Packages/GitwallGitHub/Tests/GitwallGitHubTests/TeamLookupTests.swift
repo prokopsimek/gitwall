@@ -17,19 +17,27 @@ private final class TestClock: Sendable {
     }
 }
 
-/// Answers the preset search, the item-state lookup and the team lookup from captured fixtures and counts the team
-/// lookups. `teamAnswers` is what the lookup says each time it is asked; the last answer repeats.
+/// Answers the preset search, the item-state lookup and the team lookup from the captured fixtures, with the requests
+/// of a team and a user added to pull request 24 (derived, see ``Captured``), and counts the team lookups. `teamAnswers` is what the lookup says each time it is asked; the last answer repeats.
 private struct Fixture {
-    static let teams = #"{"data":{"viewer":{"organizations":{"nodes":[{"login":"acme","teams":{"nodes":[{"slug":"platform"}]}}]}}}}"#
+    static let teams = #"{"data":{"viewer":{"organizations":{"nodes":[{"login":"\#(Captured.owner)","teams":{"nodes":[{"slug":"platform"}]}}]}}}}"#
     static let teamLookup = "teams(first: 100, role: MEMBER)"
 
     let transport: ScriptedTransport
     let clock = TestClock()
 
     init(teamAnswers: [String] = [Fixture.teams]) throws {
-        let prs = try Fixtures.data("graphql_preset_search_prs.json")
+        let requests = Captured.teamReviewRequests(team: "platform", user: "carol")
+        let prNodes = try Captured.searchNodes("graphql_preset_search_prs.json").map { node in
+            node["number"] as? Int == 24 ? Captured.with(node, ["reviewRequests": requests]) : node
+        }
+        let prs = try Captured.searchAnswer("graphql_preset_search_prs.json", nodes: prNodes)
         let issues = try Fixtures.data("graphql_preset_search_issues.json")
-        let states = try Fixtures.data("graphql_item_states.json")
+        let stateNodes: [Any] = try Captured.stateNodes().map { node in
+            guard let node = node as? Captured.Object, node["number"] as? Int == 24 else { return node }
+            return Captured.with(node, ["state": "OPEN", "reviewRequests": requests])
+        }
+        let states = try Captured.stateAnswer(nodes: stateNodes)
         let asked = OSAllocatedUnfairLock(initialState: 0)
         transport = ScriptedTransport { request in
             if request.query.contains(Self.teamLookup) {
@@ -53,18 +61,21 @@ private struct Fixture {
 
 private func account(_ id: UUID = UUID()) -> Account {
     Account(id: id, kind: .github, baseURL: github, displayName: "GitHub", me: UserRef(login: "bob"),
-            sources: [.organization(login: "acme")])
+            sources: [.organization(login: Captured.owner)])
 }
 
 private let pullRequests = PresetSearch(filter: .any, repositories: nil, sort: .lastActivity, kinds: [.pullRequest])
 
-/// The items the captured item-state answer is for, one per node it holds.
-private func askedItems(for account: Account) -> [WorkItem] {
-    [(12, ItemKind.pullRequest, "PR_kwDOAcme0012"), (13, .pullRequest, "PR_kwDOAcme0013"), (14, .pullRequest, "PR_kwDOAcme0014"),
-     (99, .pullRequest, "PR_kwDOAcme0099"), (30, .issue, "I_kwDOAcme0030"), (31, .issue, "I_kwDOAcme0031")].map { number, kind, nodeID in
-        WorkItem(accountID: account.id, kind: kind, repoFullName: "acme/app", number: number, title: "Old title",
-                 url: URL(string: "https://github.com/acme/app/pull/\(number)")!, author: UserRef(login: "heidi"),
-                 createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 0), nodeID: nodeID)
+/// The items the captured item-state answer is for, one per node it holds, in its order.
+private func askedItems(for account: Account) throws -> [WorkItem] {
+    try Captured.stateNodes().map { node in
+        let object = node as? Captured.Object
+        let number = object?["number"] as? Int ?? 9
+        let isPull = object?["__typename"] as? String == "PullRequest"
+        return WorkItem(accountID: account.id, kind: isPull ? .pullRequest : .issue, repoFullName: Captured.repository, number: number,
+                        title: "Old title", url: URL(string: "https://github.com/\(Captured.repository)/pull/\(number)")!,
+                        author: UserRef(login: "heidi"), createdAt: Date(timeIntervalSince1970: 0),
+                        updatedAt: Date(timeIntervalSince1970: 0), nodeID: object?["id"] as? String ?? Captured.missingNodeID)
     }
 }
 
@@ -82,7 +93,7 @@ struct TeamLookupCacheTests {
         #expect(await fixture.teamLookups == 1)
         // Both resolve the team request to me.
         for fetch in [first, second] {
-            #expect(try #require(fetch.items.first { $0.number == 12 }).requestedReviewers.map(\.login) == ["bob", "carol"])
+            #expect(try #require(fetch.items.first { $0.number == 24 }).requestedReviewers.map(\.login) == ["bob", "carol"])
         }
     }
 
@@ -93,11 +104,12 @@ struct TeamLookupCacheTests {
         let acme = account()
         _ = try await provider.fetchPresetItems(account: acme, token: "t", search: pullRequests)
 
-        let items = askedItems(for: acme)
+        let items = try askedItems(for: acme)
+        let pull = try #require(items.first { $0.number == 24 })
         let states = try await provider.fetchItemStates(account: acme, token: "t", items: items)
 
-        guard case .open(let item)? = states[items[0].id] else {
-            Issue.record("The first item should come back open")
+        guard case .open(let item)? = states[pull.id] else {
+            Issue.record("Pull request 24 should come back open")
             return
         }
         #expect(item.requestedReviewers.map(\.login) == ["bob", "carol"])
@@ -158,11 +170,11 @@ struct TeamLookupCacheTests {
         let acme = account()
 
         let first = try await provider.fetchPresetItems(account: acme, token: "t", search: pullRequests)
-        #expect(try #require(first.items.first { $0.number == 12 }).requestedReviewers.map(\.login) != ["bob", "carol"])
+        #expect(try #require(first.items.first { $0.number == 24 }).requestedReviewers.map(\.login) != ["bob", "carol"])
 
         let second = try await provider.fetchPresetItems(account: acme, token: "t", search: pullRequests)
         #expect(await fixture.teamLookups == 2)
-        #expect(try #require(second.items.first { $0.number == 12 }).requestedReviewers.map(\.login) == ["bob", "carol"])
+        #expect(try #require(second.items.first { $0.number == 24 }).requestedReviewers.map(\.login) == ["bob", "carol"])
     }
 
     @Test("errors beside the teams are not remembered either")

@@ -2,110 +2,62 @@
   "data": {
     "rateLimit": {
       "cost": 1,
-      "remaining": 4987,
-      "resetAt": "2026-11-19T13:00:00Z"
+      "remaining": 4794,
+      "resetAt": "2026-11-19T21:46:44Z"
     },
     "nodes": [
       {
         "__typename": "Issue",
-        "state": "OPEN",
-        "id": "I_kwDOAcme0030",
-        "number": 30,
-        "title": "Login fails behind a proxy",
-        "url": "https://github.com/acme/app/issues/30",
-        "createdAt": "2026-11-15T07:00:00Z",
-        "updatedAt": "2026-11-19T07:30:00Z",
+        "state": "CLOSED",
+        "id": "I_kwDOUUWeOM8AAAABQ1mQ8Q",
+        "number": 1,
+        "title": "Waiting for my review: show drafts that ask for my review",
+        "url": "https://github.com/prokopsimek/gitwall/issues/1",
+        "createdAt": "2026-09-11T13:32:52Z",
+        "updatedAt": "2026-09-11T14:01:06Z",
         "author": {
-          "login": "heidi",
-          "avatarUrl": "https://avatars.githubusercontent.com/u/8?v=4",
-          "name": "Heidi"
+          "login": "prokopsimek",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+          "name": "Prokop Simek"
         },
         "labels": {
           "nodes": [
             {
-              "name": "bug",
-              "color": "d73a4a"
+              "name": "enhancement",
+              "color": "a2eeef"
             }
           ]
         },
         "assignees": {
-          "nodes": [
-            {
-              "login": "bob",
-              "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4",
-              "name": "Bob"
-            }
-          ]
+          "nodes": []
         },
-        "milestone": {
-          "title": "1.4"
-        },
+        "milestone": null,
         "comments": {
-          "totalCount": 5
+          "totalCount": 0
         },
         "repository": {
-          "nameWithOwner": "acme/app"
+          "nameWithOwner": "prokopsimek/gitwall"
         }
       },
       {
         "__typename": "Issue",
         "state": "CLOSED",
-        "id": "I_kwDOAcme0031",
-        "number": 31,
-        "title": "Crash on an empty config",
-        "url": "https://github.com/acme/app/issues/31",
-        "createdAt": "2026-11-15T07:00:00Z",
-        "updatedAt": "2026-11-19T07:30:00Z",
+        "id": "I_kwDOUUWeOM8AAAABQ1mRvQ",
+        "number": 2,
+        "title": "Preset filter by author (agent and bot pull requests)",
+        "url": "https://github.com/prokopsimek/gitwall/issues/2",
+        "createdAt": "2026-09-11T13:32:54Z",
+        "updatedAt": "2026-09-11T14:01:07Z",
         "author": {
-          "login": "heidi",
-          "avatarUrl": "https://avatars.githubusercontent.com/u/8?v=4",
-          "name": "Heidi"
+          "login": "prokopsimek",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+          "name": "Prokop Simek"
         },
         "labels": {
           "nodes": [
             {
-              "name": "bug",
-              "color": "d73a4a"
-            }
-          ]
-        },
-        "assignees": {
-          "nodes": [
-            {
-              "login": "bob",
-              "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4",
-              "name": "Bob"
-            }
-          ]
-        },
-        "milestone": null,
-        "comments": {
-          "totalCount": 5
-        },
-        "repository": {
-          "nameWithOwner": "acme/app"
-        }
-      },
-      {
-        "__typename": "PullRequest",
-        "state": "OPEN",
-        "id": "PR_kwDOAcme0012",
-        "number": 12,
-        "title": "Rotate signing keys",
-        "url": "https://github.com/acme/app/pull/12",
-        "isDraft": false,
-        "createdAt": "2026-11-17T09:12:00Z",
-        "updatedAt": "2026-11-19T08:40:00Z",
-        "author": {
-          "login": "alice",
-          "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4",
-          "name": "Alice"
-        },
-        "labels": {
-          "nodes": [
-            {
-              "name": "security",
-              "color": "d73a4a"
+              "name": "enhancement",
+              "color": "a2eeef"
             }
           ]
         },
@@ -114,41 +66,47 @@
         },
         "milestone": null,
         "comments": {
-          "totalCount": 3
+          "totalCount": 0
         },
-        "reviewDecision": "REVIEW_REQUIRED",
-        "mergeable": "MERGEABLE",
-        "additions": 212,
-        "deletions": 40,
+        "repository": {
+          "nameWithOwner": "prokopsimek/gitwall"
+        }
+      },
+      null,
+      {
+        "__typename": "PullRequest",
+        "state": "MERGED",
+        "id": "PR_kwDOUUWeOM8AAAABMfb-fQ",
+        "number": 23,
+        "title": "feat(walls): Walls window with tiles, editing, rotation and a version 2 Gitwall file",
+        "url": "https://github.com/prokopsimek/gitwall/pull/23",
+        "isDraft": false,
+        "createdAt": "2026-11-03T07:03:56Z",
+        "updatedAt": "2026-11-03T07:36:23Z",
+        "author": {
+          "login": "prokopsimek",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+          "name": "Prokop Simek"
+        },
+        "labels": {
+          "nodes": []
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 0
+        },
+        "reviewDecision": null,
+        "mergeable": "UNKNOWN",
+        "additions": 4107,
+        "deletions": 200,
         "reviewRequests": {
-          "nodes": [
-            {
-              "requestedReviewer": {
-                "__typename": "Team",
-                "slug": "platform",
-                "name": "Platform"
-              }
-            },
-            {
-              "requestedReviewer": {
-                "__typename": "User",
-                "login": "carol",
-                "name": "Carol",
-                "avatarUrl": "https://avatars.githubusercontent.com/u/3?v=4"
-              }
-            }
-          ]
+          "nodes": []
         },
         "latestReviews": {
-          "nodes": [
-            {
-              "state": "COMMENTED",
-              "author": {
-                "login": "dave",
-                "avatarUrl": "https://avatars.githubusercontent.com/u/4?v=4"
-              }
-            }
-          ]
+          "nodes": []
         },
         "commits": {
           "nodes": [
@@ -162,119 +120,43 @@
           ]
         },
         "repository": {
-          "nameWithOwner": "acme/app"
-        }
-      },
-      {
-        "__typename": "PullRequest",
-        "state": "CLOSED",
-        "id": "PR_kwDOAcme0013",
-        "number": 13,
-        "title": "Try a second cache",
-        "url": "https://github.com/acme/app/pull/13",
-        "isDraft": false,
-        "createdAt": "2026-11-17T09:12:00Z",
-        "updatedAt": "2026-11-19T08:40:00Z",
-        "author": {
-          "login": "alice",
-          "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4",
-          "name": "Alice"
-        },
-        "labels": {
-          "nodes": [
-            {
-              "name": "security",
-              "color": "d73a4a"
-            }
-          ]
-        },
-        "assignees": {
-          "nodes": []
-        },
-        "milestone": null,
-        "comments": {
-          "totalCount": 3
-        },
-        "reviewDecision": "APPROVED",
-        "mergeable": "CONFLICTING",
-        "additions": 212,
-        "deletions": 40,
-        "reviewRequests": {
-          "nodes": []
-        },
-        "latestReviews": {
-          "nodes": [
-            {
-              "state": "COMMENTED",
-              "author": {
-                "login": "dave",
-                "avatarUrl": "https://avatars.githubusercontent.com/u/4?v=4"
-              }
-            }
-          ]
-        },
-        "commits": {
-          "nodes": [
-            {
-              "commit": {
-                "statusCheckRollup": {
-                  "state": "SUCCESS"
-                }
-              }
-            }
-          ]
-        },
-        "repository": {
-          "nameWithOwner": "acme/app"
+          "nameWithOwner": "prokopsimek/gitwall"
         }
       },
       {
         "__typename": "PullRequest",
         "state": "MERGED",
-        "id": "PR_kwDOAcme0014",
-        "number": 14,
-        "title": "Bump the toolchain",
-        "url": "https://github.com/acme/app/pull/14",
+        "id": "PR_kwDOUUWeOM8AAAABMnfJkQ",
+        "number": 24,
+        "title": "fix(walls,detail): full screen fills the screen, Detail closes on navigation, and four smaller fixes",
+        "url": "https://github.com/prokopsimek/gitwall/pull/24",
         "isDraft": false,
-        "createdAt": "2026-11-17T09:12:00Z",
-        "updatedAt": "2026-11-19T08:40:00Z",
+        "createdAt": "2026-11-03T17:28:01Z",
+        "updatedAt": "2026-11-03T17:40:32Z",
         "author": {
-          "login": "alice",
-          "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4",
-          "name": "Alice"
+          "login": "prokopsimek",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+          "name": "Prokop Simek"
         },
         "labels": {
-          "nodes": [
-            {
-              "name": "security",
-              "color": "d73a4a"
-            }
-          ]
+          "nodes": []
         },
         "assignees": {
           "nodes": []
         },
         "milestone": null,
         "comments": {
-          "totalCount": 3
+          "totalCount": 0
         },
-        "reviewDecision": "APPROVED",
+        "reviewDecision": null,
         "mergeable": "UNKNOWN",
-        "additions": 212,
-        "deletions": 40,
+        "additions": 388,
+        "deletions": 29,
         "reviewRequests": {
           "nodes": []
         },
         "latestReviews": {
-          "nodes": [
-            {
-              "state": "COMMENTED",
-              "author": {
-                "login": "dave",
-                "avatarUrl": "https://avatars.githubusercontent.com/u/4?v=4"
-              }
-            }
-          ]
+          "nodes": []
         },
         "commits": {
           "nodes": [
@@ -288,10 +170,9 @@
           ]
         },
         "repository": {
-          "nameWithOwner": "acme/app"
+          "nameWithOwner": "prokopsimek/gitwall"
         }
-      },
-      null
+      }
     ]
   },
   "errors": [
@@ -299,7 +180,7 @@
       "type": "NOT_FOUND",
       "path": [
         "nodes",
-        5
+        2
       ],
       "locations": [
         {
@@ -307,7 +188,7 @@
           "column": 3
         }
       ],
-      "message": "Could not resolve to a node with the global id of 'PR_kwDOAcme0099'"
+      "message": "Could not resolve to a node with the global id of 'I_kwDOUUWeOM8AAAABQ1mZZZ'"
     }
   ]
 }
