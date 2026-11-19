@@ -64,6 +64,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if popover.isShown { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
+        environment.fetchSelectedPresetOnOpen()
         if environment.isDemo { addDemoBackdrop() }
     }
 

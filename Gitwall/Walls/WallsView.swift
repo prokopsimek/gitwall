@@ -16,6 +16,9 @@ struct WallsView: View {
             .frame(minWidth: 560, minHeight: 380)
             .background(Color(nsColor: .underPageBackgroundColor))
             .onExitCommand { model.isEditing = false }
+            // The window opening, another wall coming up and a new tile; never a new snapshot.
+            .onAppear { model.fetchShownPresets() }
+            .onChange(of: model.shownPresetKey) { model.fetchShownPresets() }
     }
 
     @ViewBuilder

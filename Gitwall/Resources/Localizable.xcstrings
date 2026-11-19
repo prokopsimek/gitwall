@@ -1,7 +1,24 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-
+    "%@+" : {
+      "comment" : "The count of a preset whose search stopped at the provider's cap, as in 1000+. The argument is the number."
+    },
+    "Not fetched yet" : {
+      "comment" : "Tooltip of a preset's count, shown as a dash, while the preset was never fetched."
+    },
+    "Query failed" : {
+      "comment" : "A preset whose search the provider refused: its count, the tooltip, the footer of the popover and the main window, a wall tile and a widget."
+    },
+    "Query failed · updated %@" : {
+      "comment" : "Tooltip of a preset whose last search was refused. The argument says when its last result was fetched, as in 5 min ago."
+    },
+    "Updated %@" : {
+      "comment" : "Tooltip of a preset's count. The argument says when the preset was fetched, as in 5 min ago."
+    },
+    "Waiting for sync" : {
+      "comment" : "A widget or wall tile of a preset that was never fetched."
+    }
   },
   "version" : "1.0"
 }

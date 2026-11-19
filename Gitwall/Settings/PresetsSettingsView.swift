@@ -16,7 +16,7 @@ struct PresetsSettingsView: View {
                             HStack {
                                 Text(preset.name)
                                 Spacer()
-                                Text("\(environment.count(for: preset))")
+                                PresetCountLabel(PresetCountPresentation(environment.presetCount(for: preset), now: Date()))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .monospacedDigit()

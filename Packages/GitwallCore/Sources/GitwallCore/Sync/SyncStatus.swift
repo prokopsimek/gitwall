@@ -47,7 +47,9 @@ public struct SyncStatus: Equatable, Sendable {
         return dates.contains(nil) ? nil : dates.compactMap(\.self).min()
     }
 
-    private static func age(since date: Date, now: Date) -> String {
+    /// How long ago `date` was, as the status says it: "just now", "5 min ago", "3 h ago", "2 d ago". English,
+    /// user-facing; also what a preset's count says about when the preset was fetched.
+    public static func age(since date: Date, now: Date) -> String {
         let seconds = max(0, now.timeIntervalSince(date))
         switch seconds {
         case ..<60: return "just now"

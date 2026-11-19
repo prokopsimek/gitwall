@@ -3,6 +3,7 @@ import GitwallAuth
 import GitwallCore
 import GitwallGitHub
 import GitwallGitLab
+import GitwallUI
 import Observation
 import OSLog
 import ServiceManagement
@@ -36,6 +37,9 @@ final class AppEnvironment {
     var selectedPresetID: UUID?
     /// Item ids that appeared in the last sync, for the "new" dot in the popover.
     private(set) var newItemIDs: Set<String> = []
+    /// Presets a fetch on open runs for (``fetchOnOpen(_:)``): a list of one that was never fetched shows a spinner,
+    /// and opening it again asks nothing.
+    private(set) var fetchingPresetIDs: Set<UUID> = []
     /// Credential expiry per account; `nil` value means the credential has no expiry. See `reloadTokenExpiries`.
     private(set) var tokenExpiries: [UUID: Date?] = [:]
 
@@ -132,7 +136,9 @@ final class AppEnvironment {
             self.snapshot = Snapshot(
                 fetchedAt: snapshot.fetchedAt,
                 items: snapshot.items.filter { $0.accountID != account.id },
-                accountStatus: snapshot.accountStatus
+                accountStatus: snapshot.accountStatus,
+                presetResults: snapshot.presetResults.filter { $0.accountID != account.id },
+                searchedAccounts: snapshot.searchedAccounts.subtracting([account.id])
             )
         }
     }
@@ -304,30 +310,71 @@ final class AppEnvironment {
         }
         do {
             let result = try await syncEngine.sync()
-            previousSnapshot = result.previous
-            snapshot = result.snapshot
             lastError = nil
-            // A snapshot written before any account was synced is not a baseline: the first real sync must not
-            // flag every item as new or fire a burst of notifications.
-            let baseline = (result.previous?.accountStatus.isEmpty ?? true) ? nil : result.previous
-            let changes = SnapshotDiff.changes(from: baseline, to: result.snapshot, accounts: config.accounts,
-                                               searches: result.searches)
-            newItemIDs = Set(changes.filter { $0.event == .newItem }.map(\.item.id))
-            log.info("Sync finished with \(result.snapshot.items.count) items, \(changes.count) changes")
-
-            reloadTokenExpiries()
-            await avatars?.download(for: result.snapshot.items)
-            WidgetCenter.shared.reloadAllTimelines()
-
-            let routed = SnapshotDiff.notifications(
-                for: changes, presets: config.presets, accounts: config.accounts,
-                previous: baseline, now: Date()
-            )
-            await notifications.deliver(routed, capabilities: providers)
+            await take(result, from: .sync)
         } catch {
             lastError = error.localizedDescription
             log.error("Sync failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// What wrote the snapshot that ``take(_:from:)`` takes, for its log line.
+    private enum SnapshotSource: String {
+        case sync = "Sync"
+        case fetchOnOpen = "Fetch on open"
+    }
+
+    /// Everything after a sync or a fetch on open wrote the snapshot: the new snapshot and the one before it, the diff
+    /// and its "new" dots, avatars, widgets and notifications. Both go through here, so a preset fetched on open
+    /// reports what changed exactly as a sync would.
+    private func take(_ result: SyncResult, from source: SnapshotSource) async {
+        previousSnapshot = result.previous
+        snapshot = result.snapshot
+        // A snapshot written before any account was synced is not a baseline: the first real sync must not
+        // flag every item as new or fire a burst of notifications.
+        let baseline = (result.previous?.accountStatus.isEmpty ?? true) ? nil : result.previous
+        let changes = SnapshotDiff.changes(from: baseline, to: result.snapshot, accounts: config.accounts,
+                                           searches: result.searches)
+        newItemIDs = Set(changes.filter { $0.event == .newItem }.map(\.item.id))
+        log.info("\(source.rawValue, privacy: .public) finished with \(result.snapshot.items.count) items, \(changes.count) changes")
+
+        reloadTokenExpiries()
+        await avatars?.download(for: result.snapshot.items)
+        WidgetCenter.shared.reloadAllTimelines()
+
+        let routed = SnapshotDiff.notifications(
+            for: changes, presets: config.presets, accounts: config.accounts,
+            previous: baseline, now: Date()
+        )
+        await notifications.deliver(routed, capabilities: providers)
+    }
+
+    /// A window, the popover or a wall opened `presets`: fetches those whose result is missing or older than the sync
+    /// interval (`PresetFreshness.presetsToFetchOnOpen`), once each, while the window shows what it has. Called when a
+    /// preset opens, never because the snapshot changed, which would fetch it over and over. A failure leaves the last
+    /// result on screen and goes to the log alone; it is no failed sync.
+    func fetchOnOpen(_ presets: [Preset]) {
+        guard !usesSampleContent, let syncEngine, let snapshot else { return }
+        let ids = PresetFreshness.presetsToFetchOnOpen(
+            presets, in: snapshot, accounts: config.accounts, now: Date(),
+            interval: config.settings.refreshInterval, inFlight: fetchingPresetIDs
+        )
+        guard !ids.isEmpty else { return }
+        fetchingPresetIDs.formUnion(ids)
+        Task {
+            defer { self.fetchingPresetIDs.subtract(ids) }
+            do {
+                let result = try await syncEngine.syncPresets(ids)
+                await self.take(result, from: .fetchOnOpen)
+            } catch {
+                log.error("Fetch on open of \(ids.count) presets failed: \(String(describing: type(of: error)), privacy: .public)")
+            }
+        }
+    }
+
+    /// The preset the popover and the main window show, when one of them opens it or switches to it.
+    func fetchSelectedPresetOnOpen() {
+        fetchOnOpen(selectedPreset.map { [$0] } ?? [])
     }
 
     /// Refresh while showing sample data: one more review request arrives, and it goes through the same diff and
@@ -358,6 +405,7 @@ final class AppEnvironment {
         config.preset(id: selectedPresetID ?? UUID()) ?? config.presets.first
     }
 
+    /// The items `preset` shows, from its own results where its accounts search presets (`PresetFreshness`).
     /// Remembered per saved preset for the minute, until the snapshot or what presets find changes (`FilterCache`).
     /// The preset editor's unsaved copy is worked out every time.
     func items(for preset: Preset) -> [WorkItem] {
@@ -365,19 +413,33 @@ final class AppEnvironment {
         let accounts = config.accounts
         let now = Date()
         return filterCache.items(for: preset, saved: config.preset(id: preset.id), now: now) {
-            FilterEngine.items(matching: preset, in: snapshot.items, accounts: accounts, now: now)
+            PresetFreshness.items(for: preset, in: snapshot, accounts: accounts, now: now)
         }
     }
 
+    /// How many items ``items(for:)`` gives, from the same cache.
     func count(for preset: Preset) -> Int {
         items(for: preset).count
+    }
+
+    /// What the count beside a preset's name shows: the number with "+" above the provider's cap, "–" before the
+    /// preset was ever fetched, its fetch time and a failed query. Without a snapshot nothing was fetched yet.
+    func presetCount(for preset: Preset) -> PresetCountDisplay {
+        PresetFreshness.display(for: preset, in: snapshot ?? Snapshot(fetchedAt: .distantPast, items: []),
+                                accounts: config.accounts, itemCount: count(for: preset))
+    }
+
+    /// When the items a list of `preset` shows were fetched: the preset's own time where it has one. Without a preset,
+    /// the last sync.
+    func fetchedAt(for preset: Preset?) -> Date? {
+        guard let preset else { return snapshot?.fetchedAt }
+        return PresetCountPresentation.fetchedAt(presetCount(for: preset), snapshotFetchedAt: snapshot?.fetchedAt)
     }
 
     /// Text shown next to the menu bar icon.
     var menuBarBadge: String {
         guard let preset = config.presets.first(where: \.showCountInMenuBar) else { return "" }
-        let count = count(for: preset)
-        return count == 0 ? "" : String(count)
+        return PresetCountPresentation.menuBarText(presetCount(for: preset))
     }
 
     var accountsNeedingAttention: [(Account, FetchStatus)] {
@@ -702,6 +764,8 @@ final class AppEnvironment {
         let items = items(for: preset)
         if !items.isEmpty { return .items(items) }
         if snapshot == nil || isRefreshing { return .empty(.loading) }
+        // A preset never fetched has nothing to show while its fetch on open runs; any other shows its last items.
+        if fetchingPresetIDs.contains(preset.id), presetCount(for: preset).isWaitingForSync { return .fetching }
         // An account that watches nothing fetches nothing and still syncs fine, so say which one it is.
         switch config.emptiness(of: preset) {
         case .nothingWatched(let account): return .empty(.noRepositories(account: account))
@@ -771,6 +835,8 @@ final class AppEnvironment {
 
 enum ListState: Equatable {
     case items([WorkItem])
+    /// A preset that was never fetched while its fetch on open runs: a small spinner where the list would be.
+    case fetching
     case empty(EmptyStateKind)
 }
 

@@ -17,6 +17,13 @@ struct PopoverView: View {
             footer
         }
         .frame(width: Self.size.width, height: Self.size.height)
+        // The popover opening fetches it too (`StatusItemController.showPopover`).
+        .onChange(of: environment.selectedPreset?.id) { environment.fetchSelectedPresetOnOpen() }
+    }
+
+    /// The count of the preset on screen, for its failed query.
+    private var selectedCount: PresetCountPresentation? {
+        environment.selectedPreset.map { PresetCountPresentation(environment.presetCount(for: $0), now: Date()) }
     }
 
     private var header: some View {
@@ -29,7 +36,9 @@ struct PopoverView: View {
                     set: { environment.selectedPresetID = $0 }
                 )) {
                     ForEach(environment.config.presets) { preset in
-                        Label("\(preset.name) (\(environment.count(for: preset)))", systemImage: preset.icon)
+                        let count = PresetCountPresentation(environment.presetCount(for: preset), now: Date())
+                        Label("\(preset.name) (\(count.text))",
+                              systemImage: count.isFailure ? "exclamationmark.triangle" : preset.icon)
                             .tag(preset.id)
                     }
                 }
@@ -73,6 +82,10 @@ struct PopoverView: View {
         switch environment.listState(for: environment.selectedPreset) {
         case .items(let items):
             ItemListView(items: items, environment: environment, style: .regular)
+        case .fetching:
+            ProgressView()
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .empty(let kind):
             EmptyStateView(kind: kind, environment: environment)
         }
@@ -80,7 +93,7 @@ struct PopoverView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            if let fetchedAt = environment.snapshot?.fetchedAt {
+            if let fetchedAt = environment.fetchedAt(for: environment.selectedPreset) {
                 Text("Synced \(fetchedAt, style: .relative) ago")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -97,6 +110,11 @@ struct PopoverView: View {
                 .help(status.message ?? "")
             } else if let error = environment.lastError {
                 Text(error).font(.caption).foregroundStyle(.red).lineLimit(1).help(error)
+            } else if let count = selectedCount, count.isFailure {
+                Label("Query failed", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .help(count.help)
             }
             Spacer()
             Button("Quit") { NSApp.terminate(nil) }

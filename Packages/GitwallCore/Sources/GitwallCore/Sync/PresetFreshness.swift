@@ -55,6 +55,21 @@ public enum PresetFreshness {
         }
     }
 
+    /// The ids a window that opens `presets` should fetch now, in the order of `presets` and each once (a wall can show
+    /// a preset on two tiles): those ``needsFetchOnOpen(_:in:accounts:now:interval:)`` says so for, leaving out
+    /// `inFlight`, the presets a fetch on open is already running for, so a second window opening one asks nothing.
+    public static func presetsToFetchOnOpen(
+        _ presets: [Preset], in snapshot: Snapshot, accounts: [Account], now: Date, interval: TimeInterval,
+        inFlight: Set<UUID>
+    ) -> [UUID] {
+        var seen = inFlight
+        return presets.compactMap { preset in
+            guard seen.insert(preset.id).inserted,
+                  needsFetchOnOpen(preset, in: snapshot, accounts: accounts, now: now, interval: interval) else { return nil }
+            return preset.id
+        }
+    }
+
     /// One account's share of a preset.
     private struct Part {
         let isSearched: Bool

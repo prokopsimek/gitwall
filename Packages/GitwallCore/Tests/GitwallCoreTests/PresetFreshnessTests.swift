@@ -278,4 +278,32 @@ struct PresetFreshnessTests {
     func notSearchedNeverFetchedOnOpen() {
         #expect(!needsFetch(githubDocs, snapshot([item(1, github)], searchedAccounts: [])))
     }
+
+    func toFetch(_ presets: [Preset], _ snapshot: Snapshot, inFlight: Set<UUID> = []) -> [UUID] {
+        PresetFreshness.presetsToFetchOnOpen(presets, in: snapshot, accounts: accounts, now: now, interval: interval,
+                                             inFlight: inFlight)
+    }
+
+    @Test("a window that opens presets fetches the ones that need it, in their order")
+    func presetsToFetchOnOpen() {
+        let one = item(1, github)
+        let fresh = snapshot([one], results: [result(docs, holding: [one], fetchedAt: minutes(-1))])
+
+        #expect(toFetch([githubDocs, docs, gitlabDocs], fresh) == [githubDocs.id])
+        #expect(toFetch([docs, githubDocs], snapshot([one])) == [docs.id, githubDocs.id])
+        #expect(toFetch([], snapshot([one])).isEmpty)
+    }
+
+    @Test("a preset shown on two tiles of a wall is fetched once")
+    func repeatedPresetFetchedOnce() {
+        #expect(toFetch([githubDocs, docs, githubDocs], snapshot([item(1, github)])) == [githubDocs.id, docs.id])
+    }
+
+    @Test("a preset whose fetch on open is already running is not asked for again")
+    func inFlightPresetNotAskedAgain() {
+        let snapshot = snapshot([item(1, github)])
+
+        #expect(toFetch([githubDocs, docs], snapshot, inFlight: [githubDocs.id]) == [docs.id])
+        #expect(toFetch([githubDocs], snapshot, inFlight: [githubDocs.id]).isEmpty)
+    }
 }

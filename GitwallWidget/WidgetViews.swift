@@ -10,6 +10,8 @@ struct PresetEntry: TimelineEntry {
         case containerUnavailable
         case noAccounts
         case noPreset
+        /// The preset has nothing fetched yet: it waits for a sync, or its query failed before it was ever fetched.
+        case preset(PresetCountPresentation.Placeholder)
     }
 
     let date: Date
@@ -26,6 +28,8 @@ struct PresetEntry: TimelineEntry {
     /// No account is connected yet, so these rows are `DemoData`. Declared with a default so the existing
     /// constructions stay as they are.
     var isSample: Bool = false
+    /// The preset's last query failed; the items are those of its result before. Defaulted like ``isSample``.
+    var queryFailed: Bool = false
 
     var isStale: Bool {
         guard let fetchedAt else { return false }
@@ -80,7 +84,7 @@ struct GitwallWidgetView: View {
 
     @ViewBuilder
     private var headerTrailing: some View {
-        if entry.attention {
+        if entry.attention || entry.queryFailed {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).font(.caption)
         }
         if family != .systemSmall {
@@ -105,6 +109,11 @@ struct GitwallWidgetView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+        }
+        if entry.queryFailed, family != .systemSmall {
+            Text("Query failed")
+                .font(.caption2)
+                .foregroundStyle(.orange)
         }
         if entry.problem == nil, !entry.isSample, entry.isDefaultPreset, entry.presetCount > 1, family != .systemSmall {
             Text("Right-click → Edit Widget to pick a preset")
@@ -135,6 +144,12 @@ struct GitwallWidgetView: View {
                         Text("Create a preset").font(.caption).foregroundStyle(.secondary)
                     }
                 }
+            case .preset(.waitingForSync):
+                Image(systemName: "clock").font(.title2).foregroundStyle(.secondary)
+                Text("Waiting for sync").font(.caption).foregroundStyle(.secondary)
+            case .preset(.queryFailed):
+                Image(systemName: "exclamationmark.triangle").font(.title2).foregroundStyle(.orange)
+                Text("Query failed").font(.caption).foregroundStyle(.secondary)
             }
         }
         .multilineTextAlignment(.center)

@@ -121,4 +121,14 @@ struct SyncStatusTests {
         let status = SyncStatus(snapshot: snapshot(minutesAgo: 1, status: [UUID(): FetchStatus(state: .error)]), accounts: [github], lastError: nil)
         #expect(!status.isFailure)
     }
+
+    @Test("the age of any date reads as the status does, for other texts that say when something was fetched")
+    func ageOfAnyDate() {
+        #expect(SyncStatus.age(since: now.addingTimeInterval(-20), now: now) == "just now")
+        #expect(SyncStatus.age(since: now.addingTimeInterval(-5 * 60), now: now) == "5 min ago")
+        #expect(SyncStatus.age(since: now.addingTimeInterval(-185 * 60), now: now) == "3 h ago")
+        #expect(SyncStatus.age(since: now.addingTimeInterval(-50 * 3_600), now: now) == "2 d ago")
+        // A date ahead of the clock, as after a clock change, is just now rather than a negative age.
+        #expect(SyncStatus.age(since: now.addingTimeInterval(90), now: now) == "just now")
+    }
 }
