@@ -7,7 +7,7 @@ extension GitHubProvider {
     /// The state of each item by its node id, in batches of ``GraphQLQueries/maxItemStateLookupsPerRequest``, for items
     /// that left a preset search. A pull request is open, closed or merged, an issue open or closed; an open one comes
     /// back mapped like a search hit, team review requests included. A null node is an id GitHub cannot resolve or the
-    /// token may no longer see, so it is not found, unless an error of another type points at it. An item without a
+    /// token may no longer see, so it is not found, unless an error of another type, a refusal included, points at it. An item without a
     /// usable node id, a node of another type and a state GitHub does not document get no answer.
     ///
     /// Errors are those of every request: a refused token is `.unauthorized`, a rate limit `.rateLimited`, GraphQL
@@ -32,8 +32,9 @@ extension GitHubProvider {
                                                     query: GraphQLQueries.itemStates(nodeIDs: batch))
             let nodes = response.data?.nodes ?? []
             let errors = response.errors ?? []
-            if errors.contains(where: { $0.type?.uppercased() != "NOT_FOUND" }) {
-                gitHubLog.info("An item state lookup came with \(errors.count) GraphQL errors beside its results")
+            let unexpected = errors.filter { !["NOT_FOUND", "FORBIDDEN"].contains($0.type?.uppercased()) }
+            if !unexpected.isEmpty {
+                gitHubLog.error("An item state lookup came with \(unexpected.typeSummary, privacy: .public) beside its results")
             }
             let open = nodes.compactMap { $0?.state == "OPEN" ? $0?.item : nil }
             let slugs = await teamSlugs(for: open, account: account, token: token, endpoints: endpoints, teams: teams)

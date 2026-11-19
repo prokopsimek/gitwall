@@ -82,7 +82,12 @@ extension GitHubProvider {
                                                     variables: ["q": query.text, "after": after])
             guard let search = response.data?.search else { break }
             if let errors = response.errors, !errors.isEmpty {
-                gitHubLog.info("A preset search page came with \(errors.count) GraphQL errors beside its results")
+                gitHubLog.error("A preset search page came with \(errors.typeSummary, privacy: .public) beside its results")
+                // Null nodes of an organization that refuses the token are normal and stay. Anything else may have
+                // cost the page items that are still there, so the search fails and the previous result is kept.
+                if errors.hasPartialFailure {
+                    throw ProviderError.server(status: 200, message: "A search page came with GraphQL errors beside its results.")
+                }
             }
             totalCount = search.issueCount
             read += search.nodes.count

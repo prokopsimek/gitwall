@@ -143,6 +143,22 @@ struct ItemStateTests {
         #expect(states.isEmpty)
     }
 
+    @Test("a null node gets .notFound only when NOT_FOUND points at it, or no error does", arguments: [
+        (#"[{"type":"NOT_FOUND","path":["nodes",0],"message":"Could not resolve to a node."}]"#, true),
+        (#"[]"#, true),
+        (#"[{"type":"FORBIDDEN","path":["nodes",0],"message":"saml"}]"#, false),
+        (#"[{"type":"INTERNAL","path":["nodes",0],"message":"boom"}]"#, false),
+        (#"[{"message":"boom","path":["nodes",0]}]"#, false),
+    ])
+    func nullNode(errors: String, notFound: Bool) async throws {
+        let transport = nodesTransport(.json(#"{"data":{"nodes":[null]},"errors":\#(errors)}"#))
+        let item = stale(1, .issue, nodeID: "I_kwDOAcme0001")
+
+        let states = try await GitHubProvider(transport: transport).fetchItemStates(account: account, token: "t", items: [item])
+
+        #expect(states == (notFound ? [item.id: .notFound] : [:]))
+    }
+
     @Test("a lookup GitHub refuses throws, as every query does", arguments: [
         (StubTransport.Response.json(#"{"message":"Bad credentials"}"#, status: 401), ProviderError.unauthorized),
         (.json(#"{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}"#), .rateLimited(resetAt: nil)),

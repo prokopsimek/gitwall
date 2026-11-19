@@ -348,9 +348,12 @@ of a private repository was read.
   priority preset, sorted by GitHub by last update, may miss its most urgent items.
 - A source GitHub does not know, such as a renamed or deleted repository in a scope, makes GitHub search all of
   GitHub. That costs up to 40 pages whose items are thrown away, and the result is marked incomplete.
-- A page that comes with GraphQL errors beside its results, such as nodes of an organization the token is not
-  authorized for with single sign-on, leaves the result complete. Its missing items go unnoticed apart from a line in
-  the log.
+- A page that comes with only `FORBIDDEN` errors beside its results, such as nodes of an organization the token is
+  not authorized for with single sign-on, leaves the result complete: that organization's items are never returned,
+  and that is a normal, stable situation. An error of any other type, or without a type, fails the search like a
+  query failure, so the previous result stays and nothing counts as having left. Both are logged at error level with
+  the number and types of the errors, never their messages. An item state lookup leaves a null node without a state
+  unless `NOT_FOUND` points at it.
 - GitHub Enterprise Server and GitLab accounts behave as before.
 
 Open points, marked NEOVĚŘENO (not verified):

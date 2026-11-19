@@ -438,6 +438,50 @@ struct PresetFetchErrorTests {
         await #expect(throws: expected) { try await fetch(.json(body)) }
     }
 
+    private func page(errors: String) -> StubTransport.Response {
+        let node = SearchAnswer.node(.pullRequest, repo: "acme/app", number: 1)
+        return .json(#"{"data":{"search":{"issueCount":1,"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[\#(node),null]}},"errors":\#(errors)}"#)
+    }
+
+    @Test("a page with only FORBIDDEN errors beside its results stays complete and keeps its items")
+    func forbiddenIsTolerated() async throws {
+        let answer = page(errors: #"[{"type":"FORBIDDEN","path":["search","nodes",1],"message":"Resource protected by organization SAML enforcement."}]"#)
+        let fetch = try await GitHubProvider(transport: StubTransport([answer])).fetchPresetItems(
+            account: account([.organization(login: "acme")]), token: "t", search: search([.pullRequest])
+        )
+
+        #expect(fetch.items.count == 1)
+        #expect(fetch.isComplete)
+    }
+
+    @Test("a page with any other error beside its results fails the search and returns nothing", arguments: [
+        #"[{"type":"INTERNAL","message":"boom"}]"#,
+        #"[{"type":"SERVICE_UNAVAILABLE","message":"boom"}]"#,
+        #"[{"type":"FORBIDDEN","message":"saml"},{"type":"INTERNAL","message":"boom"}]"#,
+    ])
+    func otherErrorsFail(errors: String) async {
+        await #expect(throws: ProviderError.server(status: 200, message: "A search page came with GraphQL errors beside its results.")) {
+            try await fetch(page(errors: errors))
+        }
+    }
+
+    @Test("an error without a type is a partial failure")
+    func untypedFails() async {
+        await #expect(throws: ProviderError.server(status: 200, message: "A search page came with GraphQL errors beside its results.")) {
+            try await fetch(page(errors: #"[{"message":"Something went wrong."}]"#))
+        }
+    }
+
+    @Test("the log line names the types of the errors and never their messages")
+    func summary() throws {
+        let errors = try JSONDecoder().decode([GraphQLError].self, from: Data(
+            #"[{"type":"INTERNAL","message":"secret-login"},{"type":"FORBIDDEN","message":"x"},{"type":"INTERNAL","message":"y"},{"message":"z"}]"#.utf8
+        ))
+
+        #expect(errors.typeSummary == "4 GraphQL errors of types FORBIDDEN, INTERNAL, UNTYPED")
+        #expect(!errors.typeSummary.contains("secret-login"))
+    }
+
     @Test("a search GitHub rejects fails with the status it was rejected with", arguments: [400, 422])
     func rejected(status: Int) async {
         await #expect(throws: ProviderError.server(status: status, message: "Validation Failed")) {

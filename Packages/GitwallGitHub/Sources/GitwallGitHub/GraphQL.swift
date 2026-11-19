@@ -517,3 +517,20 @@ enum GraphQLMapping {
         userRef(login: login, name: name, avatar: avatar, optional: false)!
     }
 }
+
+// MARK: - Errors beside data
+
+extension [GraphQLError] {
+    /// What is logged about errors that came beside data: how many and of which types, never a message, a path or
+    /// anything else that could carry a login or a name. An error without a type counts as `UNTYPED`.
+    var typeSummary: String {
+        let types = Set(map { $0.type?.uppercased() ?? "UNTYPED" }).sorted()
+        return "\(count) GraphQL errors of types \(types.joined(separator: ", "))"
+    }
+
+    /// Whether any error is of a type other than `FORBIDDEN`, the one an organization that refuses the token produces
+    /// for good. Such an error beside data means nodes may be missing for a reason that will pass.
+    var hasPartialFailure: Bool {
+        contains { $0.type?.uppercased() != "FORBIDDEN" }
+    }
+}
