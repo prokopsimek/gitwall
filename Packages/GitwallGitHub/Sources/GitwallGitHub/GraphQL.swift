@@ -7,9 +7,24 @@ enum GraphQLQueries {
     static let maxRepositoriesPerBatch = 15
     static let pageSize = 50
     static let maxExtraPagesPerRepository = 3
+    /// Paging of ``search``, the `ISSUE` search of organization sources. GitHub Enterprise Server keeps exactly this.
     static let searchPageSize = 100
     static let maxSearchPages = 3
     static let maxSearchQueryLength = 256
+
+    /// Paging of ``presetSearch(kind:)`` on GitHub.com (D22, D57). 100 pull requests per page took GitHub 10 s and then
+    /// answered 502; 25 took 5–6 s. Issue nodes are lighter and stay at 100.
+    static let presetSearchPullRequestPageSize = 25
+    static let presetSearchIssuePageSize = 100
+    /// GitHub search never returns more than 1000 results for one query, so paging stops there.
+    static let maxPresetSearchResults = 1000
+
+    static func presetSearchPageSize(for kind: ItemKind) -> Int {
+        switch kind {
+        case .pullRequest: presetSearchPullRequestPageSize
+        case .issue: presetSearchIssuePageSize
+        }
+    }
 
     static let pullRequestFragment = """
     fragment PR on PullRequest {
@@ -113,16 +128,30 @@ enum GraphQLQueries {
         return !id.isEmpty && id.unicodeScalars.allSatisfy { $0.isASCII && allowed.contains($0) }
     }
 
-    static let search = """
-    query($q: String!, $after: String) {
-      \(rateLimitField)
-      search(query: $q, type: ISSUE, first: \(searchPageSize), after: $after) {
-        issueCount
-        pageInfo { hasNextPage endCursor }
-        nodes { __typename ... on PullRequest { ...PR } ... on Issue { ...Issue } }
-      }
+    static let search = searchDocument(type: "ISSUE", first: searchPageSize, kinds: [.pullRequest, .issue])
+
+    /// One page of a preset's own query on GitHub.com (D31), for one item kind. It answers in the shape of ``search``,
+    /// so ``SearchData`` decodes it.
+    static func presetSearch(kind: ItemKind) -> String {
+        searchDocument(type: "ISSUE_ADVANCED", first: presetSearchPageSize(for: kind), kinds: [kind])
     }
-    """ + fragments(for: [.pullRequest, .issue])
+
+    /// A `search` page whose nodes are only `kinds`, with only their fragments.
+    private static func searchDocument(type: String, first: Int, kinds: Set<ItemKind>) -> String {
+        var spreads: [String] = []
+        if kinds.contains(.pullRequest) { spreads.append("... on PullRequest { ...PR }") }
+        if kinds.contains(.issue) { spreads.append("... on Issue { ...Issue }") }
+        return """
+        query($q: String!, $after: String) {
+          \(rateLimitField)
+          search(query: $q, type: \(type), first: \(first), after: $after) {
+            issueCount
+            pageInfo { hasNextPage endCursor }
+            nodes { __typename \(spreads.joined(separator: " ")) }
+          }
+        }
+        """ + fragments(for: kinds)
+    }
 
     static func searchQuery(organization: String, kind: ItemKind, nativeQuery: String?) throws -> String {
         var parts = ["org:\(organization)", kind == .pullRequest ? "is:pr" : "is:issue", "is:open", "archived:false", "sort:updated-desc"]

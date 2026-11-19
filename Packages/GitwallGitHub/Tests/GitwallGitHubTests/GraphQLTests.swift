@@ -165,6 +165,19 @@ struct GraphQLFetchTests {
         #expect(await transport.requests.count == 3)
     }
 
+    /// The `ISSUE` search is what GitHub Enterprise Server keeps (D22, D57); preset search on GitHub.com is a separate path.
+    @Test("organization search asks 100 per page of type ISSUE and stops after three pages")
+    func organizationSearchPaging() async throws {
+        // Every page claims there is another one, so only the page limit can end the loop.
+        let transport = RoutingTransport([("search(", .json(try Fixtures.data("graphql_search_org_apple_prs.json")))])
+        _ = try await GitHubProvider(transport: transport).fetchItems(
+            account: account([.organization(login: "acme")]), token: "t", kinds: [.pullRequest]
+        )
+        let queries = await transport.queries
+        #expect(queries.count == 3)
+        #expect(queries.allSatisfy { $0.contains("search(query: $q, type: ISSUE, first: 100, after: $after)") })
+    }
+
     @Test("issues from search map without pull request fields")
     func organizationIssues() async throws {
         let transport = StubTransport([.json(try Fixtures.data("graphql_search_org_apple_issues.json")), .json(#"{"data":{"search":{"issueCount":0,"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}"#), .json(#"{"data":{"search":{"issueCount":0,"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}"#)])
@@ -207,6 +220,48 @@ struct GraphQLFetchTests {
             account: account([.repository(fullName: "a/b"), .organization(login: "a")]), token: "t", kinds: [.pullRequest]
         )
         #expect(items.count == 1)
+    }
+}
+
+/// GitHub.com sends each preset's own query to `ISSUE_ADVANCED` search (D31), one item kind per query. Pull requests
+/// come 25 per page because 100 took GitHub ten seconds and ended in 502; issues stay at 100 (D22, D57).
+@Suite("Preset search query")
+struct PresetSearchQueryTests {
+    @Test("pull requests are searched 25 per page with only the pull request fragment")
+    func pullRequests() {
+        let query = GraphQLQueries.presetSearch(kind: .pullRequest)
+        #expect(query.contains("search(query: $q, type: ISSUE_ADVANCED, first: 25, after: $after)"))
+        #expect(query.contains("... on PullRequest { ...PR }"))
+        #expect(query.contains("fragment PR on PullRequest"))
+        #expect(!query.contains("on Issue"))
+        #expect(!query.contains("...Issue"))
+    }
+
+    @Test("issues are searched 100 per page with only the issue fragment")
+    func issues() {
+        let query = GraphQLQueries.presetSearch(kind: .issue)
+        #expect(query.contains("search(query: $q, type: ISSUE_ADVANCED, first: 100, after: $after)"))
+        #expect(query.contains("... on Issue { ...Issue }"))
+        #expect(query.contains("fragment Issue on Issue"))
+        #expect(!query.contains("on PullRequest"))
+        #expect(!query.contains("...PR"))
+    }
+
+    @Test("a preset search answers in the shape of today's search, with the rate limit", arguments: [ItemKind.pullRequest, .issue])
+    func shape(kind: ItemKind) {
+        let query = GraphQLQueries.presetSearch(kind: kind)
+        #expect(query.hasPrefix("query($q: String!, $after: String) {"))
+        #expect(query.contains("rateLimit { cost remaining resetAt }"))
+        #expect(query.contains("issueCount"))
+        #expect(query.contains("pageInfo { hasNextPage endCursor }"))
+        #expect(query.contains("nodes { __typename "))
+    }
+
+    @Test("a preset search reads at most 1000 results, in pages of 25 pull requests or 100 issues")
+    func cap() {
+        #expect(GraphQLQueries.maxPresetSearchResults == 1000)
+        #expect(GraphQLQueries.presetSearchPageSize(for: .pullRequest) == 25)
+        #expect(GraphQLQueries.presetSearchPageSize(for: .issue) == 100)
     }
 }
 
