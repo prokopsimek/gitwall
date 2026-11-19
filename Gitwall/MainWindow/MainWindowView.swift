@@ -32,11 +32,11 @@ struct MainWindowView: View {
             // Once the list is in the window.
             Task { isListFocused = true }
         }
+        // The window opening fetches it too (`MainWindowController.show`).
         .onChange(of: environment.selectedPreset?.id) {
             detail.presetDidChange(visibleItemIDs: visibleItems.map(\.id))
             environment.fetchSelectedPresetOnOpen()
         }
-        .onAppear { environment.fetchSelectedPresetOnOpen() }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $state.showingWidgetHelp) {
             AddWidgetHelpSheet()

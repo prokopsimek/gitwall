@@ -38,6 +38,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.contentViewController = NSHostingController(rootView: PopoverView(environment: environment))
 
         environment.onShowPopover = { [weak self] in self?.showPopover() }
+        environment.isPopoverShown = { [weak self] in self?.popover.isShown ?? false }
         observeBadge()
     }
 

@@ -63,6 +63,9 @@ targets:
       - path: GitwallWidget/WidgetViews.swift
         excludes:
           - "Info.plist"
+      # The widget's configuration intent, so a sync can read which preset each placed widget shows
+      # (`AppEnvironment.widgetPresets`).
+      - path: GitwallWidget/PresetIntent.swift
     dependencies:
       - target: GitwallWidget
       - package: GitwallCore

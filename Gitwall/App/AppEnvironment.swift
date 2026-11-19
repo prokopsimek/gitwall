@@ -73,6 +73,20 @@ final class AppEnvironment {
     @ObservationIgnored var onWallsReplacedByPaste: (() -> Void)?
     @ObservationIgnored var onShowWidgetHelp: (() -> Void)?
     @ObservationIgnored var onShowSampleItem: ((WorkItem) -> Void)?
+
+    // What is on screen, asked at every regular sync (``syncSelection()``). Each window's controller answers for its
+    // own window; a window that was never opened answers no.
+
+    /// Whether the popover is open.
+    @ObservationIgnored var isPopoverShown: () -> Bool = { false }
+    /// Whether the main window is open and not in the Dock.
+    @ObservationIgnored var isMainWindowVisible: () -> Bool = { false }
+    /// The wall the Walls window shows while it is open and not in the Dock, nil otherwise.
+    @ObservationIgnored var shownWallID: () -> Wall.ID? = { nil }
+    /// The preset of each desktop widget as the last read of the widget configurations that worked in this run of the
+    /// app found it (``widgetPresets()``); nil before one worked.
+    @ObservationIgnored private var lastWidgetPresets: [UUID?]?
+
     @ObservationIgnored private var refreshLoop: Task<Void, Never>?
     @ObservationIgnored private var syncEngine: SyncEngine?
     @ObservationIgnored private let avatars: AvatarDownloader?
@@ -309,12 +323,44 @@ final class AppEnvironment {
             }
         }
         do {
-            let result = try await syncEngine.sync()
+            let selection = await syncSelection()
+            let result = try await syncEngine.sync(selection: selection)
             lastError = nil
             await take(result, from: .sync)
         } catch {
             lastError = error.localizedDescription
             log.error("Sync failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// What a regular sync fetches (`SyncSelection`): the presets of the desktop widgets, the menu bar count and the
+    /// notifications, the preset the popover or the main window shows while one is on screen, and the tiles of the wall
+    /// the Walls window shows. Nil, which fetches everything, while the widget configurations were never readable.
+    private func syncSelection() async -> SyncSelection? {
+        guard let widgets = await widgetPresets() else { return nil }
+        return SyncSelection.presets(in: config, widgets: widgets, open: openPreset.map { [$0.id] } ?? [],
+                                     shownWall: shownWallID())
+    }
+
+    /// The preset each Gitwall widget on the desktop is configured with, nil for one that names none. When WidgetKit
+    /// cannot say, what it said last in this run of the app; nil when it never could.
+    private func widgetPresets() async -> [UUID?]? {
+        do {
+            // `currentConfigurations()` needs macOS 15.
+            let widgets: [WidgetInfo] = try await withCheckedThrowingContinuation { continuation in
+                WidgetCenter.shared.getCurrentConfigurations { continuation.resume(with: $0) }
+            }
+            let presets = widgets.filter { AppGroup.widgetKinds.contains($0.kind) }
+                .map { $0.widgetConfigurationIntent(of: SelectPresetIntent.self)?.preset?.id }
+            lastWidgetPresets = presets
+            return presets
+        } catch {
+            if let lastWidgetPresets {
+                log.info("Widget configurations unreadable, using the \(lastWidgetPresets.count) widgets read before")
+            } else {
+                log.info("Widget configurations unreadable and never read, syncing every preset")
+            }
+            return lastWidgetPresets
         }
     }
 
@@ -372,9 +418,15 @@ final class AppEnvironment {
         }
     }
 
-    /// The preset the popover and the main window show, when one of them opens it or switches to it.
+    /// The preset the popover and the main window show, when one of them opens or switches to it. Nothing while neither
+    /// is on screen: a preset chosen elsewhere, as by adding one in Settings, is fetched when a window shows it.
     func fetchSelectedPresetOnOpen() {
-        fetchOnOpen(selectedPreset.map { [$0] } ?? [])
+        fetchOnOpen(openPreset.map { [$0] } ?? [])
+    }
+
+    /// The preset the popover and the main window show, while one of them is on screen.
+    private var openPreset: Preset? {
+        isPopoverShown() || isMainWindowVisible() ? selectedPreset : nil
     }
 
     /// Refresh while showing sample data: one more review request arrives, and it goes through the same diff and
