@@ -1,0 +1,302 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4990,
+      "resetAt": "2026-11-19T13:00:00Z"
+    },
+    "search": {
+      "issueCount": 5,
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjU="
+      },
+      "nodes": [
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOAcme0012",
+          "number": 12,
+          "title": "Rotate signing keys",
+          "url": "https://github.com/acme/app/pull/12",
+          "isDraft": false,
+          "createdAt": "2026-11-17T09:12:00Z",
+          "updatedAt": "2026-11-19T08:40:00Z",
+          "author": {
+            "login": "alice",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4",
+            "name": "Alice"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "security",
+                "color": "d73a4a"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 3
+          },
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "additions": 212,
+          "deletions": 40,
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "__typename": "Team",
+                  "slug": "platform",
+                  "name": "Platform"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "__typename": "User",
+                  "login": "carol",
+                  "name": "Carol",
+                  "avatarUrl": "https://avatars.githubusercontent.com/u/3?v=4"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "state": "COMMENTED",
+                "author": {
+                  "login": "dave",
+                  "avatarUrl": "https://avatars.githubusercontent.com/u/4?v=4"
+                }
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "acme/app"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOAcme0007",
+          "number": 7,
+          "title": "Paginate the audit log",
+          "url": "https://github.com/ACME/api/pull/7",
+          "isDraft": true,
+          "createdAt": "2026-11-12T14:00:00Z",
+          "updatedAt": "2026-11-18T16:05:00Z",
+          "author": {
+            "login": "bob",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4",
+            "name": "Bob"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": [
+              {
+                "login": "bob",
+                "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4",
+                "name": "Bob"
+              }
+            ]
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "CONFLICTING",
+          "additions": 88,
+          "deletions": 13,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "FAILURE"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "ACME/api"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOAcme0003",
+          "number": 3,
+          "title": "Update the pricing page",
+          "url": "https://github.com/octo-org/site/pull/3",
+          "isDraft": false,
+          "createdAt": "2026-11-10T10:00:00Z",
+          "updatedAt": "2026-11-18T11:30:00Z",
+          "author": {
+            "login": "erin",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5?v=4",
+            "name": "Erin"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": "APPROVED",
+          "mergeable": "MERGEABLE",
+          "additions": 10,
+          "deletions": 2,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "author": {
+                  "login": "frank",
+                  "avatarUrl": "https://avatars.githubusercontent.com/u/6?v=4"
+                }
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "PENDING"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "octo-org/site"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOAcme0009",
+          "number": 9,
+          "title": "Bump the build image",
+          "url": "https://github.com/octo-org/other/pull/9",
+          "isDraft": false,
+          "createdAt": "2026-11-09T10:00:00Z",
+          "updatedAt": "2026-11-17T09:00:00Z",
+          "author": {
+            "login": "erin",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5?v=4",
+            "name": "Erin"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "MERGEABLE",
+          "additions": 10,
+          "deletions": 2,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "octo-org/other"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOAcme0041",
+          "number": 41,
+          "title": "Speed up the linter",
+          "url": "https://github.com/globex/tools/pull/41",
+          "isDraft": false,
+          "createdAt": "2026-11-08T10:00:00Z",
+          "updatedAt": "2026-11-16T09:00:00Z",
+          "author": {
+            "login": "grace",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/7?v=4",
+            "name": "Grace"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "MERGEABLE",
+          "additions": 10,
+          "deletions": 2,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": null
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "globex/tools"
+          }
+        }
+      ]
+    }
+  }
+}

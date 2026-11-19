@@ -18,6 +18,9 @@ enum GraphQLQueries {
     static let presetSearchIssuePageSize = 100
     /// GitHub search never returns more than 1000 results for one query, so paging stops there.
     static let maxPresetSearchResults = 1000
+    /// The longest search string `ISSUE_ADVANCED` accepts. Counted in UTF-8 bytes, the most any reading of the limit can
+    /// come to, so a name with accents makes a search split a little early rather than fail.
+    static let maxPresetSearchQueryLength = 4000
 
     static func presetSearchPageSize(for kind: ItemKind) -> Int {
         switch kind {
@@ -258,8 +261,17 @@ struct PriorityNode: Decodable {
 }
 
 struct SearchData: Decodable, RateLimitCarrying {
+    /// One page of results, with GitHub's count of every match, which can be more than the 1000 a search returns.
+    struct Results: Decodable {
+        let issueCount: Int
+        let pageInfo: Connection<ItemNode>.PageInfo?
+        let nodes: [ItemNode?]
+
+        var items: [ItemNode] { nodes.compactMap { $0 } }
+    }
+
     let rateLimitInfo: RateLimitInfo?
-    let search: Connection<ItemNode>
+    let search: Results
 
     enum CodingKeys: String, CodingKey {
         case rateLimitInfo = "rateLimit"

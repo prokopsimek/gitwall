@@ -218,7 +218,7 @@ enum PresetSearchQuery {
     /// Owners of repositories, as `GraphQLQueries.splitFullName` accepts them.
     private static let ownerCharacters = loginCharacters.union(CharacterSet(charactersIn: "."))
 
-    private static func isOwner(_ value: String) -> Bool {
+    static func isOwner(_ value: String) -> Bool {
         !value.isEmpty && value.unicodeScalars.allSatisfy(ownerCharacters.contains)
     }
 }

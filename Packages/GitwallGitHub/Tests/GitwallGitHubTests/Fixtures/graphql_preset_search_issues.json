@@ -1,0 +1,108 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4989,
+      "resetAt": "2026-11-19T13:00:00Z"
+    },
+    "search": {
+      "issueCount": 3,
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjU="
+      },
+      "nodes": [
+        {
+          "__typename": "Issue",
+          "id": "I_kwDOAcme0030",
+          "number": 30,
+          "title": "Login fails behind a proxy",
+          "url": "https://github.com/acme/app/issues/30",
+          "createdAt": "2026-11-15T07:00:00Z",
+          "updatedAt": "2026-11-19T07:30:00Z",
+          "author": {
+            "login": "heidi",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/8?v=4",
+            "name": "Heidi"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "bug",
+                "color": "d73a4a"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": [
+              {
+                "login": "bob",
+                "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4",
+                "name": "Bob"
+              }
+            ]
+          },
+          "milestone": {
+            "title": "1.4"
+          },
+          "comments": {
+            "totalCount": 5
+          },
+          "repository": {
+            "nameWithOwner": "acme/app"
+          }
+        },
+        {
+          "__typename": "Issue",
+          "id": "I_kwDOAcme0002",
+          "number": 2,
+          "title": "Document the config file",
+          "url": "https://github.com/globex/tools/issues/2",
+          "createdAt": "2026-11-14T07:00:00Z",
+          "updatedAt": "2026-11-18T07:30:00Z",
+          "author": {
+            "login": "grace",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/7?v=4",
+            "name": "Grace"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "repository": {
+            "nameWithOwner": "globex/tools"
+          }
+        },
+        {
+          "__typename": "Issue",
+          "id": "I_kwDOAcme0004",
+          "number": 4,
+          "title": "Broken link in the footer",
+          "url": "https://github.com/octo-org/site/issues/4",
+          "createdAt": "2026-11-13T07:00:00Z",
+          "updatedAt": "2026-11-17T07:30:00Z",
+          "author": null,
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "repository": {
+            "nameWithOwner": "octo-org/site"
+          }
+        }
+      ]
+    }
+  }
+}

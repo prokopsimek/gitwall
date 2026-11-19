@@ -134,7 +134,7 @@ public struct GitHubProvider: GitProvider {
     }
 
     /// Nothing to resolve unless the token owner is known and GitHub asked one of their teams for a review.
-    private func teamSlugs(
+    func teamSlugs(
         for nodes: [ItemNode],
         account: Account,
         token: String,

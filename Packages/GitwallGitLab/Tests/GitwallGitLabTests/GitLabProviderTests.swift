@@ -44,6 +44,21 @@ struct GitLabCapabilitiesTests {
         #expect(!provider.capabilities.supportsOrganizationSources)
         #expect(provider.capabilities.supportsGroupSources)
     }
+
+    @Test("neither gitlab.com nor a self-managed instance searches per preset; both keep fetching everything",
+          arguments: [cloud, URL(string: "https://gitlab.acme.test")!])
+    func noPresetSearch(baseURL: URL) async {
+        let transport = StubTransport()
+        let provider = GitLabProvider(transport: transport)
+        let account = account([.group(fullPath: "acme", includeSubgroups: true)], baseURL: baseURL)
+        #expect(!provider.capabilities(for: account).presetSearch)
+
+        let search = PresetSearch(filter: .any, repositories: nil, sort: .lastActivity, kinds: [.pullRequest])
+        await #expect(throws: ProviderError.unsupported("Preset search")) {
+            _ = try await provider.fetchPresetItems(account: account, token: "glpat-x", search: search)
+        }
+        #expect(await transport.requests.isEmpty)
+    }
 }
 
 @Suite("REST: verify and discovery")
