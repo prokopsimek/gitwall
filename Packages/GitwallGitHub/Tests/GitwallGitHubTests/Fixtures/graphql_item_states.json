@@ -1,0 +1,313 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4987,
+      "resetAt": "2026-11-19T13:00:00Z"
+    },
+    "nodes": [
+      {
+        "__typename": "Issue",
+        "state": "OPEN",
+        "id": "I_kwDOAcme0030",
+        "number": 30,
+        "title": "Login fails behind a proxy",
+        "url": "https://github.com/acme/app/issues/30",
+        "createdAt": "2026-11-15T07:00:00Z",
+        "updatedAt": "2026-11-19T07:30:00Z",
+        "author": {
+          "login": "heidi",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/8?v=4",
+          "name": "Heidi"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "bob",
+              "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4",
+              "name": "Bob"
+            }
+          ]
+        },
+        "milestone": {
+          "title": "1.4"
+        },
+        "comments": {
+          "totalCount": 5
+        },
+        "repository": {
+          "nameWithOwner": "acme/app"
+        }
+      },
+      {
+        "__typename": "Issue",
+        "state": "CLOSED",
+        "id": "I_kwDOAcme0031",
+        "number": 31,
+        "title": "Crash on an empty config",
+        "url": "https://github.com/acme/app/issues/31",
+        "createdAt": "2026-11-15T07:00:00Z",
+        "updatedAt": "2026-11-19T07:30:00Z",
+        "author": {
+          "login": "heidi",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/8?v=4",
+          "name": "Heidi"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": [
+            {
+              "login": "bob",
+              "avatarUrl": "https://avatars.githubusercontent.com/u/2?v=4",
+              "name": "Bob"
+            }
+          ]
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 5
+        },
+        "repository": {
+          "nameWithOwner": "acme/app"
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "state": "OPEN",
+        "id": "PR_kwDOAcme0012",
+        "number": 12,
+        "title": "Rotate signing keys",
+        "url": "https://github.com/acme/app/pull/12",
+        "isDraft": false,
+        "createdAt": "2026-11-17T09:12:00Z",
+        "updatedAt": "2026-11-19T08:40:00Z",
+        "author": {
+          "login": "alice",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4",
+          "name": "Alice"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "security",
+              "color": "d73a4a"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 3
+        },
+        "reviewDecision": "REVIEW_REQUIRED",
+        "mergeable": "MERGEABLE",
+        "additions": 212,
+        "deletions": 40,
+        "reviewRequests": {
+          "nodes": [
+            {
+              "requestedReviewer": {
+                "__typename": "Team",
+                "slug": "platform",
+                "name": "Platform"
+              }
+            },
+            {
+              "requestedReviewer": {
+                "__typename": "User",
+                "login": "carol",
+                "name": "Carol",
+                "avatarUrl": "https://avatars.githubusercontent.com/u/3?v=4"
+              }
+            }
+          ]
+        },
+        "latestReviews": {
+          "nodes": [
+            {
+              "state": "COMMENTED",
+              "author": {
+                "login": "dave",
+                "avatarUrl": "https://avatars.githubusercontent.com/u/4?v=4"
+              }
+            }
+          ]
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            }
+          ]
+        },
+        "repository": {
+          "nameWithOwner": "acme/app"
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "state": "CLOSED",
+        "id": "PR_kwDOAcme0013",
+        "number": 13,
+        "title": "Try a second cache",
+        "url": "https://github.com/acme/app/pull/13",
+        "isDraft": false,
+        "createdAt": "2026-11-17T09:12:00Z",
+        "updatedAt": "2026-11-19T08:40:00Z",
+        "author": {
+          "login": "alice",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4",
+          "name": "Alice"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "security",
+              "color": "d73a4a"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 3
+        },
+        "reviewDecision": "APPROVED",
+        "mergeable": "CONFLICTING",
+        "additions": 212,
+        "deletions": 40,
+        "reviewRequests": {
+          "nodes": []
+        },
+        "latestReviews": {
+          "nodes": [
+            {
+              "state": "COMMENTED",
+              "author": {
+                "login": "dave",
+                "avatarUrl": "https://avatars.githubusercontent.com/u/4?v=4"
+              }
+            }
+          ]
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            }
+          ]
+        },
+        "repository": {
+          "nameWithOwner": "acme/app"
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "state": "MERGED",
+        "id": "PR_kwDOAcme0014",
+        "number": 14,
+        "title": "Bump the toolchain",
+        "url": "https://github.com/acme/app/pull/14",
+        "isDraft": false,
+        "createdAt": "2026-11-17T09:12:00Z",
+        "updatedAt": "2026-11-19T08:40:00Z",
+        "author": {
+          "login": "alice",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/1?v=4",
+          "name": "Alice"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "security",
+              "color": "d73a4a"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 3
+        },
+        "reviewDecision": "APPROVED",
+        "mergeable": "UNKNOWN",
+        "additions": 212,
+        "deletions": 40,
+        "reviewRequests": {
+          "nodes": []
+        },
+        "latestReviews": {
+          "nodes": [
+            {
+              "state": "COMMENTED",
+              "author": {
+                "login": "dave",
+                "avatarUrl": "https://avatars.githubusercontent.com/u/4?v=4"
+              }
+            }
+          ]
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            }
+          ]
+        },
+        "repository": {
+          "nameWithOwner": "acme/app"
+        }
+      },
+      null
+    ]
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "nodes",
+        5
+      ],
+      "locations": [
+        {
+          "line": 3,
+          "column": 3
+        }
+      ],
+      "message": "Could not resolve to a node with the global id of 'PR_kwDOAcme0099'"
+    }
+  ]
+}

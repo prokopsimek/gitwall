@@ -18,7 +18,15 @@ public struct RoutedNotification: Hashable, Sendable {
 /// Detects what changed between two syncs and which presets want to be told about it.
 public enum SnapshotDiff {
     /// Nothing is reported for the very first sync (`previous == nil`), so a fresh install never produces a burst.
-    public static func changes(from previous: Snapshot?, to current: Snapshot, accounts: [Account]) -> [ItemChange] {
+    ///
+    /// An item that left the snapshot is `.closed`, one that joined it `.newItem` (and `.reviewRequested` when it asks
+    /// me), and an item in both gets an event for each change it went through. For the items of an account in
+    /// ``SearchFindings/accounts`` two of these rules are narrower, because its searches return only the open items that
+    /// match: an item that left is `.closed` only when it is in ``SearchFindings/closedItemIDs``, and one that joined is
+    /// news only when it is in ``SearchFindings/comparedItemIDs``. Closed and merged are both `.closed`.
+    public static func changes(
+        from previous: Snapshot?, to current: Snapshot, accounts: [Account], searches: SearchFindings = .none
+    ) -> [ItemChange] {
         guard let previous else { return [] }
         let identities = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0.me) })
         let previousByID = Dictionary(uniqueKeysWithValues: previous.items.map { ($0.id, $0) })
@@ -28,6 +36,8 @@ public enum SnapshotDiff {
             let me = identities[item.accountID] ?? nil
             let requestedNow = isRequested(me, in: item)
             guard let old = previousByID[item.id] else {
+                // The first result of a pair, or of an edited preset, is the baseline its later results are compared to.
+                if searches.accounts.contains(item.accountID), !searches.comparedItemIDs.contains(item.id) { continue }
                 changes.append(ItemChange(item: item, event: .newItem))
                 if requestedNow { changes.append(ItemChange(item: item, event: .reviewRequested)) }
                 continue
@@ -48,6 +58,8 @@ public enum SnapshotDiff {
 
         let currentIDs = Set(current.items.map(\.id))
         for old in previous.items where !currentIDs.contains(old.id) {
+            // It may only have stopped matching, or belong to a preset this sync did not search.
+            if searches.accounts.contains(old.accountID), !searches.closedItemIDs.contains(old.id) { continue }
             changes.append(ItemChange(item: old, event: .closed))
         }
         return changes

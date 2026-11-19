@@ -28,12 +28,24 @@ struct SyncEngineTests {
         var presetFetchesAfterToken: [String: Result<PresetFetch, ProviderError>] = [:]
         /// Every preset search the engine sent, in order.
         var presetSearches: [PresetSearchCall] = []
+        /// What an item state lookup answers, by item id; an item that is not scripted gets no answer.
+        var itemStates: [String: ItemState] = [:]
+        /// Makes every item state lookup fail.
+        var itemStateFailure: ProviderError?
+        /// Every item state lookup the engine sent, in order.
+        var itemStateLookups: [ItemStateLookup] = []
         private let lock = NSLock()
 
         struct PresetSearchCall: Equatable {
             let accountID: UUID
             let token: String
             let search: PresetSearch
+        }
+
+        struct ItemStateLookup: Equatable {
+            let accountID: UUID
+            let token: String
+            let itemIDs: [String]
         }
 
         init(kind: ProviderKind) { self.kind = kind }
@@ -63,6 +75,14 @@ struct SyncEngineTests {
             if let result = presetFetchesAfterToken[token] { return try result.get() }
             let result = presetFetches[search] ?? .success(PresetFetch(items: [], totalCount: 0, isComplete: true, requests: 1))
             return try result.get()
+        }
+        func fetchItemStates(account: Account, token: String, items: [WorkItem]) async throws -> [String: ItemState] {
+            lock.withLock {
+                itemStateLookups.append(ItemStateLookup(accountID: account.id, token: token, itemIDs: items.map(\.id)))
+            }
+            if let itemStateFailure { throw itemStateFailure }
+            let asked = Set(items.map(\.id))
+            return itemStates.filter { asked.contains($0.key) }
         }
         func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup {
             lock.withLock {

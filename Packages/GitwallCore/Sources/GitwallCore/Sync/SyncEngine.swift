@@ -4,6 +4,8 @@ public struct SyncResult: Sendable {
     public let snapshot: Snapshot
     /// Snapshot that was current before this sync, for diffing and notifications.
     public let previous: Snapshot?
+    /// What the preset searches of this sync found out, for ``SnapshotDiff/changes(from:to:accounts:searches:)``.
+    public let searches: SearchFindings
 }
 
 /// Fetches every configured account through its provider and writes the merged snapshot.
@@ -12,7 +14,8 @@ public struct SyncResult: Sendable {
 /// account keeps what it showed (`ok`, or an error it already had) and only ``FetchStatus/consecutiveFailures`` counts it.
 /// Preset results carry over from the previous snapshot, except those of deleted presets and removed accounts, and so do
 /// the items they hold. With a ``SyncSelection``, an account whose provider searches presets on the server searches only
-/// the selected presets; see ``sync(selection:)``.
+/// the selected presets, asks the provider what became of the items that left those results, and reports what it
+/// learned in ``SyncResult/searches``; see ``sync(selection:)``.
 public actor SyncEngine {
     /// Failed syncs in a row, for a passing reason, that an account rides out without showing an error.
     private static let quietFailures = 2
@@ -48,7 +51,11 @@ public actor SyncEngine {
     ///   period as for a full fetch, it keeps every item it had, and no priorities are looked up.
     /// - Otherwise the account is `ok` once at least one search succeeded; when none did, or none was selected for it,
     ///   it keeps the status it had and is not even asked for its token in the latter case.
-    /// - The project priorities are looked up once, over everything the searches found.
+    /// - Items that left a fresh result whose pair had an earlier result of the same selection, and that no search of
+    ///   this sync returned, go to one ``GitProvider/fetchItemStates(account:token:items:)``. A closed or merged item
+    ///   leaves every result of the account and is reported closed; one the provider does not find leaves them too,
+    ///   without a word; an open one gets the provider's data. A failed lookup changes nothing and reports nothing.
+    /// - The project priorities are looked up once, over everything the searches found and the lookup refreshed.
     /// - An item stays in the snapshot only while a search returned it or a preset result holds it.
     ///
     /// Each sync with a selection writes one line of counts to the unified log.
@@ -81,10 +88,18 @@ public actor SyncEngine {
         var items: [WorkItem] = []
         var status: [UUID: FetchStatus] = [:]
         var presetOutcomes: [PresetOutcome] = []
+        var findings = SearchFindings.none
+        var gone: Set<String> = []
+        var refreshed: [String: WorkItem] = [:]
         for outcome in outcomes {
             items.append(contentsOf: outcome.items)
             status[outcome.accountID] = outcome.status
             presetOutcomes.append(contentsOf: outcome.presets)
+            if outcome.searched { findings.accounts.insert(outcome.accountID) }
+            findings.comparedItemIDs.formUnion(outcome.compared)
+            findings.closedItemIDs.formUnion(outcome.lookup.closed)
+            gone.formUnion(outcome.lookup.gone)
+            for item in outcome.lookup.refreshed { refreshed[item.id] = item }
         }
 
         let presetIDs = Set(config.presets.map(\.id))
@@ -92,8 +107,12 @@ public actor SyncEngine {
         let carried = (previous?.presetResults ?? []).filter {
             presetIDs.contains($0.presetID) && accountIDs.contains($0.accountID)
         }
-        let presetResults = PresetResult.merged(carried, with: presetOutcomes, at: timestamp)
-        let kept = Self.items(items, keepingFrom: previous?.items ?? [], heldBy: presetResults)
+        let presetResults = PresetResult.merged(carried, with: presetOutcomes, at: timestamp).map {
+            Self.removing(gone, from: $0)
+        }
+        // A refreshed item takes the place of its previous copy, and stays only where a result still holds it.
+        let earlier = (previous?.items ?? []).map { refreshed[$0.id] ?? $0 }
+        let kept = Self.items(items, keepingFrom: earlier, heldBy: presetResults)
 
         let snapshot = Snapshot(
             fetchedAt: timestamp,
@@ -111,7 +130,7 @@ public actor SyncEngine {
                 duration: clock.now - start
             ).write()
         }
-        return SyncResult(snapshot: snapshot, previous: previous)
+        return SyncResult(snapshot: snapshot, previous: previous, searches: findings)
     }
 
     // MARK: - Internals
@@ -153,16 +172,42 @@ public actor SyncEngine {
         /// Preset searches sent, a repeat after a token refresh included, and the requests the successful ones took.
         var searches = 0
         var requests = 0
+        /// Whether the account fetched through preset searches, whatever came of them.
+        var searched = false
+        /// Items held by a result fetched now whose pair had an earlier result of the same selection.
+        var compared: Set<String> = []
+        /// What the provider said about the items that left a fresh result.
+        var lookup = ItemLookup()
+    }
+
+    /// What ``GitProvider/fetchItemStates(account:token:items:)`` said about items that left a fresh result.
+    private struct ItemLookup: Sendable {
+        /// Confirmed closed or merged.
+        var closed: Set<String> = []
+        /// Closed, merged or not found: they leave every result of the account.
+        var gone: Set<String> = []
+        /// Still open, with the provider's current data and, once the priorities are read, theirs.
+        var refreshed: [WorkItem] = []
     }
 
     /// What an account showed before this sync, which a failed fetch keeps.
     private struct Before: Sendable {
         let items: [WorkItem]
         let status: FetchStatus?
+        let results: [PresetResult]
 
         init(account: Account, previous: Snapshot?) {
             items = previous?.items.filter { $0.accountID == account.id } ?? []
             status = previous?.accountStatus[account.id]
+            results = previous?.presetResults.filter { $0.accountID == account.id } ?? []
+        }
+
+        /// The earlier result of `preset` in the account, when it was fetched for the selection the preset has now. A
+        /// fresh result can only be compared with such a one; without it the fresh result is the baseline.
+        func comparableResult(for preset: Preset) -> PresetResult? {
+            results.first {
+                $0.presetID == preset.id && $0.selection == preset.selectionFingerprint && $0.fetchedAt != nil
+            }
         }
 
         /// `state` and `message`, with the last success and the project access the account had.
@@ -247,6 +292,17 @@ public actor SyncEngine {
             if held.contains(key), present.insert(key).inserted { items.append(item) }
         }
         return items
+    }
+
+    /// `result` without the items in `gone`, which the provider confirmed closed or merged or could not find, and with
+    /// its count lowered by as many.
+    static func removing(_ gone: Set<String>, from result: PresetResult) -> PresetResult {
+        guard !gone.isEmpty else { return result }
+        var result = result
+        let count = result.itemIDs.count
+        result.itemIDs.removeAll { gone.contains($0) }
+        result.totalCount = max(0, result.totalCount - (count - result.itemIDs.count))
+        return result
     }
 
     private struct ItemKey: Hashable {
@@ -347,7 +403,7 @@ public actor SyncEngine {
     ) async -> AccountOutcome {
         // Nothing selected is in the account's scope: it is asked nothing, not even for its token.
         guard !queries.isEmpty else {
-            return AccountOutcome(accountID: account.id, items: [], status: before.status)
+            return AccountOutcome(accountID: account.id, items: [], status: before.status, searched: true)
         }
         var token: String
         switch await readToken(for: account, before: before) {
@@ -355,7 +411,8 @@ public actor SyncEngine {
             token = read
         case .failed(let status):
             let presets = queries.map { PresetOutcome(preset: $0.preset, accountID: account.id, kind: .accountFailed) }
-            return AccountOutcome(accountID: account.id, items: before.items, status: status, presets: presets)
+            return AccountOutcome(accountID: account.id, items: before.items, status: status, presets: presets,
+                                  searched: true)
         }
 
         var found: [WorkItem] = []
@@ -366,6 +423,9 @@ public actor SyncEngine {
         var fetchedAny = false
         var mayRefresh = true
         var accountError: (any Error)?
+        var compared: Set<String> = []
+        // Items that left a fresh result which can be compared with an earlier one, in the order they left.
+        var left: [String] = []
 
         searching: for query in queries {
             searches += 1
@@ -391,8 +451,14 @@ public actor SyncEngine {
                 fetchedAny = true
                 requests += fetch.requests
                 found += fetch.items.filter { foundIDs.insert($0.id).inserted }
+                let fetchedIDs = fetch.items.map(\.id)
+                if let earlier = before.comparableResult(for: query.preset) {
+                    compared.formUnion(fetchedIDs)
+                    let returned = Set(fetchedIDs)
+                    left += earlier.itemIDs.filter { !returned.contains($0) }
+                }
                 let kind = PresetOutcome.Kind.fetched(
-                    itemIDs: fetch.items.map(\.id), totalCount: fetch.totalCount, isComplete: fetch.isComplete
+                    itemIDs: fetchedIDs, totalCount: fetch.totalCount, isComplete: fetch.isComplete
                 )
                 presets.append(PresetOutcome(preset: query.preset, accountID: account.id, kind: kind))
             case .failure(let error):
@@ -415,22 +481,69 @@ public actor SyncEngine {
             }
             let fresh = Self.keepingPriorities(on: found, from: before.items)
             let items = fresh + before.items.filter { !foundIDs.contains($0.id) }
+            // Nothing is looked up: the account failed, and it keeps every item it had anyway.
             return AccountOutcome(accountID: account.id, items: items, status: before.failed(by: accountError),
-                                  presets: presets, searches: searches, requests: requests)
+                                  presets: presets, searches: searches, requests: requests, searched: true,
+                                  compared: compared)
         }
         // Searches refused on their own say nothing about the account.
         guard fetchedAny else {
             return AccountOutcome(accountID: account.id, items: [], status: before.status,
-                                  presets: presets, searches: searches, requests: requests)
+                                  presets: presets, searches: searches, requests: requests, searched: true)
         }
-        let (items, access) = await prioritized(found, account: account, provider: provider, token: token, before: before)
+        // An item another search of this sync returned is still open; only the others are in question.
+        var asked: Set<String> = []
+        var lookup = await lookUp(left.filter { !foundIDs.contains($0) && asked.insert($0).inserted },
+                                  account: account, provider: provider, token: token, before: before)
+        let (items, access) = await prioritized(found + lookup.refreshed, account: account, provider: provider,
+                                                token: token, before: before)
+        // `applying` keeps the order, so the refreshed items are the ones after those the searches found.
+        lookup.refreshed = Array(items.dropFirst(found.count))
         return AccountOutcome(
             accountID: account.id,
-            items: items,
+            items: Array(items.prefix(found.count)),
             status: FetchStatus(state: .ok, lastSuccessAt: timestamp, message: nil, projectAccess: access),
             presets: presets,
             searches: searches,
-            requests: requests
+            requests: requests,
+            searched: true,
+            compared: compared,
+            lookup: lookup
         )
+    }
+
+    /// Asks the provider what became of the items `ids` names, which left a fresh result, by the copies the account had
+    /// before. A failed lookup is logged with its count alone and says nothing about any of them.
+    private func lookUp(
+        _ ids: [String], account: Account, provider: any GitProvider, token: String, before: Before
+    ) async -> ItemLookup {
+        let copies = Dictionary(before.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let items = ids.compactMap { copies[$0] }
+        guard !items.isEmpty else { return ItemLookup() }
+        let states: [String: ItemState]
+        do {
+            states = try await provider.fetchItemStates(account: account, token: token, items: items)
+        } catch {
+            syncLog.info("""
+                Could not look up \(items.count, privacy: .public) items that left a preset result; \
+                they stay only where another result holds them
+                """)
+            return ItemLookup()
+        }
+        var lookup = ItemLookup()
+        for item in items {
+            switch states[item.id] {
+            case .closed, .merged:
+                lookup.closed.insert(item.id)
+                lookup.gone.insert(item.id)
+            case .notFound:
+                lookup.gone.insert(item.id)
+            case .open(let current):
+                lookup.refreshed.append(current)
+            case nil:
+                continue
+            }
+        }
+        return lookup
     }
 }

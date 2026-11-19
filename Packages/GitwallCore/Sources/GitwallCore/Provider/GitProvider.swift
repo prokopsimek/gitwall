@@ -124,6 +124,10 @@ public protocol GitProvider: Sendable {
     /// preset shows, never less; `FilterEngine` still decides what the preset shows.
     func fetchPresetItems(account: Account, token: String, search: PresetSearch) async throws -> PresetFetch
 
+    /// What became of `items` of `account`, which left a fresh preset result: closed, merged, not found, or open with
+    /// current data. Keyed by ``WorkItem/id``; an item the provider has no answer for is left out. Read-only.
+    func fetchItemStates(account: Account, token: String, items: [WorkItem]) async throws -> [String: ItemState]
+
     /// When the credential stops working, when the provider can tell. Never throws: an unknown expiry is `nil`,
     /// so settings can warn about an expiring personal access token without turning it into a sync failure.
     func tokenExpiry(baseURL: URL, token: String) async -> Date?
@@ -147,6 +151,11 @@ extension GitProvider {
     /// Providers without a search of their own fetch every item with ``fetchItems(account:token:kinds:)``.
     public func fetchPresetItems(account: Account, token: String, search: PresetSearch) async throws -> PresetFetch {
         throw ProviderError.unsupported("Preset search")
+    }
+
+    /// Providers without a lookup by item: nothing that left a result can be confirmed closed.
+    public func fetchItemStates(account: Account, token: String, items: [WorkItem]) async throws -> [String: ItemState] {
+        throw ProviderError.unsupported("Item state lookup")
     }
 
     public func tokenExpiry(baseURL: URL, token: String) async -> Date? { nil }

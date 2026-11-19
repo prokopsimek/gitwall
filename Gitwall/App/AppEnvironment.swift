@@ -310,7 +310,8 @@ final class AppEnvironment {
             // A snapshot written before any account was synced is not a baseline: the first real sync must not
             // flag every item as new or fire a burst of notifications.
             let baseline = (result.previous?.accountStatus.isEmpty ?? true) ? nil : result.previous
-            let changes = SnapshotDiff.changes(from: baseline, to: result.snapshot, accounts: config.accounts)
+            let changes = SnapshotDiff.changes(from: baseline, to: result.snapshot, accounts: config.accounts,
+                                               searches: result.searches)
             newItemIDs = Set(changes.filter { $0.event == .newItem }.map(\.item.id))
             log.info("Sync finished with \(result.snapshot.items.count) items, \(changes.count) changes")
 

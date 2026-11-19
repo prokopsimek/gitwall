@@ -1,0 +1,101 @@
+import Foundation
+import Testing
+@testable import GitwallCore
+
+/// What a sync that searched presets on GitHub.com reports. A search returns only open items that match, so for an
+/// account that searched, a missing item counts only when it was confirmed closed or merged, and a new one only when a
+/// result that had an earlier result to compare with brought it.
+@Suite("SnapshotDiff with preset searches")
+struct SnapshotDiffSearchTests {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let github = Account(kind: .github, baseURL: URL(string: "https://github.com")!, displayName: "GitHub", me: UserRef(login: "me"))
+    let gitlab = Account(kind: .gitlab, baseURL: URL(string: "https://gitlab.com")!, displayName: "GitLab", me: UserRef(login: "me"))
+    let enterprise = Account(kind: .github, baseURL: URL(string: "https://github.acme.test")!, displayName: "Acme",
+                             me: UserRef(login: "me"))
+
+    private func item(
+        _ number: Int, in account: Account? = nil, review: ReviewState = .none, ci: CIState = .none,
+        labels: [String] = [], requested: [String] = []
+    ) -> WorkItem {
+        WorkItem(accountID: (account ?? github).id, kind: .pullRequest, repoFullName: "acme/app", number: number,
+                 title: "Item \(number)", url: URL(string: "https://example.com/\(number)")!, author: UserRef(login: "x"),
+                 createdAt: now, updatedAt: now, labels: labels.map { Label(name: $0) }, reviewState: review, ciState: ci,
+                 requestedReviewers: requested.map { UserRef(login: $0) })
+    }
+
+    /// A sync in which the GitHub.com account searched presets.
+    private func searched(closed: [WorkItem] = [], compared: [WorkItem] = []) -> SearchFindings {
+        SearchFindings(accounts: [github.id], closedItemIDs: Set(closed.map(\.id)), comparedItemIDs: Set(compared.map(\.id)))
+    }
+
+    private func events(
+        _ previous: [WorkItem], _ current: [WorkItem], _ searches: SearchFindings,
+        previousResults: [PresetResult] = [], currentResults: [PresetResult] = []
+    ) -> [Int: [NotificationEvent]] {
+        let changes = SnapshotDiff.changes(
+            from: Snapshot(fetchedAt: now, items: previous, presetResults: previousResults),
+            to: Snapshot(fetchedAt: now, items: current, presetResults: currentResults),
+            accounts: [github, gitlab, enterprise], searches: searches
+        )
+        return Dictionary(grouping: changes, by: { $0.item.number }).mapValues { $0.map(\.event).sorted { $0.rawValue < $1.rawValue } }
+    }
+
+    @Test("an item of a searched account confirmed closed or merged is reported closed, once")
+    func confirmedClosed() {
+        let gone = item(2)
+        #expect(events([item(1), gone], [item(1)], searched(closed: [gone])) == [2: [.closed]])
+    }
+
+    @Test("an item of a searched account that left without being confirmed closed sends nothing")
+    func unconfirmedMissing() {
+        #expect(events([item(1), item(2)], [item(1)], searched()).isEmpty)
+    }
+
+    @Test("an item that came with the first result of its pair is no new item, not even with a review request for me")
+    func firstResultIsABaseline() {
+        #expect(events([item(1)], [item(1), item(2, requested: ["me"])], searched()).isEmpty)
+    }
+
+    @Test("a new item in a result that had an earlier result to compare with is new, with its review request")
+    func newInAComparedResult() {
+        let new = item(2, requested: ["me"])
+        #expect(events([item(1)], [item(1), new], searched(compared: [new])) == [2: [.newItem, .reviewRequested]])
+    }
+
+    @Test("an item in both snapshots of a searched account gets today's events: a review changes, a label does not")
+    func changesOfKeptItems() {
+        let previous = [item(1), item(2, labels: ["a"]), item(3, ci: .running)]
+        let current = [item(1, review: .approved), item(2, labels: ["b"]), item(3, ci: .failure)]
+        #expect(events(previous, current, searched()) == [1: [.approved], 3: [.ciFailed]])
+    }
+
+    @Test("an item two results hold changes once")
+    func twoResultsOneEvent() {
+        let gone = item(2), new = item(3)
+        let results = [UUID(), UUID()].map {
+            PresetResult(presetID: $0, accountID: github.id, itemIDs: [gone.id, new.id], fetchedAt: now, totalCount: 2,
+                         isComplete: true, selection: "s")
+        }
+        #expect(events([item(1), gone], [item(1), new], searched(closed: [gone], compared: [new]),
+                       previousResults: results, currentResults: results)
+            == [2: [.closed], 3: [.newItem]])
+    }
+
+    @Test("items of GitLab and GitHub Enterprise accounts keep today's rules in a sync that searched GitHub.com")
+    func otherAccountsUnchanged() {
+        let previous = [item(1, in: gitlab), item(2, in: enterprise), item(3)]
+        let current = [item(4, in: gitlab), item(5, in: enterprise, requested: ["me"])]
+        #expect(events(previous, current, searched())
+            == [1: [.closed], 2: [.closed], 4: [.newItem], 5: [.newItem, .reviewRequested]])
+    }
+
+    @Test("the first sync with a selection after the update sends nothing for the searched account")
+    func firstSyncAfterTheUpdate() {
+        // The previous snapshot holds no preset results: every item of it came from a full fetch.
+        let previous = [item(1), item(2), item(3, requested: ["me"])]
+        let current = [item(3, requested: ["me"]), item(4), item(5, requested: ["me"])]
+        let results = [PresetResult(presetID: UUID(), accountID: github.id, itemIDs: current.map(\.id), fetchedAt: now,
+                                    totalCount: 3, isComplete: true, selection: "s")]
+        #expect(events(previous, current, searched(), currentResults: results).isEmpty)
+    }
+}

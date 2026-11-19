@@ -125,6 +125,19 @@ enum GraphQLQueries {
         return "query {\n  \(rateLimitField)\n  nodes(ids: [\(ids)]) { ... on Issue { id \(items) } ... on PullRequest { id \(items) } }\n}\n"
     }
 
+    /// `nodes(ids:)` takes at most 100 ids per request.
+    static let maxItemStateLookupsPerRequest = 100
+
+    /// The state of up to ``maxItemStateLookupsPerRequest`` issues and pull requests, by node id, with the fields of the
+    /// list fragments, so an open item maps exactly like a search hit. `state` is OPEN, CLOSED or MERGED on a pull
+    /// request and OPEN or CLOSED on an issue, fields the lists already read with the same permissions. GitHub answers
+    /// in the order of the ids, with null for an id it cannot resolve or the token may not see.
+    static func itemStates(nodeIDs: [String]) -> String {
+        let ids = nodeIDs.map { "\"\($0)\"" }.joined(separator: ", ")
+        return "query {\n  \(rateLimitField)\n  nodes(ids: [\(ids)]) { __typename ... on PullRequest { state ...PR } "
+            + "... on Issue { state ...Issue } }\n}\n" + fragments(for: [.pullRequest, .issue])
+    }
+
     /// Node ids are base64-like (`I_kwDOAbc`, `PR_kwDO-x`, legacy `MDU6SXNzdWUx==`); anything else is not inlined.
     static func isNodeID(_ id: String) -> Bool {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-=+/"))
@@ -257,6 +270,48 @@ struct PriorityNode: Decodable {
         Priority.mostUrgent(in: (projectItems?.items ?? []).compactMap { item in
             item.project?.closed == true ? nil : item.fieldValueByName?.name
         })
+    }
+}
+
+struct ItemStatesData: Decodable, RateLimitCarrying {
+    let rateLimitInfo: RateLimitInfo?
+    /// In the order of the ids asked for.
+    let nodes: [ItemStateNode?]
+
+    enum CodingKeys: String, CodingKey {
+        case rateLimitInfo = "rateLimit"
+        case nodes
+    }
+}
+
+/// One node of ``GraphQLQueries/itemStates(nodeIDs:)``. Only a pull request or an issue carries a state and the item;
+/// a node of any other type answers with its `__typename` alone and has neither.
+struct ItemStateNode: Decodable {
+    let typename: String?
+    let state: String?
+    let item: ItemNode?
+
+    private enum CodingKeys: String, CodingKey {
+        case typename = "__typename"
+        case state
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typename = try container.decodeIfPresent(String.self, forKey: .typename)
+        self.typename = typename
+        state = try container.decodeIfPresent(String.self, forKey: .state)
+        item = Self.kind(of: typename) == nil ? nil : try ItemNode(from: decoder)
+    }
+
+    var kind: ItemKind? { Self.kind(of: typename) }
+
+    private static func kind(of typename: String?) -> ItemKind? {
+        switch typename {
+        case "PullRequest": .pullRequest
+        case "Issue": .issue
+        default: nil
+        }
     }
 }
 
