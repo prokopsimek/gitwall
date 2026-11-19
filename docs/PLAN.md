@@ -31,6 +31,13 @@
 - 2026-11-02: presety se dají kopírovat a vkládat jako JSON (Settings › Presets › ⋯), aby mohly žít v souboru
   v jiném repozitáři. Formát má verzi 1 a stabilní UUID, neznámý klíč je chyba, vložení nic nemaže a u nahrazeného
   presetu nechá účty, notifikace a počet v menu baru (`docs/adr/0013`).
+- 2026-11-19: na GitHub.com se každý preset stahuje vlastním hledáním na serveru (`search(type: ISSUE_ADVANCED)`).
+  Pravidelná synchronizace stahuje jen presety, které jsou vidět. Jsou to presety widgetů na ploše, preset s počtem v
+  menu baru, presety se zapnutými notifikacemi, preset otevřeného popoveru nebo hlavního okna a presety stěny, kterou
+  ukazuje okno Walls. Ostatní presety se stáhnou při otevření. Výsledek se ukládá po presetu a účtu. O tom, co preset
+  ukáže, dál rozhoduje místní `FilterEngine`; dotaz na serveru proto musí najít aspoň všechno, co najde místní filtr.
+  Zmizelou položku ověří `nodes(ids:)` a notifikace o zavření přijde, jen když je opravdu zavřená nebo mergnutá.
+  GitHub Enterprise Server a GitLab stahují dál všechno (`docs/adr/0017`).
 
 ## Context
 
@@ -91,7 +98,7 @@ Repozitář je prázdný (žádné commity). Rozhodnutí níže vzešla z rozhov
 Zásady:
 - Providery znají jen `GitwallCore`. Nic providerově specifického neprosakuje do UI. Terminologie: model používá `pullRequest`; provider dodá `displayTerm` („PR“ / „MR“).
 - Widget nikdy nesahá na síť ani na Keychain. Když je snapshot starší než 3× interval, ukáže stáří a odkaz „Otevřít Gitwall“.
-- Filtry se vyhodnocují lokálně nad snapshotem (`FilterEngine`), takže tray i widget dávají shodný výsledek. Provider může filtr „předfiltrovat“ na serveru, ale nesmí na tom záviset správnost.
+- Filtry se vyhodnocují lokálně nad snapshotem (`FilterEngine`), takže tray i widget dávají shodný výsledek. Provider může filtr „předfiltrovat“ na serveru, ale nesmí na tom záviset správnost. GitHub.com to od 2026-11-19 dělá, a proto musí dotaz na serveru najít aspoň všechno, co najde místní filtr (`docs/adr/0017`).
 - Swift 6 language mode, strict concurrency; stavové objekty jako `actor`, UI přes `@Observable`.
 
 ## Balíčky a targety
