@@ -65,7 +65,9 @@ extension GitHubProvider {
     }
 
     /// Pages through one search until GitHub has no further page or ``GraphQLQueries/maxPresetSearchResults`` results
-    /// were read. Complete only when GitHub ran out of pages and counted no more than that.
+    /// were read. Complete only when GitHub ran out of pages and counted no more than that. A page that still has a
+    /// successor and holds an item outside the query's sources ends it too, incomplete: GitHub has dropped the OR group
+    /// of sources it does not know and is searching all of GitHub, so what follows would only be thrown away.
     private func run(
         _ query: PresetQuery, kind: ItemKind, account: Account, token: String, endpoints: GitHubEndpoints, teams: TeamSlugs
     ) async throws -> (items: [WorkItem], totalCount: Int, isComplete: Bool) {
@@ -78,7 +80,7 @@ extension GitHubProvider {
         var after: String?
         var isComplete = false
         // No more pages than hold the cap, so pages that come back short cannot keep the search going.
-        for _ in 0..<(cap + pageSize - 1) / pageSize {
+        for pageNumber in 1...((cap + pageSize - 1) / pageSize) {
             let response = try await client.graphQL(SearchData.self, endpoint: endpoints.graphQL, token: token, query: document,
                                                     variables: ["q": query.text, "after": after])
             guard let search = response.data?.search else { break }
@@ -98,6 +100,11 @@ extension GitHubProvider {
                       let repository = node.repository?.nameWithOwner, query.covers(repository) else { return nil }
                 return (node, repository)
             }
+            let outside = search.items.filter { node in
+                guard (node.__typename == "PullRequest") == (kind == .pullRequest),
+                      let repository = node.repository?.nameWithOwner else { return false }
+                return !query.covers(repository)
+            }.count
             let slugs = await teamSlugs(for: matching.map(\.node), account: account, token: token, endpoints: endpoints, teams: teams)
             items += matching.map {
                 GraphQLMapping.workItem($0.node, kind: kind, accountID: account.id, fallbackRepository: $0.repository,
@@ -106,6 +113,10 @@ extension GitHubProvider {
 
             guard let pageInfo = search.pageInfo, pageInfo.hasNextPage else {
                 isComplete = totalCount <= cap
+                break
+            }
+            if outside > 0 {
+                gitHubLog.error("A preset search returned \(outside, privacy: .public) items outside its sources and was stopped after \(pageNumber, privacy: .public) pages")
                 break
             }
             guard read < cap, let cursor = pageInfo.endCursor else { break }

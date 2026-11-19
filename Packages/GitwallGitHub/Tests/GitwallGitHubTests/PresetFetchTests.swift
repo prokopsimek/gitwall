@@ -321,6 +321,76 @@ struct PresetFetchPagingTests {
         #expect(!fetch.isComplete)
     }
 
+    /// Two pages that GitHub says follow each other; `first` is page one, page two holds one covered pull request.
+    private func twoPages(first: [String]) -> ScriptedTransport {
+        ScriptedTransport { request in
+            if request.variables["after"] == nil {
+                return SearchAnswer.page(first, issueCount: 30, endCursor: cursor(after: 0), hasNextPage: true)
+            }
+            return SearchAnswer.page([SearchAnswer.node(.pullRequest, repo: "acme/app", number: 99)], issueCount: 30,
+                                     endCursor: cursor(after: 1), hasNextPage: false)
+        }
+    }
+
+    @Test("pages that hold only items of the sources are read to the end, and the result is complete")
+    func coveredPagesArePagedNormally() async throws {
+        let transport = twoPages(first: [SearchAnswer.node(.pullRequest, repo: "acme/api", number: 1)])
+        let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
+            account: account([.organization(login: "acme")]), token: "t", search: search([.pullRequest])
+        )
+
+        #expect(await transport.requests.count == 2)
+        #expect(fetch.items.map(\.number) == [1, 99])
+        #expect(fetch.isComplete)
+    }
+
+    @Test("a page with an item outside the sources stops the search: one request, the covered items kept, incomplete")
+    func stopsAtAnItemOutsideTheSources() async throws {
+        let transport = twoPages(first: [
+            SearchAnswer.node(.pullRequest, repo: "acme/app", number: 1),
+            SearchAnswer.node(.pullRequest, repo: "globex/tools", number: 2),
+        ])
+        let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
+            account: account([.organization(login: "acme")]), token: "t", search: search([.pullRequest])
+        )
+
+        #expect(await transport.requests.count == 1)
+        #expect(fetch.requests == 1)
+        #expect(fetch.items.map(\.number) == [1])
+        #expect(fetch.totalCount == 30)
+        #expect(!fetch.isComplete)
+    }
+
+    @Test("an item of the other kind outside the sources is ignored, and paging goes on")
+    func otherKindOutsideTheSourcesIsIgnored() async throws {
+        let transport = twoPages(first: [
+            SearchAnswer.node(.pullRequest, repo: "acme/app", number: 1),
+            SearchAnswer.node(.issue, repo: "globex/tools", number: 2),
+        ])
+        let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
+            account: account([.organization(login: "acme")]), token: "t", search: search([.pullRequest])
+        )
+
+        #expect(await transport.requests.count == 2)
+        #expect(fetch.items.map(\.number) == [1, 99])
+        #expect(fetch.isComplete)
+    }
+
+    @Test("an item without a repository is not outside the sources: it is dropped and paging goes on")
+    func itemWithoutRepositoryIsNotOutside() async throws {
+        let nameless = SearchAnswer.node(.pullRequest, repo: "acme/app", number: 2)
+            .replacingOccurrences(of: #""repository":{"nameWithOwner":"acme/app"}"#, with: #""repository":null"#)
+        #expect(nameless.contains(#""repository":null"#))
+        let transport = twoPages(first: [SearchAnswer.node(.pullRequest, repo: "acme/app", number: 1), nameless])
+        let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
+            account: account([.organization(login: "acme")]), token: "t", search: search([.pullRequest])
+        )
+
+        #expect(await transport.requests.count == 2)
+        #expect(fetch.items.map(\.number) == [1, 99])
+        #expect(fetch.isComplete)
+    }
+
     @Test("a page GitHub answered with 502 is asked again, and both attempts count as requests")
     func gatewayErrorCounts() async throws {
         let sleeps = SleepRecorder()

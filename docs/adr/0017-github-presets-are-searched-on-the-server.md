@@ -350,7 +350,9 @@ of a private repository was read.
   `authorsNone` download more and reach the cap of 1000 sooner. Above the cap the rest of the preset is missing, and a
   priority preset, sorted by GitHub by last update, may miss its most urgent items.
 - A source GitHub does not know, such as a renamed or deleted repository in a scope, makes GitHub search all of
-  GitHub. That costs up to 40 pages whose items are thrown away, and the result is marked incomplete.
+  GitHub. The search stops at the first page that has a successor and holds an item outside the sources, so it
+  costs one page rather than up to 40. The items of the sources that page held are kept, and the result is marked
+  incomplete.
 - A page that comes with only `FORBIDDEN` errors beside its results, such as nodes of an organization the token is
   not authorized for with single sign-on, leaves the result complete: that organization's items are never returned,
   and that is a normal, stable situation. An error of any other type, or without a type, fails the search like a
