@@ -6,7 +6,8 @@ import Testing
 struct SyncEngineTests {
     /// Scripted provider: returns items per account or throws.
     final class FakeProvider: GitProvider, @unchecked Sendable {
-        // @unchecked: mutated only before the engine runs; tests are single-threaded per instance.
+        // @unchecked: the script is set before the engine runs and only read while it runs. What the engine's calls
+        // record is written under `lock`, because accounts of one kind share this provider and sync concurrently.
         let kind: ProviderKind
         var results: [UUID: Result<[WorkItem], ProviderError>] = [:]
         /// Overrides `results` when the call arrives with this token, so a retry after a refresh can succeed.
@@ -17,6 +18,23 @@ struct SyncEngineTests {
         var priorityLookup: PriorityLookup = .unsupported
         /// Tokens the priority lookup was called with, in order.
         var priorityTokens: [String] = []
+        /// Ids of the items each priority lookup was asked about, in order.
+        var priorityItemIDs: [[String]] = []
+        /// Accounts that search each preset on the server.
+        var presetSearchAccounts: Set<UUID> = []
+        /// What a preset search returns, by its search; one that is not scripted finds nothing in one request.
+        var presetFetches: [PresetSearch: Result<PresetFetch, ProviderError>] = [:]
+        /// Overrides `presetFetches` when the search arrives with this token, so a retry after a refresh can succeed.
+        var presetFetchesAfterToken: [String: Result<PresetFetch, ProviderError>] = [:]
+        /// Every preset search the engine sent, in order.
+        var presetSearches: [PresetSearchCall] = []
+        private let lock = NSLock()
+
+        struct PresetSearchCall: Equatable {
+            let accountID: UUID
+            let token: String
+            let search: PresetSearch
+        }
 
         init(kind: ProviderKind) { self.kind = kind }
 
@@ -25,18 +43,32 @@ struct SyncEngineTests {
                                  supportsOrganizationSources: true, supportsGroupSources: false,
                                  resolvesTeamReviewRequests: false, hostName: "GitHub")
         }
+        func capabilities(for account: Account) -> ProviderCapabilities {
+            var capabilities = self.capabilities
+            capabilities.presetSearch = presetSearchAccounts.contains(account.id)
+            return capabilities
+        }
         func verify(baseURL: URL, token: String) async throws -> UserRef { UserRef(login: "me") }
         func discoverRepositories(baseURL: URL, token: String, query: String?) async throws -> [RepoRef] { [] }
         func discoverContainers(baseURL: URL, token: String) async throws -> [ContainerRef] { [] }
         func fetchItems(account: Account, token: String, kinds: Set<ItemKind>) async throws -> [WorkItem] {
-            requestedKinds[account.id] = kinds
+            lock.withLock { requestedKinds[account.id] = kinds }
             if let error = failuresAfterToken[token] { throw error }
             if let items = resultsAfterToken[token] { return items }
             guard let result = results[account.id] else { return [] }
             return try result.get()
         }
+        func fetchPresetItems(account: Account, token: String, search: PresetSearch) async throws -> PresetFetch {
+            lock.withLock { presetSearches.append(PresetSearchCall(accountID: account.id, token: token, search: search)) }
+            if let result = presetFetchesAfterToken[token] { return try result.get() }
+            let result = presetFetches[search] ?? .success(PresetFetch(items: [], totalCount: 0, isComplete: true, requests: 1))
+            return try result.get()
+        }
         func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup {
-            priorityTokens.append(token)
+            lock.withLock {
+                priorityTokens.append(token)
+                priorityItemIDs.append(items.map(\.id))
+            }
             return priorityLookup
         }
     }
