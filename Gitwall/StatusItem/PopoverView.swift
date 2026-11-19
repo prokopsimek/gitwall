@@ -79,6 +79,10 @@ struct PopoverView: View {
         .padding(.vertical, 10)
     }
 
+    private var fetchingLabel: String {
+        environment.selectedPreset.map { String(localized: "Fetching “\($0.name)”…") } ?? String(localized: "Fetching…")
+    }
+
     @ViewBuilder
     private var content: some View {
         switch environment.listState(for: environment.selectedPreset) {
@@ -87,6 +91,8 @@ struct PopoverView: View {
         case .fetching:
             ProgressView()
                 .controlSize(.small)
+                .accessibilityLabel(fetchingLabel)
+                .help(fetchingLabel)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .empty(let kind):
             EmptyStateView(kind: kind, environment: environment)

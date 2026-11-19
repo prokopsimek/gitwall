@@ -7,6 +7,9 @@
     "%@+" : {
       "comment" : "The count of a preset whose search stopped at the provider's cap, as in 1000+. The argument is the number."
     },
+    "Fetching “%@”…" : {
+      "comment" : "Accessibility label and tooltip of the spinner of a preset's list while the preset is being fetched. The argument is the preset's name."
+    },
     "Fetching…" : {
       "comment" : "Header of the preset editor, beside a spinner, while a preset that was never fetched is being fetched."
     },

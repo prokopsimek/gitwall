@@ -374,14 +374,19 @@ final class AppEnvironment {
     /// and its "new" dots, avatars, widgets and notifications. Both go through here, so a preset fetched on open
     /// reports what changed exactly as a sync would.
     private func take(_ result: SyncResult, from source: SnapshotSource) async {
-        previousSnapshot = result.previous
         snapshot = result.snapshot
         // A snapshot written before any account was synced is not a baseline: the first real sync must not
         // flag every item as new or fire a burst of notifications.
         let baseline = (result.previous?.accountStatus.isEmpty ?? true) ? nil : result.previous
         let changes = SnapshotDiff.changes(from: baseline, to: result.snapshot, accounts: config.accounts,
                                            searches: result.searches)
-        newItemIDs = Set(changes.filter { $0.event == .newItem }.map(\.item.id))
+        let kept = SnapshotCarry.kept(
+            after: source == .sync ? .sync : .fetchOnOpen, current: result.snapshot, replaced: result.previous,
+            newItemIDs: Set(changes.filter { $0.event == .newItem }.map(\.item.id)),
+            earlierPrevious: previousSnapshot, earlierNewItemIDs: newItemIDs
+        )
+        previousSnapshot = kept.previous
+        newItemIDs = kept.newItemIDs
         log.info("\(source.rawValue, privacy: .public) finished with \(result.snapshot.items.count) items, \(changes.count) changes")
 
         reloadTokenExpiries()
