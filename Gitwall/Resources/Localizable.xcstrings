@@ -1,11 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ items match now" : {
+      "comment" : "Header of the preset editor for a preset that has a count. The argument is the number, as in 12 or 1000+."
+    },
     "%@+" : {
       "comment" : "The count of a preset whose search stopped at the provider's cap, as in 1000+. The argument is the number."
     },
+    "Fetching…" : {
+      "comment" : "Header of the preset editor, beside a spinner, while a preset that was never fetched is being fetched."
+    },
     "Not fetched yet" : {
-      "comment" : "Tooltip of a preset's count, shown as a dash, while the preset was never fetched."
+      "comment" : "Tooltip of a preset's count, shown as a dash, while the preset was never fetched. Also the header of the preset editor for such a preset."
     },
     "Query failed" : {
       "comment" : "A preset whose search the provider refused: its count, the tooltip, the footer of the popover and the main window, a wall tile and a widget."

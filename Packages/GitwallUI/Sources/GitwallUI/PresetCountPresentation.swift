@@ -47,6 +47,37 @@ public struct PresetCountPresentation: Equatable, Sendable {
         }
     }
 
+    /// What the preset editor's header says about the preset.
+    public enum EditorSummary: Equatable, Sendable {
+        /// "12 items match now", "1000+ items match now".
+        case counted(String)
+        /// The preset waits for its first fetch, and none runs.
+        case notFetched
+        /// The preset waits for its first fetch, which runs now; the view shows a spinner beside ``text``.
+        case fetching
+        /// The query failed before the preset was ever fetched.
+        case queryFailed
+
+        public var text: String {
+            switch self {
+            case .counted(let text): text
+            case .notFetched: String(localized: "Not fetched yet")
+            case .fetching: String(localized: "Fetching…")
+            case .queryFailed: String(localized: "Query failed")
+            }
+        }
+    }
+
+    /// The editor's header: a number only when the preset has a count. A preset that waits for a fetch, as one just
+    /// added or just edited does, says so instead of "0 items".
+    public static func editorSummary(_ display: PresetCountDisplay, isFetching: Bool) -> EditorSummary {
+        if let count = display.count {
+            return .counted(String(localized: "\(text(count: count, isCapped: display.isCapped)) items match now"))
+        }
+        if display.failure != nil { return .queryFailed }
+        return isFetching ? .fetching : .notFetched
+    }
+
     /// The count beside the menu bar icon: nothing for no items or for a preset never fetched.
     public static func menuBarText(_ display: PresetCountDisplay) -> String {
         guard let count = display.count, count > 0 else { return "" }

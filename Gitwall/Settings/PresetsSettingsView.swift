@@ -204,9 +204,18 @@ private struct PresetEditor: View {
                 HStack {
                     Text("Preset")
                     Spacer()
-                    Text("\(environment.items(for: preset).count) items match now")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
+                    HStack(spacing: 4) {
+                        let summary = PresetCountPresentation.editorSummary(
+                            environment.presetCount(for: preset),
+                            isFetching: environment.fetchingPresetIDs.contains(preset.id)
+                        )
+                        if summary == .fetching {
+                            ProgressView().controlSize(.mini)
+                        }
+                        Text(summary.text)
+                    }
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
                 }
             }
 
@@ -328,6 +337,13 @@ private struct PresetEditor: View {
         }
         .formStyle(.grouped)
         .onChange(of: preset) { _, newValue in environment.updatePreset(newValue) }
+        // An edit changes what the preset searches for, so its stored result no longer matches: the open editor
+        // fetches it again once the typing pauses. A new fingerprint cancels the wait of the previous one.
+        .task(id: preset.selectionFingerprint) {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled, let saved = environment.config.preset(id: preset.id) else { return }
+            environment.fetchOnOpen([saved])
+        }
     }
 
     private func split(_ text: String) -> [String] {

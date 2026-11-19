@@ -356,6 +356,19 @@ struct PresetFreshnessTests {
         #expect(toFetch([githubDocs, docs, githubDocs], snapshot([item(1, github)])) == [githubDocs.id, docs.id])
     }
 
+    @Test("a preset whose fingerprint changed after its last fetch needs a fetch on open, although the result is fresh")
+    func editedPresetNeedsFetchOnOpen() {
+        let one = item(1, github)
+        var edited = githubDocs
+        let snapshot = snapshot([one], results: [result(edited, holding: [one], fetchedAt: minutes(-1))])
+        #expect(!needsFetch(edited, snapshot))
+
+        edited.filter.query = "label:bug"
+
+        #expect(edited.selectionFingerprint != githubDocs.selectionFingerprint)
+        #expect(needsFetch(edited, snapshot))
+    }
+
     @Test("a preset whose fetch on open is already running is not asked for again")
     func inFlightPresetNotAskedAgain() {
         let snapshot = snapshot([item(1, github)])

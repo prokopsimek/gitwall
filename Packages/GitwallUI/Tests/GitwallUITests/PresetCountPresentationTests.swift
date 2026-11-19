@@ -106,4 +106,39 @@ struct PresetCountPresentationTests {
         #expect(PresetCountPresentation.fetchedAt(undated, snapshotFetchedAt: snapshotTime) == snapshotTime)
         #expect(PresetCountPresentation.fetchedAt(undated, snapshotFetchedAt: nil) == nil)
     }
+
+    // MARK: - Editor summary
+
+    @Test("the editor says how many items match now for a fetched preset, with a plus at the provider's cap")
+    func editorSummaryCounted() {
+        #expect(PresetCountPresentation.editorSummary(display(count: 12, fetchedAt: minutes(-5)), isFetching: false)
+            == .counted("12 items match now"))
+        #expect(PresetCountPresentation.editorSummary(display(count: 0, fetchedAt: minutes(-5)), isFetching: false)
+            == .counted("0 items match now"))
+        #expect(PresetCountPresentation.editorSummary(display(count: 1_000, fetchedAt: minutes(-2), isCapped: true), isFetching: false)
+            == .counted("1000+ items match now"))
+        // A fetch that refreshes a counted preset leaves its count on screen.
+        #expect(PresetCountPresentation.editorSummary(display(count: 12, fetchedAt: minutes(-5)), isFetching: true)
+            == .counted("12 items match now"))
+    }
+
+    @Test("the editor shows no number for a preset that waits for its fetch, and a spinner while it is fetched")
+    func editorSummaryWaiting() {
+        let waiting = display(count: 0, fetchedAt: nil, hasResult: false)
+
+        #expect(PresetCountPresentation.editorSummary(waiting, isFetching: false) == .notFetched)
+        #expect(PresetCountPresentation.editorSummary(waiting, isFetching: true) == .fetching)
+        #expect(PresetCountPresentation.editorSummary(waiting, isFetching: false).text == "Not fetched yet")
+        #expect(PresetCountPresentation.editorSummary(waiting, isFetching: true).text == "Fetching…")
+    }
+
+    @Test("the editor says the query failed when it failed before any result, and keeps the count after one")
+    func editorSummaryFailed() {
+        #expect(PresetCountPresentation.editorSummary(display(count: 0, fetchedAt: nil, failedAt: minutes(-1)), isFetching: false)
+            == .queryFailed)
+        #expect(PresetCountPresentation.editorSummary(display(count: 0, fetchedAt: nil, failedAt: minutes(-1)), isFetching: true)
+            == .queryFailed)
+        #expect(PresetCountPresentation.editorSummary(display(count: 3, fetchedAt: minutes(-20), failedAt: minutes(-1)), isFetching: false)
+            == .counted("3 items match now"))
+    }
 }

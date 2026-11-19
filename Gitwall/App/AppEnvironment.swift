@@ -472,7 +472,7 @@ final class AppEnvironment {
     }
 
     /// How many items ``items(for:)`` gives, from the same cache.
-    func count(for preset: Preset) -> Int {
+    private func count(for preset: Preset) -> Int {
         items(for: preset).count
     }
 
