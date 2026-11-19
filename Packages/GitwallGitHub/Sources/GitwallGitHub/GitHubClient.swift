@@ -86,6 +86,7 @@ struct GitHubClient: Sendable {
     private func send<T: Decodable>(_ request: URLRequest, decoding type: T.Type) async throws -> (T, HTTPURLResponse) {
         var delays = Self.retryDelays[...]
         while true {
+            RequestTally.record()
             let (data, response) = try await transport.send(request)
             let failure: ProviderError
             // What the log says GitHub answered: the status, and the size of a body that is not JSON.

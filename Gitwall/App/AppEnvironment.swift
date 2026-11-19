@@ -356,9 +356,9 @@ final class AppEnvironment {
             return presets
         } catch {
             if let lastWidgetPresets {
-                log.info("Widget configurations unreadable, using the \(lastWidgetPresets.count) widgets read before")
+                log.notice("Widget configurations unreadable, using the \(lastWidgetPresets.count) widgets read before")
             } else {
-                log.info("Widget configurations unreadable and never read, syncing every preset")
+                log.notice("Widget configurations unreadable and never read, syncing every preset")
             }
             return lastWidgetPresets
         }

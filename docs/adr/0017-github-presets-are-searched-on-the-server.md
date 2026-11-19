@@ -228,10 +228,16 @@ an account look broken. One sync or on-demand fetch runs at a time. Fetch reques
 one fetch. A fetch that had to wait fetches only the presets that, by the snapshot it starts from, still need a fetch on
 open, because what ran first may have fetched them; with none left it asks no provider and writes nothing.
 
-Each sync with a selection and each on-demand fetch writes one line to the unified log (`SyncReport`, category `sync`)
-with the presets per source, the searches, requests and items, and the duration, and with the accounts an account error
-stopped (a sync with a selection only when there were any; see ADR 0016 for the line of a quiet failure). Queries carry
-logins, so no query, login or name ever goes to the log.
+Every sync, with a selection or without, and each on-demand fetch writes one line to the unified log (`SyncReport`,
+category `sync`) at the notice level, which the system keeps on disk where info is kept in memory only (see ADR 0016).
+It holds the presets per source and the searches (a sync with a selection and an on-demand fetch), the requests and
+items, the duration, and the accounts an account error stopped (only when there were any). The requests are all the
+HTTP requests the accounts sent for it, counted where the provider's client hands a request to its transport: the
+searches and downloads, a repeat after a gateway error, the lookup of items that left a result in every batch, the
+project priorities in every batch, and the attempts of a search that ended in an account error. A sync without a
+selection says so ("Synced every account in full") and has no searches. The line does not count the refresh of an
+OAuth token, which is not a provider request. See ADR 0016 for the line of a quiet failure. Queries carry logins, so no
+query, login or name ever goes to the log.
 
 ### What a change must keep
 
@@ -333,9 +339,13 @@ of a private repository was read.
 
 - A sync on GitHub.com sends, for each selected preset, one search per kind (more when a query is split), and one
   lookup per account when items left a result. A preset nobody sees costs nothing until it opens. The first sync with
-  a selection on a real configuration sent 6 searches and 14 requests and kept 355 items.
-- The searches of an account run one after another. On 2026-11-19 a regular sync with 14–17 requests in a row took
-  90–102 s (4–8 s per request), within the default interval of 5 minutes.
+  a selection on a real configuration sent 6 searches and kept 355 items; the 14 requests of its line counted the
+  successful searches and one per lookup, nothing else.
+- The searches of an account run one after another. On 2026-11-19 a regular sync took 90–102 s with 14–17 requests
+  counted in its line. That count left out the project priority lookup, every batch of the item state lookup, the
+  attempts of a search that failed and every request of an account that downloads everything, while the duration
+  includes them all, so no time per request follows from these numbers. The line now counts every request. The sync
+  stays within the default interval of 5 minutes.
 - Presets that are not selected show their last known count, with its time in the tooltip, and "–" until every
   searched part has its first result. "+" shows in the popover, the sidebar, Settings › Presets and onboarding; widgets
   and wall tiles show the plain count, because `TileView` takes one.

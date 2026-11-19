@@ -192,6 +192,21 @@ struct GitLabGraphQLTests {
     /// Real fixtures report further pages; these answer the follow-up page requests.
     private var lastPages: [StubTransport.Response] { [.json(emptyProject), .json(emptyProject), .json(emptyProject)] }
 
+    @Test("every request of a download counts for the sync that asked, one per page of each list")
+    func requestsAreCounted() async throws {
+        let transport = StubTransport([.json(try Fixtures.data("graphql_project.json"))] + lastPages)
+
+        let (_, requests) = try await RequestTally.counting {
+            try await GitLabProvider(transport: transport).fetchItems(
+                account: account([.repository(fullName: "gitlab-org/gitlab-runner")], baseURL: cloud), token: "t",
+                kinds: [.pullRequest, .issue]
+            )
+        }
+
+        #expect(requests > 0)
+        #expect(requests == (await transport.requests.count))
+    }
+
     @Test("maps the captured project fixture: merge requests and issues")
     func mapsProject() async throws {
         let transport = StubTransport([.json(try Fixtures.data("graphql_project.json"))] + lastPages)

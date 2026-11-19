@@ -54,6 +54,11 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   (`FetchStatus.projectAccess = .denied`, a hint in Settings), anything else `.failed`, which keeps the previous
   values. Never put `projectItems` into the list queries: a token without `read:project` would lose the whole list
   (see `docs/adr/0012`).
+- The request count in `SyncReport` is every request the accounts send, counted by `RequestTally` (GitwallCore): each
+  provider client calls `RequestTally.record()` just before it hands a request to its transport, repeats included, and
+  `SyncEngine` runs each account's work inside one tally. A new client, or a new place that calls a transport directly,
+  must record too, or its requests are missing from the line. The line is written at `SyncReport.logLevel` (notice, so
+  the unified log keeps it); do not lower it to info.
 - Only `GitHubClient.send(_:decoding:)` repeats a request, and only after 502, 503 or 504 or a 2xx answer whose body
   is not JSON at all (an empty body included): twice at most, after 1 s and 2 s (`retryDelays`). A body still not
   JSON after the last attempt is thrown as `ProviderError.network`. A 401, a rate limit, any other status, GraphQL

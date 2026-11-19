@@ -59,11 +59,17 @@ before this change have no `consecutiveFailures` and load with 0.
 ### A quiet failure is written to the log
 
 A failure that stays quiet leaves nothing on screen, so the unified log is where it shows. Each regular sync writes one
-info line (category `sync`, `QuietFailure`) for every account it rides out, with the provider, the kind of error and the
+notice line (category `sync`, `QuietFailure`) for every account it rides out, with the provider, the kind of error and the
 failure's place in the series, such as `A github account failed quietly (server 502), 1 of 2`. The line holds no
 message, because a message can carry a URL or a login. The third failure writes `error` and shows on screen, so it gets
 no such line. An on-demand fetch ([ADR 0017](0017-github-presets-are-searched-on-the-server.md)) changes no status and
 writes none.
+
+The line is written at the notice level, not at info: the unified log keeps info messages in memory only, so a later
+`log show --predicate 'subsystem == "cz.prokopsimek.gitwall"'` or a sysdiagnose would find nothing, while notice
+messages are written to disk. At most one such line per failed account and sync, about one sync every 5 minutes, so the
+cost is small. Which level the lines have is `SyncReport.logLevel`, which a test asserts; that the system keeps them
+on disk is Apple's documented behaviour and was not checked on a running build.
 
 The line of a sync with a selection ("Synced presets of widgets …", `SyncReport`) gets `failed accounts N` when an
 account error stopped one or more accounts, a quiet one included; the line of an on-demand fetch always had the count.
@@ -118,7 +124,8 @@ GitHub client, `NotJSONSyncTests`, and the log lines by `SyncEngineQuietFailureT
 - An answer that stays not JSON into a third sync shows as "Network error: GitHub sent an answer that could not be
   read." instead of the decoding error it showed before.
 - The unified log tells a quiet sync from a healthy one: a line per account that failed quietly, and `failed accounts`
-  in the line of a sync with a selection. Neither holds anything but counts, kinds and the provider.
+  in the line of every sync. Neither holds anything but counts, kinds and the provider, and both are written at the
+  notice level.
 - Organization sources on GitHub.com still send the `ISSUE` search with 100 per page, the query measured above. Until
   they use a smaller page, the retry and the quiet period are what keep its 502 off the screen.
 - The numbers are two constants, `GitHubClient.retryDelays` and `SyncEngine.quietFailures`.

@@ -6,7 +6,7 @@ public struct SyncResult: Sendable {
     public let previous: Snapshot?
     /// What the preset searches of this sync found out, for ``SnapshotDiff/changes(from:to:accounts:searches:)``.
     public let searches: SearchFindings
-    /// The counts this sync wrote to the log; nil for a sync without a selection, which writes none.
+    /// The counts this sync wrote to the log.
     let report: SyncReport?
     /// The accounts this sync could not fetch but left showing what they showed, as it logged them. None for an
     /// on-demand fetch, which changes no account's status.
@@ -80,8 +80,9 @@ public actor SyncEngine {
     /// - An item stays in the snapshot only while a search returned it or a preset result holds it.
     ///
     /// The searching accounts become the snapshot's ``Snapshot/searchedAccounts``; a sync without a selection names none.
-    /// It waits while another sync or an on-demand fetch runs. Each sync with a selection writes one line of counts to
-    /// the unified log, failed accounts included, and every sync writes one line per account that failed quietly.
+    /// It waits while another sync or an on-demand fetch runs. Every sync writes one line of counts to the unified log,
+    /// failed accounts and the requests of every account included (see ``SyncReport``), and one line per account that
+    /// failed quietly.
     public func sync(selection: SyncSelection? = nil) async throws -> SyncResult {
         callCount += 1
         await takeTurn()
@@ -109,13 +110,17 @@ public actor SyncEngine {
         try snapshotStore.save(snapshot)
         let quietFailures = outcomes.compactMap(\.quietFailure)
         for failure in quietFailures { failure.write() }
-        let report = selection.map { selection in
-            SyncReport(selection: selection, failedAccounts: outcomes.filter(\.failed).count,
-                       searches: outcomes.reduce(0) { $0 + $1.searches },
-                       requests: outcomes.reduce(0) { $0 + $1.requests }, items: snapshot.items.count,
+        let failedAccounts = outcomes.filter(\.failed).count
+        let requests = outcomes.reduce(0) { $0 + $1.requests }
+        let report = if let selection {
+            SyncReport(selection: selection, failedAccounts: failedAccounts,
+                       searches: outcomes.reduce(0) { $0 + $1.searches }, requests: requests,
+                       items: snapshot.items.count, duration: clock.now - start)
+        } else {
+            SyncReport(everything: failedAccounts, requests: requests, items: snapshot.items.count,
                        duration: clock.now - start)
         }
-        report?.write()
+        report.write()
         return SyncResult(snapshot: snapshot, previous: previous, searches: merged.findings, report: report,
                           quietFailures: quietFailures)
     }
@@ -283,13 +288,20 @@ public actor SyncEngine {
             for (account, plan) in plans {
                 let before = Before(account: account, previous: previous)
                 group.addTask {
-                    switch plan {
-                    case .everything(let kinds):
-                        await self.fetch(account: account, kinds: kinds, before: before, timestamp: timestamp)
-                    case .presets(let queries, let provider):
-                        await self.search(account: account, queries: queries, provider: provider, before: before,
-                                          timestamp: timestamp)
+                    // Every request the account sends in this sync lands in one tally, whichever provider call sends it
+                    // and however that call ends.
+                    let tally = RequestTally()
+                    var outcome = await tally.run {
+                        switch plan {
+                        case .everything(let kinds):
+                            await self.fetch(account: account, kinds: kinds, before: before, timestamp: timestamp)
+                        case .presets(let queries, let provider):
+                            await self.search(account: account, queries: queries, provider: provider, before: before,
+                                              timestamp: timestamp)
+                        }
                     }
+                    outcome.requests = tally.count
+                    return outcome
                 }
             }
             var collected: [AccountOutcome] = []
@@ -351,7 +363,7 @@ public actor SyncEngine {
         var presets: [PresetOutcome] = []
         /// Preset searches sent, a repeat after a token refresh included.
         var searches = 0
-        /// Requests the successful searches took, and those of the item state lookup.
+        /// Every HTTP request the account sent in this sync, whatever came of it; set once the account is done.
         var requests = 0
         /// Whether the account fetched through preset searches, whatever came of them.
         var searched = false
@@ -365,6 +377,9 @@ public actor SyncEngine {
         var lookup = ItemLookup()
     }
 
+    /// The level of the line a failed lookup writes; see ``SyncReport/logLevel``.
+    static let lookupFailureLogLevel = SyncReport.logLevel
+
     /// What ``GitProvider/fetchItemStates(account:token:items:)`` said about items that left a fresh result.
     private struct ItemLookup: Sendable {
         /// Confirmed closed or merged.
@@ -373,9 +388,6 @@ public actor SyncEngine {
         var gone: Set<String> = []
         /// Still open, with the provider's current data and, once the priorities are read, theirs.
         var refreshed: [WorkItem] = []
-        /// One for a lookup that was sent, answered or not. The provider does not say how many HTTP requests it split
-        /// the lookup into, so a lookup counts as one.
-        var requests = 0
     }
 
     /// What an account showed before this sync, which a failed fetch keeps.
@@ -624,7 +636,6 @@ public actor SyncEngine {
         var foundIDs: Set<String> = []
         var presets: [PresetOutcome] = []
         var searches = 0
-        var requests = 0
         var fetchedAny = false
         var mayRefresh = true
         var accountError: (any Error)?
@@ -654,7 +665,6 @@ public actor SyncEngine {
             switch result {
             case .success(let fetch):
                 fetchedAny = true
-                requests += fetch.requests
                 found += fetch.items.filter { foundIDs.insert($0.id).inserted }
                 let fetchedIDs = fetch.items.map(\.id)
                 if let earlier = before.comparableResult(for: query.preset) {
@@ -690,13 +700,13 @@ public actor SyncEngine {
             let status = before.failed(by: accountError)
             let quiet = Self.quietFailure(of: account, by: accountError, leaving: status)
             return AccountOutcome(accountID: account.id, items: items, status: status,
-                                  presets: presets, searches: searches, requests: requests, searched: true,
+                                  presets: presets, searches: searches, searched: true,
                                   failed: true, quietFailure: quiet, compared: compared)
         }
         // Searches refused on their own say nothing about the account.
         guard fetchedAny else {
             return AccountOutcome(accountID: account.id, items: [], status: before.status,
-                                  presets: presets, searches: searches, requests: requests, searched: true)
+                                  presets: presets, searches: searches, searched: true)
         }
         // An item another search of this sync returned is still open; only the others are in question.
         var asked: Set<String> = []
@@ -712,7 +722,6 @@ public actor SyncEngine {
             status: FetchStatus(state: .ok, lastSuccessAt: timestamp, message: nil, projectAccess: access),
             presets: presets,
             searches: searches,
-            requests: requests + lookup.requests,
             searched: true,
             compared: compared,
             lookup: lookup
@@ -731,13 +740,13 @@ public actor SyncEngine {
         do {
             states = try await provider.fetchItemStates(account: account, token: token, items: items)
         } catch {
-            syncLog.info("""
+            syncLog.log(level: Self.lookupFailureLogLevel, """
                 Could not look up \(items.count, privacy: .public) items that left a preset result; \
                 they stay only where another result holds them
                 """)
-            return ItemLookup(requests: 1)
+            return ItemLookup()
         }
-        var lookup = ItemLookup(requests: 1)
+        var lookup = ItemLookup()
         for item in items {
             switch states[item.id] {
             case .closed, .merged:

@@ -14,12 +14,17 @@ struct SyncReport: Hashable, Sendable {
         case selection(widgets: Int, menuBar: Int, notifications: Int, windows: Int, wall: Int, failedAccounts: Int)
         /// ``SyncEngine/syncPresets(_:)``: the presets it fetched, and the accounts an account error stopped.
         case onDemand(presets: Int, failedAccounts: Int)
+        /// A sync without a selection: every account downloaded all its open items, and an account error stopped
+        /// `failedAccounts` of them, a quiet one included.
+        case everything(failedAccounts: Int)
     }
 
     var origin: Origin
     /// Preset searches sent, a repeat after a token refresh included.
     var searches: Int
-    /// HTTP requests the successful searches took, and one per item state lookup.
+    /// Every HTTP request the accounts sent for the sync: searches and downloads, the item state lookup, the project
+    /// priorities, and the attempts of a request that was repeated or that failed. Not the token refresh, which no
+    /// provider sends.
     var requests: Int
     /// Items in the snapshot the sync wrote.
     var items: Int
@@ -44,11 +49,27 @@ struct SyncReport: Hashable, Sendable {
         self.duration = duration
     }
 
+    init(everything failedAccounts: Int, requests: Int, items: Int, duration: Duration) {
+        origin = .everything(failedAccounts: failedAccounts)
+        searches = 0
+        self.requests = requests
+        self.items = items
+        self.duration = duration
+    }
+
+    /// The level the lines of a sync are written at. `info` is not kept by the unified log, and these lines are what
+    /// an operator reads afterwards, about one per sync.
+    static let logLevel = OSLogType.default
+
     /// The log line, made of counts alone.
     var message: String {
         let milliseconds = Int((duration / .milliseconds(1)).rounded())
         let counts = "\(searches) searches, \(requests) requests, \(items) items, \(milliseconds) ms"
         switch origin {
+        case .everything(let failedAccounts):
+            let failed = failedAccounts > 0 ? ", failed accounts \(failedAccounts)" : ""
+            return "Synced every account in full\(failed): \(requests) requests, \(items) items, \(milliseconds) ms"
+
         case .selection(let widgets, let menuBar, let notifications, let windows, let wall, let failedAccounts):
             // A sync in which every account worked leaves the count out.
             let failed = failedAccounts > 0 ? ", failed accounts \(failedAccounts)" : ""
@@ -60,7 +81,7 @@ struct SyncReport: Hashable, Sendable {
     }
 
     func write(to log: Logger = syncLog) {
-        log.info("\(message, privacy: .public)")
+        log.log(level: Self.logLevel, "\(message, privacy: .public)")
     }
 }
 
@@ -86,8 +107,11 @@ struct QuietFailure: Hashable, Sendable {
         "A \(provider.rawValue) account failed quietly (\(error)), \(failure) of \(SyncEngine.quietFailures)"
     }
 
+    /// The level of ``SyncReport`` lines, for the same reason.
+    static let logLevel = SyncReport.logLevel
+
     func write(to log: Logger = syncLog) {
-        log.info("\(message, privacy: .public)")
+        log.log(level: Self.logLevel, "\(message, privacy: .public)")
     }
 
     /// `error` by its case, with the status of a server error, or by its type when it is no ``ProviderError``.

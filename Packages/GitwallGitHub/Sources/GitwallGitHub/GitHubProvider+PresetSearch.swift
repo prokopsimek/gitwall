@@ -27,18 +27,13 @@ extension GitHubProvider {
             return PresetFetch(items: [], totalCount: 0, isComplete: true, requests: 0)
         }
 
-        // Every request of this fetch passes the counter: repeats after a gateway error and the team lookup too.
-        let counter = RequestCounter(transport: client.transport)
-        let counted = GitHubProvider(client: GitHubClient(transport: counter, userAgent: client.userAgent, sleep: client.sleep), teamCache: teamCache)
-        let found = try await counted.searchPreset(search, sources: sources, account: account, token: token, now: Date())
+        // Every request of this fetch is counted by the client: repeats after a gateway error and the team lookup too.
+        // The sync that asked counts them as well.
+        let (found, requests) = try await RequestTally.counting {
+            try await searchPreset(search, sources: sources, account: account, token: token, now: Date())
+        }
         return PresetFetch(items: found.items, totalCount: found.totalCount, isComplete: found.isComplete,
-                           requests: await counter.count)
-    }
-
-    /// A provider that sends through `client`.
-    private init(client: GitHubClient, teamCache: TeamSlugCache) {
-        self.client = client
-        self.teamCache = teamCache
+                           requests: requests)
     }
 
     private func searchPreset(
@@ -236,20 +231,5 @@ private struct PresetQuery {
         let name = fullName.lowercased()
         guard let owner = name.split(separator: "/").first else { return false }
         return repositories.contains(name) || owners.contains(String(owner))
-    }
-}
-
-/// Counts the requests of one preset fetch on their way to the real transport.
-private actor RequestCounter: HTTPTransport {
-    private let transport: any HTTPTransport
-    private(set) var count = 0
-
-    init(transport: any HTTPTransport) {
-        self.transport = transport
-    }
-
-    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        count += 1
-        return try await transport.send(request)
     }
 }

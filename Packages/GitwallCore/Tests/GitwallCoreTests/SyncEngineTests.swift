@@ -34,6 +34,12 @@ struct SyncEngineTests {
         var itemStateFailure: ProviderError?
         /// Every item state lookup the engine sent, in order.
         var itemStateLookups: [ItemStateLookup] = []
+        /// HTTP requests each call takes, which the fake records the way a real provider's client does. A preset search
+        /// counts those of its scripted fetch; one that fails counts `presetFailureRequests`.
+        var presetFailureRequests = 0
+        var itemStateRequests = 1
+        var priorityRequests = 0
+        var fetchItemsRequests = 0
         private let lock = NSLock()
 
         struct PresetSearchCall: Equatable {
@@ -65,6 +71,7 @@ struct SyncEngineTests {
         func discoverContainers(baseURL: URL, token: String) async throws -> [ContainerRef] { [] }
         func fetchItems(account: Account, token: String, kinds: Set<ItemKind>) async throws -> [WorkItem] {
             lock.withLock { requestedKinds[account.id] = kinds }
+            RequestTally.record(fetchItemsRequests)
             if let error = failuresAfterToken[token] { throw error }
             if let items = resultsAfterToken[token] { return items }
             guard let result = results[account.id] else { return [] }
@@ -72,14 +79,19 @@ struct SyncEngineTests {
         }
         func fetchPresetItems(account: Account, token: String, search: PresetSearch) async throws -> PresetFetch {
             lock.withLock { presetSearches.append(PresetSearchCall(accountID: account.id, token: token, search: search)) }
-            if let result = presetFetchesAfterToken[token] { return try result.get() }
-            let result = presetFetches[search] ?? .success(PresetFetch(items: [], totalCount: 0, isComplete: true, requests: 1))
+            let result = presetFetchesAfterToken[token]
+                ?? presetFetches[search] ?? .success(PresetFetch(items: [], totalCount: 0, isComplete: true, requests: 1))
+            switch result {
+            case .success(let fetch): RequestTally.record(fetch.requests)
+            case .failure: RequestTally.record(presetFailureRequests)
+            }
             return try result.get()
         }
         func fetchItemStates(account: Account, token: String, items: [WorkItem]) async throws -> [String: ItemState] {
             lock.withLock {
                 itemStateLookups.append(ItemStateLookup(accountID: account.id, token: token, itemIDs: items.map(\.id)))
             }
+            RequestTally.record(itemStateRequests)
             if let itemStateFailure { throw itemStateFailure }
             let asked = Set(items.map(\.id))
             return itemStates.filter { asked.contains($0.key) }
@@ -89,6 +101,7 @@ struct SyncEngineTests {
                 priorityTokens.append(token)
                 priorityItemIDs.append(items.map(\.id))
             }
+            RequestTally.record(priorityRequests)
             return priorityLookup
         }
     }
