@@ -48,6 +48,12 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   (`FetchStatus.projectAccess = .denied`, a hint in Settings), anything else `.failed`, which keeps the previous
   values. Never put `projectItems` into the list queries: a token without `read:project` would lose the whole list
   (see `docs/adr/0012`).
+- Only `GitHubClient.send(_:)` repeats a request, and only after 502, 503 or 504: twice at most, after 1 s and 2 s
+  (`retryDelays`). A 401, a rate limit, any other status, GraphQL errors in a 200 answer and network errors fail at
+  once, and the GitLab client repeats nothing. A 502–504 or a network error that reaches `SyncEngine` counts in
+  `FetchStatus.consecutiveFailures`: the first two failed syncs in a row leave the account's state and message as they
+  were, the third writes `error` (`SyncEngine.quietFailures`). Keep the quiet period in `FetchStatus`, because
+  Settings, the popover, the main window and the widget all read `FetchStatus.state` (see `docs/adr/0016`).
 - Filter categories combine with AND, values inside one category with OR. Two deliberate exceptions live in
   `FilterEngine`: a draft that names me as a reviewer passes a review preset even when drafts are off (cloud
   agents cannot mark their pull requests ready), and author logins are compared without a trailing `[bot]`,
