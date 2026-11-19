@@ -836,22 +836,29 @@ final class AppEnvironment {
         guard containerAvailable else { return .empty(.containerUnavailable) }
         guard !needsOnboarding else { return .empty(.noAccounts) }
         guard let preset else { return .empty(.noPresets) }
-        // A preset without a count shows a spinner while its fetch runs and otherwise why it has nothing, also when
-        // another of its parts, as from GitLab, has items, as the widget and the wall do; any other shows its last items.
-        // While there is no snapshot or a regular sync runs, it is loading instead, as the sync may still fetch it.
-        switch PresetCountPresentation.listPlaceholder(
-            presetCount(for: preset), isFetching: fetchingPresetIDs.contains(preset.id),
-            isSyncing: snapshot == nil || isRefreshing
-        ) {
-        case .fetching: return .fetching
-        case .loading: return .empty(.loading)
-        case .waitingForSync: return .empty(.waitingForSync(presetID: preset.id))
-        case .queryFailed: return .empty(.queryFailed(presetID: preset.id))
-        case nil: break
+        // A preset over accounts that all watch nothing fetches nothing and never gets a count, so no placeholder or
+        // loading state applies: it shows its items, if any, and otherwise names the idle account.
+        var watchesNothing = false
+        if case .nothingWatched = config.emptiness(of: preset) { watchesNothing = true }
+        if !watchesNothing {
+            // A preset without a count shows a spinner while its fetch runs and otherwise why it has nothing, also when
+            // another of its parts, as from GitLab, has items, as the widget and the wall do; any other shows its last
+            // items. While there is no snapshot or a regular sync runs, it is loading instead, as the sync may still
+            // fetch it.
+            switch PresetCountPresentation.listPlaceholder(
+                presetCount(for: preset), isFetching: fetchingPresetIDs.contains(preset.id),
+                isSyncing: snapshot == nil || isRefreshing
+            ) {
+            case .fetching: return .fetching
+            case .loading: return .empty(.loading)
+            case .waitingForSync: return .empty(.waitingForSync(presetID: preset.id))
+            case .queryFailed: return .empty(.queryFailed(presetID: preset.id))
+            case nil: break
+            }
         }
         let items = items(for: preset)
         if !items.isEmpty { return .items(items) }
-        if snapshot == nil || isRefreshing { return .empty(.loading) }
+        if !watchesNothing, snapshot == nil || isRefreshing { return .empty(.loading) }
         // An account that watches nothing fetches nothing and still syncs fine, so say which one it is.
         switch config.emptiness(of: preset) {
         case .nothingWatched(let account): return .empty(.noRepositories(account: account))

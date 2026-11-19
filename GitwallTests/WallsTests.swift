@@ -237,7 +237,7 @@ struct WallsAppTests {
         let environment = environment()
         environment.enterSampleData()
         var review = try #require(environment.config.presets.first { $0.name == "Waiting for my review" })
-        _ = environment.count(for: review)
+        _ = environment.items(for: review).count
         #expect(environment.filterCache.count == 1)
 
         environment.setWalls([])
@@ -253,15 +253,15 @@ struct WallsAppTests {
         let environment = environment()
         environment.enterSampleData()
         var review = try #require(environment.config.presets.first { $0.name == "Waiting for my review" })
-        let before = environment.count(for: review)
-        #expect(environment.count(for: review) == before)
+        let before = environment.items(for: review).count
+        #expect(environment.items(for: review).count == before)
 
         // Refresh with sample data brings one more review request in a new snapshot.
         await environment.refresh()
-        #expect(environment.count(for: review) == before + 1)
+        #expect(environment.items(for: review).count == before + 1)
 
         review.filter = ItemFilter(query: "is:issue")
         environment.updatePreset(review)
-        #expect(environment.count(for: review) == 0)
+        #expect(environment.items(for: review).count == 0)
     }
 }
