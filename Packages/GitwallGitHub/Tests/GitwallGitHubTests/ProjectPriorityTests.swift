@@ -110,9 +110,10 @@ struct ProjectPriorityTests {
         StubTransport.Response.json(#"{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}"#),
     ])
     func passingFailure(response: StubTransport.Response) async throws {
-        let transport = StubTransport([response])
+        // An outage answers every attempt the client makes; the other answers are final at the first.
+        let transport = StubTransport(Array(repeating: response, count: 3))
 
-        let lookup = await GitHubProvider(transport: transport).projectPriorities(account: account, token: "t", items: [item(1, nodeID: "I_a")])
+        let lookup = await GitHubProvider(transport: transport, sleep: { _ in }).projectPriorities(account: account, token: "t", items: [item(1, nodeID: "I_a")])
 
         guard case .failed = lookup else {
             Issue.record("expected .failed, got \(lookup)")

@@ -23,6 +23,11 @@ public struct GitHubProvider: GitProvider {
         client = GitHubClient(transport: transport, userAgent: userAgent)
     }
 
+    /// For tests: `sleep` stands in for the wait before a 502, 503 or 504 is tried again.
+    init(transport: any HTTPTransport, userAgent: String = "Gitwall", sleep: @escaping @Sendable (Duration) async throws -> Void) {
+        client = GitHubClient(transport: transport, userAgent: userAgent, sleep: sleep)
+    }
+
     // MARK: REST
 
     public func verify(baseURL: URL, token: String) async throws -> UserRef {

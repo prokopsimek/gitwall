@@ -28,7 +28,8 @@ struct ItemDetailTests {
 
     private func detail(_ item: WorkItem, _ routes: [(String, StubTransport.Response)]) async throws -> (ItemDetail, RoutingTransport) {
         let transport = RoutingTransport(routes)
-        let detail = try #require(await GitHubProvider(transport: transport).itemDetail(account: account, token: "t", item: item))
+        let detail = try #require(await GitHubProvider(transport: transport, sleep: { _ in })
+            .itemDetail(account: account, token: "t", item: item))
         return (detail, transport)
     }
 

@@ -8,6 +8,8 @@ let gitHubLog = Logger(subsystem: "cz.prokopsimek.gitwall", category: "github")
 struct GitHubClient: Sendable {
     let transport: any HTTPTransport
     let userAgent: String
+    /// Waits before a request GitHub answered with 502, 503 or 504 is sent again. Tests inject one that returns at once.
+    var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
 
     static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
@@ -70,12 +72,29 @@ struct GitHubClient: Sendable {
 
     // MARK: Errors
 
+    /// The waits before the first and the second repeat of a request that ended in 502, 503 or 504.
+    private static let retryDelays: [Duration] = [.seconds(1), .seconds(2)]
+
+    /// Every request goes through here. A gateway error is repeated after each of `retryDelays`, so a request gets at
+    /// most three attempts; any other failure, and the gateway error of the last attempt, is thrown at once.
     private func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await transport.send(request)
-        guard 200..<300 ~= response.statusCode else {
-            throw Self.map(status: response.statusCode, data: data, response: response)
+        var delays = Self.retryDelays[...]
+        while true {
+            let (data, response) = try await transport.send(request)
+            if 200..<300 ~= response.statusCode { return (data, response) }
+            let error = Self.map(status: response.statusCode, data: data, response: response)
+            guard Self.isGatewayError(error), let delay = delays.popFirst() else { throw error }
+            gitHubLog.info("GitHub answered \(response.statusCode), trying again in \(delay, privacy: .public)")
+            try await sleep(delay)
+            try Task.checkCancellation()
         }
-        return (data, response)
+    }
+
+    /// Bad gateway, service unavailable and gateway timeout: GitHub is briefly unreachable, the request itself is fine.
+    /// Network errors are left to the sync's own handling, and everything else would fail the same way again.
+    private static func isGatewayError(_ error: ProviderError) -> Bool {
+        guard case .server(let status, _) = error else { return false }
+        return [502, 503, 504].contains(status)
     }
 
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
