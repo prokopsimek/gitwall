@@ -3,6 +3,17 @@ import GitwallCore
 
 // MARK: - Item states
 
+/// What the unified log says about errors beside an item state lookup: count and types, never GitHub's text.
+enum ItemStateLog {
+    /// A line for every error that is not `NOT_FOUND`, a refusal (`FORBIDDEN`) included, or nil when there is none. A
+    /// refusal changes no state, but an organization that refuses the token must leave a trace.
+    static func unexpected(_ errors: [GraphQLError]) -> String? {
+        let unexpected = errors.filter { $0.type?.uppercased() != "NOT_FOUND" }
+        guard !unexpected.isEmpty else { return nil }
+        return "An item state lookup came with \(unexpected.typeSummary) beside its results"
+    }
+}
+
 extension GitHubProvider {
     /// The state of each item by its node id, in batches of ``GraphQLQueries/maxItemStateLookupsPerRequest``, for items
     /// that left a preset search. A pull request is open, closed or merged, an issue open or closed; an open one comes
@@ -32,9 +43,8 @@ extension GitHubProvider {
                                                     query: GraphQLQueries.itemStates(nodeIDs: batch))
             let nodes = response.data?.nodes ?? []
             let errors = response.errors ?? []
-            let unexpected = errors.filter { !["NOT_FOUND", "FORBIDDEN"].contains($0.type?.uppercased()) }
-            if !unexpected.isEmpty {
-                gitHubLog.error("An item state lookup came with \(unexpected.typeSummary, privacy: .public) beside its results")
+            if let line = ItemStateLog.unexpected(errors) {
+                gitHubLog.error("\(line, privacy: .public)")
             }
             let open = nodes.compactMap { $0?.state == "OPEN" ? $0?.item : nil }
             let slugs = await teamSlugs(for: open, account: account, token: token, endpoints: endpoints, teams: teams)

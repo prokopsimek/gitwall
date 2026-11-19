@@ -371,7 +371,8 @@ That repository has no issue, so no issue of a private repository was read.
   and that is a normal, stable situation. An error of any other type, or without a type, fails the search like a
   query failure, so the previous result stays and nothing counts as having left. Both are logged at error level with
   the number and types of the errors, never their messages. An item state lookup leaves a null node without a state
-  unless `NOT_FOUND` points at it.
+  unless `NOT_FOUND` points at it, and logs every error other than `NOT_FOUND`, `FORBIDDEN` included, the same way,
+  without changing any state.
 - GitHub Enterprise Server and GitLab accounts behave as before.
 
 Open points, marked NEOVĚŘENO (not verified):

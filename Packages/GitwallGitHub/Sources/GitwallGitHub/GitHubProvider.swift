@@ -293,15 +293,15 @@ extension GitHubProvider {
             } catch ProviderError.unauthorized {
                 // `INSUFFICIENT_SCOPES` or `FORBIDDEN` without data. The lists were just read with this token, so it
                 // is the projects the token may not read, not the token itself.
-                gitHubLog.info("Project priorities skipped for \(account.displayName, privacy: .public): the token may not read projects")
+                gitHubLog.info("\(ProjectPriorityLog.skipped, privacy: .public)")
                 return .missingPermission
             } catch {
-                gitHubLog.info("Project priorities unavailable: \(error.localizedDescription, privacy: .public)")
+                gitHubLog.error("\(ProjectPriorityLog.unavailable(error, items: itemIDs.count), privacy: .public)")
                 return .failed(error.localizedDescription)
             }
         }
         if refused, priorities.isEmpty {
-            gitHubLog.info("Project priorities refused for \(account.displayName, privacy: .public)")
+            gitHubLog.info("\(ProjectPriorityLog.refused, privacy: .public)")
             return .missingPermission
         }
         return .found(priorities)
@@ -374,6 +374,31 @@ actor TeamSlugCache {
         case .unreliable(let slugs):
             entries[key] = nil
             return slugs
+        }
+    }
+}
+
+/// What the unified log says about the project priority lookup: the kind of failure and counts, never an account, a
+/// message or a name. The returned `PriorityLookup` carries the message for the UI; the log does not.
+enum ProjectPriorityLog {
+    static let skipped = "Project priorities skipped: the token may not read projects"
+    static let refused = "Project priorities refused: GitHub refused the Priority field"
+
+    static func unavailable(_ error: Error, items: Int) -> String {
+        "Project priorities unavailable (\(kind(of: error))) for \(items) items"
+    }
+
+    /// The error by its case, with the status of a server error, or by its type when it is no ``ProviderError``.
+    static func kind(of error: Error) -> String {
+        switch error as? ProviderError {
+        case .server(let status, _): "server \(status)"
+        case .network: "network"
+        case .unauthorized: "unauthorized"
+        case .rateLimited: "rateLimited"
+        case .invalidResponse: "invalidResponse"
+        case .notFound: "notFound"
+        case .unsupported: "unsupported"
+        case nil: String(describing: type(of: error))
         }
     }
 }
