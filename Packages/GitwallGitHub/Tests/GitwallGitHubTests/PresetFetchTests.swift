@@ -114,6 +114,40 @@ struct PresetFetchRequestTests {
         ])
     }
 
+    @Test("a kind the filter cannot match is not searched: no request, complete, nothing found", arguments: [
+        ItemFilter(query: "is:issue label:bug"),
+        ItemFilter(labelsAny: ["bug"], query: "mentions:x"),
+        ItemFilter(query: "(label:bug"),
+    ])
+    func kindThatMatchesNothing(filter: ItemFilter) async throws {
+        let transport = ScriptedTransport { _ in SearchAnswer.empty }
+        let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
+            account: account([.organization(login: "acme")]), token: "t", search: search([.pullRequest], filter: filter)
+        )
+
+        #expect(await transport.requests.isEmpty)
+        #expect(fetch == PresetFetch(items: [], totalCount: 0, isComplete: true, requests: 0))
+    }
+
+    @Test("of two kinds, one the filter cannot match is skipped and the other is searched")
+    func oneKindMatchesNothing() async throws {
+        let transport = ScriptedTransport { _ in
+            SearchAnswer.page([SearchAnswer.node(.issue, repo: "acme/app", number: 1)], issueCount: 1)
+        }
+        let fetch = try await GitHubProvider(transport: transport).fetchPresetItems(
+            account: account([.organization(login: "acme")]), token: "t",
+            search: search([.pullRequest, .issue], filter: ItemFilter(query: "is:issue label:bug"))
+        )
+
+        #expect(await transport.requests.map { $0.variables["q"] } == [
+            #"is:issue is:open org:acme archived:false label:"bug" sort:updated-desc"#,
+        ])
+        #expect(fetch.requests == 1)
+        #expect(fetch.items.count == 1)
+        #expect(fetch.totalCount == 1)
+        #expect(fetch.isComplete)
+    }
+
     struct NothingToSearch: Sendable, CustomTestStringConvertible {
         let testDescription: String
         let sources: [RepoSource]

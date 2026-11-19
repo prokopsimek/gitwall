@@ -116,8 +116,9 @@ draft that asks for my review (`includeDraftsRequestingMyReview`), `reviewStates
 `text`. From the query, bare words stay local, because GitHub matches whole words and Gitwall any part of the title,
 and so do `priority:`, `authorsNone` and every negated login except `-author:@me` and `-assignee:@me`. `is:` and
 `type:` other than draft are decided before the search, for the kind it runs, because GitHub reads them as a choice of
-kind and state for the whole search (`is:pr -is:pr` returns every item). A filter that matches nothing locally sends
-no terms.
+kind and state for the whole search (`is:pr -is:pr` returns every item). A kind the filter cannot match locally, whether
+by an `is:` term, a kind exclusion or a query that cannot be read, is not searched: no request is sent, and its result is
+complete and empty.
 
 Each of these choices can only widen the search beyond the local filter. The reasons come from GitHub's answers.
 GraphQL gives a GitHub App's login as its bare slug, and `reviewed-by:<slug>` finds nothing while
@@ -209,7 +210,7 @@ nothing, a closed item included.
   account's `FetchStatus`. GitHub does not refuse a malformed query with an error: an unclosed parenthesis or an
   unknown qualifier comes back as 200 with no results (see *Checked against GitHub*). So "Query failed" comes only
   from GraphQL errors, 400 or 422. Gitwall never sends such a query anyway, because `SearchQuery.parse` rejects it,
-  the preset matches nothing, and `PresetSearchQuery` sends none of an unreadable query.
+  the preset matches nothing, and an unreadable query is a filter that matches nothing, so no kind of it is searched.
 - The account is `ok` with a new `lastSuccessAt` once at least one search succeeded and none ended in an account
   error. When only refused searches ran, or none of its presets was selected, it keeps the status it had.
 - After the searches, the project priorities ([ADR 0012](0012-priority-comes-from-a-projects-field-then-labels.md))

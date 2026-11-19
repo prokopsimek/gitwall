@@ -8,11 +8,12 @@ struct TranslationCase: Sendable, CustomTestStringConvertible {
     let name: String
     var kind: ItemKind = .pullRequest
     let filter: ItemFilter
-    let expected: [String]
+    /// Nil when the filter matches nothing locally, so the kind is not searched at all.
+    let expected: [String]?
 
     var testDescription: String { name }
 
-    static func query(_ name: String, _ query: String, kind: ItemKind = .pullRequest, _ expected: [String]) -> TranslationCase {
+    static func query(_ name: String, _ query: String, kind: ItemKind = .pullRequest, _ expected: [String]?) -> TranslationCase {
         TranslationCase(name: name, kind: kind, filter: ItemFilter(query: query), expected: expected)
     }
 }
@@ -152,10 +153,13 @@ struct PresetSearchQueryTests {
         .query("-is:draft in a pull request search", "-is:draft", ["-is:draft"]),
         .query("-is:draft in an issue search", "-is:draft label:bug", kind: .issue, [#"label:"bug""#]),
         .query("-is:issue in a pull request search", "-is:issue label:bug", [#"label:"bug""#]),
-        // These match nothing locally, so any search is wide enough; none is sent.
-        .query("is:issue in a pull request search", "is:issue label:bug", []),
-        .query("is:draft in an issue search", "is:draft label:bug", kind: .issue, []),
-        .query("-is:open", "-is:open label:bug", []),
+        // These match nothing locally, so the kind is not searched at all.
+        .query("is:issue in a pull request search", "is:issue label:bug", nil),
+        .query("is:draft in an issue search", "is:draft label:bug", kind: .issue, nil),
+        .query("-is:open", "-is:open label:bug", nil),
+        .query("-is:pr in a pull request search", "-is:pr", nil),
+        .query("an AND with a term that cannot hold", "label:bug is:issue", nil),
+        .query("an OR of branches that all cannot hold", "is:issue OR -is:open", nil),
         .query("an OR branch that cannot hold falls away", "is:issue OR label:bug", [#"label:"bug""#]),
         .query("an OR branch that always holds empties the group", "is:pr OR label:bug", []),
     ]
@@ -205,11 +209,13 @@ struct PresetSearchQueryTests {
         .query("negated free text drops", "-crash label:bug", [#"label:"bug""#]),
         .query("a negated login in an OR group drops the group", "label:bug OR -author:alice", []),
         .query("a negated @me in an OR group", "label:bug OR -author:@me", [#"(label:"bug" OR -author:@me)"#]),
-        // Locally an unreadable query matches nothing, so any search is wide enough for it.
-        .query("an unreadable query drops whole", "label:bug mentions:alice", []),
-        .query("an unclosed parenthesis drops whole", "(label:bug", []),
-        TranslationCase(name: "an unreadable query keeps the other fields", filter: ItemFilter(labelsAny: ["bug"], query: "author:"),
-                        expected: [#"label:"bug""#]),
+        // Locally an unreadable query matches nothing, so the kind is not searched at all, whatever else the filter says.
+        .query("an unreadable query matches nothing", "label:bug mentions:alice", nil),
+        .query("an unclosed parenthesis matches nothing", "(label:bug", nil),
+        TranslationCase(name: "an unreadable query beats the other fields", filter: ItemFilter(labelsAny: ["bug"], query: "author:"),
+                        expected: nil),
+        TranslationCase(name: "a typo on top of other fields", filter: ItemFilter(relations: [.authoredByMe], query: "mentions:x"),
+                        expected: nil),
         .query("an empty query", "   ", []),
     ]
 
@@ -242,7 +248,7 @@ struct PresetSearchQueryTests {
             let moment = start.addingTimeInterval(Double(step) * 900)
             for days in [0, 1, 2, 7, 30] {
                 let terms = PresetSearchQuery.filterTerms(for: ItemFilter(updatedWithinDays: days), kind: .pullRequest, now: moment)
-                let term = try #require(terms.first)
+                let term = try #require(terms?.first)
                 let day = try #require(parseInstant(String(term.dropFirst("updated:>=".count)) + "T00:00:00Z"))
                 let cutoff = moment.addingTimeInterval(-Double(days) * 86_400)
                 #expect(day.addingTimeInterval(12 * 3600) <= cutoff, "\(term) for \(days) days at \(moment)")
@@ -274,7 +280,7 @@ struct PresetSearchQueryTests {
 
     @Test("a preset without a filter sends only kind, state, the source, archived:false and the sort")
     func presetWithoutFilter() {
-        let terms = PresetSearchQuery.filterTerms(for: ItemFilter(), kind: .issue, now: now)
+        let terms = PresetSearchQuery.filterTerms(for: ItemFilter(), kind: .issue, now: now) ?? []
         let query = PresetSearchQuery.query(kind: .issue, sources: ["org:acme"], filterTerms: terms, sort: .lastActivity)
         #expect(query == "is:issue is:open org:acme archived:false sort:updated-desc")
     }
@@ -338,8 +344,13 @@ struct PresetSearchQueryLiveTests {
                 empty += 1
                 continue
             }
+            guard let terms = PresetSearchQuery.filterTerms(for: filter, kind: row.kind, now: now) else {
+                Issue.record("\(row.name): the translation says the kind is not searched, yet the local filter kept \(local.count) items")
+                failed += 1
+                continue
+            }
             let query = PresetSearchQuery.query(kind: row.kind, sources: LiveGitHub.sources,
-                                                filterTerms: PresetSearchQuery.filterTerms(for: filter, kind: row.kind, now: now),
+                                                filterTerms: terms,
                                                 sort: .lastActivity)
             let server = try await search(query, kind: row.kind, until: Set(local.map(\.url)))
             let absent = local.filter { !server.urls.contains($0.url) }

@@ -25,8 +25,13 @@ import GitwallCore
 enum PresetSearchQuery {
     /// The filter as top-level AND terms, each a complete piece of GitHub search syntax that can be left out on its own
     /// without making the query narrower. Kind, state, sources and sort are added by ``query(kind:sources:filterTerms:sort:)``.
-    static func filterTerms(for filter: ItemFilter, kind: ItemKind, now: Date) -> [String] {
-        node(for: filter, kind: kind, now: now).fragments
+    ///
+    /// Nil when the filter matches nothing of this kind locally (an `is:issue` in a pull request search, an `-is:open`, a
+    /// query that cannot be read): no search can be narrower than that, so the kind is not searched at all.
+    static func filterTerms(for filter: ItemFilter, kind: ItemKind, now: Date) -> [String]? {
+        let node = node(for: filter, kind: kind, now: now)
+        if case .never = node { return nil }
+        return node.fragments
     }
 
     static func sortQualifier(for order: GitwallCore.SortOrder) -> String {
@@ -112,8 +117,8 @@ enum PresetSearchQuery {
         guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .always }
         switch SearchQuery.parse(raw) {
         case .success(let query): return query.root.map { node(for: $0, kind: kind) } ?? .always
-        // An unreadable query matches nothing locally, so no search can be narrower than it: none of it is sent.
-        case .failure: return .always
+        // An unreadable query matches nothing locally, so the kind it is asked of is not searched at all.
+        case .failure: return .never
         }
     }
 
@@ -270,7 +275,7 @@ private indirect enum Node: Equatable {
         }
     }
 
-    /// The top-level AND terms. A filter that matches nothing locally sends no terms: any search is wide enough.
+    /// The top-level AND terms. ``PresetSearchQuery/filterTerms(for:kind:now:)`` answers nil for `.never` before it gets here.
     var fragments: [String] {
         switch self {
         case .always, .never: []

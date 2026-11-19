@@ -12,7 +12,7 @@ extension GitHubProvider {
         return capabilities
     }
 
-    /// One `ISSUE_ADVANCED` search per kind of the preset, over the scope's repositories or else every organization and
+    /// One `ISSUE_ADVANCED` search per kind of the preset that its filter can match, over the scope's repositories or else every organization and
     /// repository of the account, written by ``PresetSearchQuery``. A search too long for GitHub is split by its sources
     /// or, where even one source does not fit, widened by leaving out filter terms. Each search is paged up to
     /// ``GraphQLQueries/maxPresetSearchResults``, and only items from its own sources are kept, because GitHub drops a
@@ -51,7 +51,8 @@ extension GitHubProvider {
         var totalCount = 0
         var isComplete = true
         for kind in search.kinds.sorted(by: { $0.rawValue < $1.rawValue }) {
-            let terms = PresetSearchQuery.filterTerms(for: search.filter, kind: kind, now: now)
+            // A filter that matches nothing of this kind locally needs no search: no request, nothing missing.
+            guard let terms = PresetSearchQuery.filterTerms(for: search.filter, kind: kind, now: now) else { continue }
             for query in Self.presetQueries(kind: kind, sources: sources, filterTerms: terms, sort: search.sort) {
                 let result = try await run(query, kind: kind, account: account, token: token, endpoints: endpoints, teams: teams)
                 items += result.items.filter { seen.insert($0.id).inserted }
