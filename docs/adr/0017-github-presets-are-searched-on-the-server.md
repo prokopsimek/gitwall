@@ -267,8 +267,10 @@ The first rows ran over organizations of a real account and are given as counts 
 | `is:pr -is:pr` | every item, so `is:` chooses kind and state for the whole search |
 | `-author:` with a login GitHub does not know | 0, the whole search comes back empty |
 | `PresetSearchQueryLiveTests` with a token, over 60 pull requests and 200 issues of `cli/cli` (311 s) | 35 rows of the translation table. In 32 the local filter's result is a subset of GitHub's answer, 3 skipped (one row with `@me`, two with a milestone the repository lacks), none failed |
+| `PresetSearchQueryLiveTests` with the GitHub CLI's classic token (`repo`, `read:org`), over 126 pull requests and 208 issues of a public repository with milestones and two public repositories of the token's owner (594 s) | 46 rows. In 42 the local filter's result is a subset of GitHub's answer, none failed. The 12 rows with `@me` and the relations (each relation alone, all three as one OR group, `author:`, `review-requested:`, `assignee:` and `involves:@me`, `-author:@me`, `-assignee:@me`) each kept local items, 1 or 2, and 125 and 207 for the two exclusions. The two milestone rows kept 24 issues each. The two rows with a bot reviewer were skipped, because this data has no bot reviewer; they passed in the run over `cli/cli`. The query with terms that stay local (no `priority:P1` item in this data) and the unreadable query (nothing by design) kept no local item, so the table test is what covers them |
 | A preset search for pull requests, `first: 25` / for issues, `first: 100` | `rateLimit.cost` 1, about 5.7 s / cost 2, about 5 s |
 | `nodes(ids:)` with 100 ids, 80 issues and 20 pull requests of `cli/cli` | cost 5, 3.5 s, no node null |
+| `fetchItemStates` (`ItemStateLiveTests`) with 150 ids of open items a fetch had just returned, 75 pull requests and 75 issues, with the same token and repositories as the row above | two batches of 100, all 150 open and of the kind they were fetched as, none closed, missing or unanswered; 16.1 s |
 | `repo:cli/cli (is:pr` / `repo:cli/cli frobnicate:1` | 200, no `errors`, `issueCount` 0 |
 | Six levels of parentheses / a trailing `AND` | 200 with results |
 | A trailing `OR` | 502, twice, after about 11 s each |
@@ -278,6 +280,11 @@ The first rows ran over organizations of a real account and are given as counts 
 `ISSUE_ADVANCED` accepted six levels of parentheses where `SearchQuery` allows five, so the local parser is the stricter
 one. Gitwall sends none of the malformed queries above, and no query over 4000 characters (see *Failures* and *Length,
 paging and sources*).
+
+`PresetSearchQueryLiveTests` and `ItemStateLiveTests` run only with `GITWALL_GITHUB_TOKEN`. `GITWALL_GITHUB_REPO` takes
+several repositories separated by commas. The account learns the token owner with the same identity call the app makes,
+so `@me` and the relations mean the same person on both sides. A row whose local result is empty proves nothing and
+counts as "local 0", not as passed. Both print counts only.
 
 Paging, splitting, merging, selection, the lookup and the diff are covered by `PresetSearchQueryTests`,
 `PresetFetchTests`, `ItemStateTests`, `SyncSelectionTests`, `PresetResultMergeTests`, `PresetFreshnessTests`,
@@ -331,5 +338,4 @@ Open points, marked NEOVĚŘENO (not verified):
   for nothing.
 - NEOVĚŘENO: a search and a lookup with a fine-grained token. The documentation above does not cover GraphQL
   `ISSUE_ADVANCED` or `nodes(ids:)` by name. A live call of both with a fine-grained token settles it.
-- NEOVĚŘENO: the translation rows with `@me` against a real account; the live test skips them.
 - NEOVĚŘENO: whether GitHub Enterprise Server accepts `ISSUE_ADVANCED`, which would let it search per preset too.

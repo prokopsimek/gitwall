@@ -298,39 +298,47 @@ struct PresetSearchQueryTests {
 
 // MARK: - Against GitHub
 
-/// Checks the translation against GitHub itself. For every row, each item the local filter keeps out of the repository's
-/// open items must also be in GitHub's answer to the translated query. The values come from the repository's own data,
-/// so no login, label or milestone is written here; a row whose role has nobody in the data is reported as skipped, and
-/// rows with `@me` are left to the real account. The summary prints counts only.
+/// Checks the translation against GitHub itself. For every row, each item the local filter keeps out of the repositories'
+/// open items must also be in GitHub's answer to the translated query. The values come from the repositories' own data,
+/// so no login, label or milestone is written here; a row whose role has nobody in the data is reported as skipped. The
+/// rows with `@me` and the relations mean the token owner, whom the account learns the way the app does. A row whose
+/// local result is empty proves nothing and is reported as such, not as passed. Every line prints counts only.
 ///
 ///     GITWALL_GITHUB_TOKEN=$(gh auth token) swift test --package-path Packages/GitwallGitHub --filter PresetSearchQueryLiveTests
 ///
-/// `GITWALL_GITHUB_REPO` picks the repository, `cli/cli` by default. It takes a few minutes and reads public data only.
-@Suite("Preset search query against GitHub", .enabled(if: ProcessInfo.processInfo.environment["GITWALL_GITHUB_TOKEN"] != nil))
+/// `GITWALL_GITHUB_REPO` picks the repositories, several separated by commas, `cli/cli` by default. The `@me` rows need
+/// repositories where the token owner authored, is asked to review or is assigned an open item, and the milestone rows
+/// one whose open items are in a milestone. It takes a few minutes and reads only what the token can see.
+@Suite("Preset search query against GitHub", .enabled(if: LiveGitHub.isEnabled))
 struct PresetSearchQueryLiveTests {
-    private let token = ProcessInfo.processInfo.environment["GITWALL_GITHUB_TOKEN"] ?? ""
-    private let repo = ProcessInfo.processInfo.environment["GITWALL_GITHUB_REPO"].flatMap { $0.isEmpty ? nil : $0 } ?? "cli/cli"
+    private let token = LiveGitHub.token
     private let provider = GitHubProvider()
-    private let endpoints = GitHubEndpoints(baseURL: URL(string: "https://github.com")!)
+    private let endpoints = GitHubEndpoints(baseURL: LiveGitHub.baseURL)
 
     @Test("what the local filter keeps is a subset of what GitHub answers, row by row")
     func localIsSubsetOfServer() async throws {
-        let account = Account(kind: .github, baseURL: URL(string: "https://github.com")!, displayName: "GitHub",
-                              sources: [.repository(fullName: repo)])
+        let account = try await LiveGitHub.account(provider: provider)
         let now = Date()
         let items = try await provider.fetchItems(account: account, token: token, kinds: [.pullRequest, .issue])
-        let data = RepositoryData(repo: repo, items: items, bots: try await botLogins())
-        print("preset search live | \(repo) | \(data.pulls.count) pull requests, \(data.issues.count) issues")
-        #expect(!data.pulls.isEmpty, "\(repo) has no open pull requests to check against")
+        let data = RepositoryData(repositories: LiveGitHub.repositories, items: items, bots: try await botLogins())
+        print("preset search live | \(LiveGitHub.repositoryCount) | \(data.pulls.count) pull requests, \(data.issues.count) issues")
+        #expect(!data.pulls.isEmpty, "The repositories have no open pull requests to check against")
 
+        var passed = 0, empty = 0, skipped = 0, failed = 0
         for row in data.rows {
             guard let filter = row.filter else {
                 print("preset search live | \(row.name) | skipped: \(row.skipped)")
+                skipped += 1
                 continue
             }
             let local = FilterEngine.items(matching: Preset(name: row.name, kinds: [row.kind], filter: filter), in: items,
                                            accounts: [account], now: now)
-            let query = PresetSearchQuery.query(kind: row.kind, sources: ["repo:\(repo)"],
+            guard !local.isEmpty else {
+                print("preset search live | \(row.name) | local 0, nothing to compare")
+                empty += 1
+                continue
+            }
+            let query = PresetSearchQuery.query(kind: row.kind, sources: LiveGitHub.sources,
                                                 filterTerms: PresetSearchQuery.filterTerms(for: filter, kind: row.kind, now: now),
                                                 sort: .lastActivity)
             let server = try await search(query, kind: row.kind, until: Set(local.map(\.url)))
@@ -344,7 +352,9 @@ struct PresetSearchQueryLiveTests {
             print(line)
             #expect(missing.isEmpty, "\(row.name): GitHub's answer lacks \(missing.map(\.url.absoluteString))")
             #expect(server.otherKind == 0, "\(row.name): GitHub answered with the other kind of item")
+            if missing.isEmpty, server.otherKind == 0 { passed += 1 } else { failed += 1 }
         }
+        print("preset search live | summary | \(data.rows.count) rows | \(passed) passed | \(empty) local 0 | \(skipped) skipped | \(failed) failed")
     }
 
     // MARK: Requests
@@ -447,7 +457,7 @@ struct PresetSearchQueryLiveTests {
         } } }
         """
         var bots: Set<String> = []
-        for kind in ["is:pr", "is:issue"] {
+        for (repo, kind) in LiveGitHub.repositories.flatMap({ repo in ["is:pr", "is:issue"].map { (repo, $0) } }) {
             let response = try await provider.client.graphQL(BotPage.self, endpoint: endpoints.graphQL, token: token, query: document,
                                                              variables: ["q": "repo:\(repo) \(kind) is:open sort:updated-desc"])
             for node in response.data?.search.nodes.compactMap({ $0 }) ?? [] {
@@ -461,7 +471,7 @@ struct PresetSearchQueryLiveTests {
     }
 }
 
-/// The repository's open items and the real values the rows are built from.
+/// The repositories' open items and the real values the rows are built from.
 private struct RepositoryData {
     struct Row {
         let name: String
@@ -470,13 +480,14 @@ private struct RepositoryData {
         let skipped: String
     }
 
+    /// The first repository, for the row that names a repository and its owner in the query.
     let repo: String
     let pulls: [WorkItem]
     let issues: [WorkItem]
     let bots: Set<String>
 
-    init(repo: String, items: [WorkItem], bots: Set<String>) {
-        self.repo = repo
+    init(repositories: [String], items: [WorkItem], bots: Set<String>) {
+        repo = repositories.first ?? ""
         pulls = items.filter { $0.kind == .pullRequest }
         issues = items.filter { $0.kind == .issue }
         self.bots = bots
@@ -536,7 +547,19 @@ private struct RepositoryData {
 
         add("kind and state only, pull requests", ItemFilter())
         add("kind and state only, issues", kind: .issue, ItemFilter())
-        rows.append(Row(name: "relations and @me in the query", kind: .pullRequest, filter: nil, skipped: "@me needs the real account"))
+        // The token owner: the account's `me` locally, `@me` on GitHub.
+        add("relations authoredByMe", ItemFilter(relations: [.authoredByMe]))
+        add("relations reviewRequestedFromMe", ItemFilter(relations: [.reviewRequestedFromMe]))
+        add("relations assignedToMe, pull requests", ItemFilter(relations: [.assignedToMe]))
+        add("relations assignedToMe, issues", kind: .issue, ItemFilter(relations: [.assignedToMe]))
+        add("relations, all three as one OR group", ItemFilter(relations: Set(Relation.allCases)))
+        addQuery("query author:@me", "author:@me")
+        addQuery("query review-requested:@me", "review-requested:@me")
+        addQuery("query assignee:@me, pull requests", "assignee:@me")
+        addQuery("query assignee:@me, issues", kind: .issue, "assignee:@me")
+        addQuery("query involves:@me", "involves:@me")
+        addQuery("query -author:@me", "-author:@me")
+        addQuery("query -assignee:@me, issues", kind: .issue, "-assignee:@me")
         add("authorsAny, person", needs: "pull request author", author.map { ItemFilter(authorsAny: [$0]) })
         add("authorsAny, bot written with [bot]", needs: "bot author", botAuthor.map { ItemFilter(authorsAny: [$0 + "[bot]"]) })
         add("authorsNone, person", needs: "pull request author", author.map { ItemFilter(authorsNone: [$0]) })
