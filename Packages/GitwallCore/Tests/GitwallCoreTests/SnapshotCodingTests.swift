@@ -162,6 +162,42 @@ struct SnapshotCodingTests {
         ])
     }
 
+    // MARK: - Searched accounts
+
+    @Test("a snapshot written before searched accounts existed loads with none, so every account reads all its items")
+    func withoutSearchedAccounts() throws {
+        let json = """
+        {
+          "schemaVersion": 2,
+          "fetchedAt": "2026-09-10T06:35:00.000Z",
+          "items": [],
+          "accountStatus": {},
+          "presetResults": []
+        }
+        """
+        let snapshot = try SnapshotCoding.decode(Snapshot.self, from: Data(json.utf8))
+
+        #expect(snapshot.searchedAccounts.isEmpty)
+    }
+
+    @Test("searched accounts are written in the order of their ids and read back unchanged")
+    func searchedAccountsRoundTrip() throws {
+        let snapshot = Snapshot(fetchedAt: Date(timeIntervalSince1970: 1_800_000_000), items: [],
+                                searchedAccounts: [Self.accountB, Self.accountA])
+
+        let encoded = try SnapshotCoding.encode(snapshot)
+
+        let text = String(decoding: encoded, as: UTF8.self)
+        let first = try #require(text.range(of: Self.accountA.uuidString))
+        let second = try #require(text.range(of: Self.accountB.uuidString))
+        #expect(text.contains(#""searchedAccounts" : ["#))
+        #expect(first.lowerBound < second.lowerBound)
+        #expect(try SnapshotCoding.decode(Snapshot.self, from: encoded) == snapshot)
+        // The same set gives the same bytes every time, whatever order the set iterates in.
+        #expect(try SnapshotCoding.encode(Snapshot(fetchedAt: snapshot.fetchedAt, items: [],
+                                                   searchedAccounts: [Self.accountA, Self.accountB])) == encoded)
+    }
+
     @Test("work item id is stable and derived from account, repo, number and kind")
     func workItemID() throws {
         let snapshot = try SnapshotCoding.decode(Snapshot.self, from: Fixtures.data("snapshot.json"))

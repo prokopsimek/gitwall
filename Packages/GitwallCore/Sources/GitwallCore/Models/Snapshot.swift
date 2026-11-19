@@ -61,7 +61,8 @@ extension FetchStatus: Codable {
 
 /// Everything the widget needs, written by the app into the App Group container.
 public struct Snapshot: Hashable, Sendable {
-    /// 2 added ``presetResults``. A snapshot of version 1 has none and loads as it is, without a migration.
+    /// 2 added ``presetResults`` and ``searchedAccounts``. A snapshot of version 1 has neither and loads as it is,
+    /// without a migration.
     public static let currentSchemaVersion = 2
 
     public var schemaVersion: Int
@@ -71,25 +72,32 @@ public struct Snapshot: Hashable, Sendable {
     /// The last search per preset and account, for accounts that fetch each preset with its own search. Written in the
     /// order of preset, then account. Read one through ``result(for:account:)``, which applies the selection check.
     public var presetResults: [PresetResult]
+    /// Accounts whose items go by ``presetResults``: they fetched through preset searches in the sync that wrote the
+    /// snapshot, whatever came of the searches. Every other account fetched all its items, and its results, if it has
+    /// any, say nothing about what a preset shows. Readers learn this here and never from the provider kind, because
+    /// the widget has no providers. Written in the order of the ids.
+    public var searchedAccounts: Set<UUID>
 
     public init(
         schemaVersion: Int = Snapshot.currentSchemaVersion,
         fetchedAt: Date,
         items: [WorkItem],
         accountStatus: [UUID: FetchStatus] = [:],
-        presetResults: [PresetResult] = []
+        presetResults: [PresetResult] = [],
+        searchedAccounts: Set<UUID> = []
     ) {
         self.schemaVersion = schemaVersion
         self.fetchedAt = fetchedAt
         self.items = items
         self.accountStatus = accountStatus
         self.presetResults = presetResults
+        self.searchedAccounts = searchedAccounts
     }
 }
 
 extension Snapshot: Codable {
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, fetchedAt, items, accountStatus, presetResults
+        case schemaVersion, fetchedAt, items, accountStatus, presetResults, searchedAccounts
     }
 
     public init(from decoder: Decoder) throws {
@@ -110,6 +118,7 @@ extension Snapshot: Codable {
         }
         accountStatus = status
         presetResults = try container.decodeIfPresent([PresetResult].self, forKey: .presetResults) ?? []
+        searchedAccounts = Set(try container.decodeIfPresent([UUID].self, forKey: .searchedAccounts) ?? [])
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -120,6 +129,7 @@ extension Snapshot: Codable {
         let raw = Dictionary(uniqueKeysWithValues: accountStatus.map { ($0.key.uuidString, $0.value) })
         try container.encode(raw, forKey: .accountStatus)
         try container.encode(presetResults.sorted(by: PresetResult.precedes), forKey: .presetResults)
+        try container.encode(searchedAccounts.sorted { $0.uuidString < $1.uuidString }, forKey: .searchedAccounts)
     }
 }
 

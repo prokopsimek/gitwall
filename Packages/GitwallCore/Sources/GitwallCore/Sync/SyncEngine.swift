@@ -6,6 +6,8 @@ public struct SyncResult: Sendable {
     public let previous: Snapshot?
     /// What the preset searches of this sync found out, for ``SnapshotDiff/changes(from:to:accounts:searches:)``.
     public let searches: SearchFindings
+    /// The counts this sync wrote to the log; nil for a sync without a selection, which writes none.
+    let report: SyncReport?
 }
 
 /// Fetches every configured account through its provider and writes the merged snapshot.
@@ -15,7 +17,11 @@ public struct SyncResult: Sendable {
 /// Preset results carry over from the previous snapshot, except those of deleted presets and removed accounts, and so do
 /// the items they hold. With a ``SyncSelection``, an account whose provider searches presets on the server searches only
 /// the selected presets, asks the provider what became of the items that left those results, and reports what it
-/// learned in ``SyncResult/searches``; see ``sync(selection:)``.
+/// learned in ``SyncResult/searches``; see ``sync(selection:)``. ``syncPresets(_:)`` fetches presets a window opens
+/// the same way, between syncs.
+///
+/// One sync or on-demand fetch runs at a time. Each reads the snapshot, waits for its providers and writes the snapshot
+/// back, and the actor alone would let another one start during those waits and lose what the first one wrote.
 public actor SyncEngine {
     /// Failed syncs in a row, for a passing reason, that an account rides out without showing an error.
     private static let quietFailures = 2
@@ -25,6 +31,16 @@ public actor SyncEngine {
     private let configStore: ConfigStore
     private let snapshotStore: SnapshotStore
     private let now: @Sendable () -> Date
+
+    /// Whether a sync or an on-demand fetch has its turn now.
+    private var isRunning = false
+    /// Calls waiting for their turn, in the order they came.
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    /// The on-demand fetch that waits for its turn, which every later request joins until the turn comes.
+    private var pendingFetch: PendingFetch?
+    /// Calls to ``sync(selection:)`` and ``syncPresets(_:)`` so far, counted as they arrive and before they wait; lets
+    /// tests line up concurrent calls.
+    private(set) var callCount = 0
 
     public init(
         providers: [ProviderKind: any GitProvider],
@@ -58,8 +74,14 @@ public actor SyncEngine {
     /// - The project priorities are looked up once, over everything the searches found and the lookup refreshed.
     /// - An item stays in the snapshot only while a search returned it or a preset result holds it.
     ///
-    /// Each sync with a selection writes one line of counts to the unified log.
+    /// The searching accounts become the snapshot's ``Snapshot/searchedAccounts``; a sync without a selection names none.
+    /// It waits while another sync or an on-demand fetch runs. Each sync with a selection writes one line of counts to
+    /// the unified log.
     public func sync(selection: SyncSelection? = nil) async throws -> SyncResult {
+        callCount += 1
+        await takeTurn()
+        defer { endTurn() }
+
         let clock = ContinuousClock()
         let start = clock.now
         let config = try configStore.load()
@@ -67,73 +89,127 @@ public actor SyncEngine {
         let timestamp = now()
 
         let plans = config.accounts.map { ($0, plan(for: $0, in: config, selection: selection)) }
-        let outcomes = await withTaskGroup(of: AccountOutcome.self, returning: [AccountOutcome].self) { group in
-            for (account, plan) in plans {
-                let before = Before(account: account, previous: previous)
-                group.addTask {
-                    switch plan {
-                    case .everything(let kinds):
-                        await self.fetch(account: account, kinds: kinds, before: before, timestamp: timestamp)
-                    case .presets(let queries, let provider):
-                        await self.search(account: account, queries: queries, provider: provider, before: before,
-                                          timestamp: timestamp)
-                    }
-                }
-            }
-            var collected: [AccountOutcome] = []
-            for await outcome in group { collected.append(outcome) }
-            return collected
-        }
-
-        var items: [WorkItem] = []
+        let outcomes = await outcomes(of: plans, previous: previous, timestamp: timestamp)
+        let merged = Merged(outcomes, config: config, previous: previous, timestamp: timestamp)
         var status: [UUID: FetchStatus] = [:]
-        var presetOutcomes: [PresetOutcome] = []
-        var findings = SearchFindings.none
-        var gone: Set<String> = []
-        var refreshed: [String: WorkItem] = [:]
-        for outcome in outcomes {
-            items.append(contentsOf: outcome.items)
-            status[outcome.accountID] = outcome.status
-            presetOutcomes.append(contentsOf: outcome.presets)
-            if outcome.searched { findings.accounts.insert(outcome.accountID) }
-            findings.comparedItemIDs.formUnion(outcome.compared)
-            findings.closedItemIDs.formUnion(outcome.lookup.closed)
-            gone.formUnion(outcome.lookup.gone)
-            for item in outcome.lookup.refreshed { refreshed[item.id] = item }
-        }
-
-        let presetIDs = Set(config.presets.map(\.id))
-        let accountIDs = Set(config.accounts.map(\.id))
-        let carried = (previous?.presetResults ?? []).filter {
-            presetIDs.contains($0.presetID) && accountIDs.contains($0.accountID)
-        }
-        let presetResults = PresetResult.merged(carried, with: presetOutcomes, at: timestamp).map {
-            Self.removing(gone, from: $0)
-        }
-        // A refreshed item takes the place of its previous copy, and stays only where a result still holds it.
-        let earlier = (previous?.items ?? []).map { refreshed[$0.id] ?? $0 }
-        let kept = Self.items(items, keepingFrom: earlier, heldBy: presetResults)
+        for outcome in outcomes { status[outcome.accountID] = outcome.status }
 
         let snapshot = Snapshot(
             fetchedAt: timestamp,
-            items: FilterEngine.sort(kept, by: .lastActivity),
+            items: merged.items,
             accountStatus: status,
-            presetResults: presetResults
+            presetResults: merged.results,
+            searchedAccounts: merged.findings.accounts
         )
         try snapshotStore.save(snapshot)
-        if let selection {
-            SyncReport(
-                selection: selection,
-                searches: outcomes.reduce(0) { $0 + $1.searches },
-                requests: outcomes.reduce(0) { $0 + $1.requests },
-                items: snapshot.items.count,
-                duration: clock.now - start
-            ).write()
+        let report = selection.map { selection in
+            SyncReport(selection: selection, searches: outcomes.reduce(0) { $0 + $1.searches },
+                       requests: outcomes.reduce(0) { $0 + $1.requests }, items: snapshot.items.count,
+                       duration: clock.now - start)
         }
-        return SyncResult(snapshot: snapshot, previous: previous, searches: findings)
+        report?.write()
+        return SyncResult(snapshot: snapshot, previous: previous, searches: merged.findings, report: report)
+    }
+
+    /// Fetches `presetIDs` now, for a window that opens them, and writes the snapshot.
+    ///
+    /// Each account whose provider answers ``ProviderCapabilities/presetSearch`` for it searches the given presets that
+    /// exist and are in its scope, in the order of the configuration, exactly as ``sync(selection:)`` searches selected
+    /// ones: the same refused queries, the same lookup of the items that left a fresh result, the same priorities,
+    /// results and items, and the same ``SyncResult/searches`` for the diff and the notifications, so a preset's first
+    /// result reports nothing. What differs:
+    /// - No account's ``FetchStatus`` changes, whatever the searches come to. This is no sync of the account: it neither
+    ///   counts in the quiet period nor shows an error. An account error leaves the presets the account did not fetch
+    ///   yet as they were and only counts in the log line.
+    /// - Every other account is asked nothing and keeps its items, and so does a searching account that none of the
+    ///   presets covers.
+    /// - ``Snapshot/fetchedAt`` stays as it was, and ``Snapshot/searchedAccounts`` gains the accounts that searched.
+    ///
+    /// It waits while a sync or another on-demand fetch runs. Requests that wait at the same time run as one fetch of
+    /// all their presets, and each of them gets that fetch's result. Each fetch writes one line of counts to the
+    /// unified log, marked as on demand.
+    public func syncPresets(_ presetIDs: [UUID]) async throws -> SyncResult {
+        callCount += 1
+        if pendingFetch != nil {
+            pendingFetch?.presetIDs.formUnion(presetIDs)
+            return try await withCheckedThrowingContinuation { pendingFetch?.callers.append($0) }
+        }
+        pendingFetch = PendingFetch(presetIDs: Set(presetIDs))
+        await takeTurn()
+        defer { endTurn() }
+        // From here on a new request waits for the next turn instead of joining this fetch.
+        guard let fetch = pendingFetch else { preconditionFailure("The fetch waiting for its turn was taken by another") }
+        pendingFetch = nil
+
+        let result: Result<SyncResult, any Error>
+        do {
+            result = .success(try await fetchPresets(fetch.presetIDs))
+        } catch {
+            result = .failure(error)
+        }
+        for caller in fetch.callers { caller.resume(with: result) }
+        return try result.get()
+    }
+
+    // MARK: - Turns
+
+    /// An on-demand fetch waiting for its turn: every preset asked for so far, and the requests that joined it.
+    private struct PendingFetch {
+        var presetIDs: Set<UUID>
+        var callers: [CheckedContinuation<SyncResult, any Error>] = []
+    }
+
+    /// Returns once nothing else runs, in the order the calls came.
+    private func takeTurn() async {
+        guard isRunning else {
+            isRunning = true
+            return
+        }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    /// Hands the turn straight to the next waiting call, so that nothing can start in between.
+    private func endTurn() {
+        guard !waiting.isEmpty else {
+            isRunning = false
+            return
+        }
+        waiting.removeFirst().resume()
     }
 
     // MARK: - Internals
+
+    /// See ``syncPresets(_:)``.
+    private func fetchPresets(_ presetIDs: Set<UUID>) async throws -> SyncResult {
+        let clock = ContinuousClock()
+        let start = clock.now
+        let config = try configStore.load()
+        let previous = try snapshotStore.load()
+        let timestamp = now()
+
+        let presets = config.presets.filter { presetIDs.contains($0.id) }
+        let plans = config.accounts.compactMap { account in onDemandPlan(for: account, presets: presets).map { (account, $0) } }
+        let outcomes = await outcomes(of: plans, previous: previous, timestamp: timestamp)
+        let merged = Merged(outcomes, config: config, previous: previous, timestamp: timestamp)
+        let accountIDs = Set(config.accounts.map(\.id))
+
+        let snapshot = Snapshot(
+            // A few presets were fetched, not the accounts, so the date of the data and every status stay as they were.
+            fetchedAt: previous?.fetchedAt ?? timestamp,
+            items: merged.items,
+            accountStatus: (previous?.accountStatus ?? [:]).filter { accountIDs.contains($0.key) },
+            presetResults: merged.results,
+            searchedAccounts: (previous?.searchedAccounts ?? []).intersection(accountIDs).union(merged.findings.accounts)
+        )
+        try snapshotStore.save(snapshot)
+        let report = SyncReport(
+            onDemand: presets.count, failedAccounts: outcomes.filter(\.failed).count,
+            searches: outcomes.reduce(0) { $0 + $1.searches }, requests: outcomes.reduce(0) { $0 + $1.requests },
+            items: snapshot.items.count, duration: clock.now - start
+        )
+        report.write()
+        return SyncResult(snapshot: snapshot, previous: previous, searches: merged.findings, report: report)
+    }
 
     /// How an account is fetched in one sync.
     private enum Plan: Sendable {
@@ -150,16 +226,93 @@ public actor SyncEngine {
     }
 
     private func plan(for account: Account, in config: AppConfig, selection: SyncSelection?) -> Plan {
-        guard let selection, let provider = providers[account.kind], provider.capabilities(for: account).presetSearch else {
+        guard let selection, let provider = presetSearcher(for: account) else {
             return .everything(Self.kindsNeeded(for: account, presets: config.presets))
         }
-        let queries = selection.presetIDs.compactMap { id -> PresetQuery? in
-            guard let preset = config.preset(id: id), let search = PresetSearch(preset: preset, accountID: account.id) else {
-                return nil
-            }
-            return PresetQuery(preset: preset, search: search)
+        return .presets(Self.queries(for: selection.presetIDs.compactMap(config.preset(id:)), in: account), provider)
+    }
+
+    /// The searches of `presets` in an account whose provider searches presets. Nil for every other account, and for
+    /// one that none of the presets covers: an on-demand fetch asks them nothing.
+    private func onDemandPlan(for account: Account, presets: [Preset]) -> Plan? {
+        guard let provider = presetSearcher(for: account) else { return nil }
+        let queries = Self.queries(for: presets, in: account)
+        return queries.isEmpty ? nil : .presets(queries, provider)
+    }
+
+    /// The provider of `account` when it searches each preset on the server for this account.
+    private func presetSearcher(for account: Account) -> (any GitProvider)? {
+        guard let provider = providers[account.kind], provider.capabilities(for: account).presetSearch else { return nil }
+        return provider
+    }
+
+    /// What each of `presets` that covers `account` searches there, in their order.
+    private static func queries(for presets: [Preset], in account: Account) -> [PresetQuery] {
+        presets.compactMap { preset in
+            PresetSearch(preset: preset, accountID: account.id).map { PresetQuery(preset: preset, search: $0) }
         }
-        return .presets(queries, provider)
+    }
+
+    /// Fetches every account of `plans` at the same time.
+    private func outcomes(of plans: [(Account, Plan)], previous: Snapshot?, timestamp: Date) async -> [AccountOutcome] {
+        await withTaskGroup(of: AccountOutcome.self, returning: [AccountOutcome].self) { group in
+            for (account, plan) in plans {
+                let before = Before(account: account, previous: previous)
+                group.addTask {
+                    switch plan {
+                    case .everything(let kinds):
+                        await self.fetch(account: account, kinds: kinds, before: before, timestamp: timestamp)
+                    case .presets(let queries, let provider):
+                        await self.search(account: account, queries: queries, provider: provider, before: before,
+                                          timestamp: timestamp)
+                    }
+                }
+            }
+            var collected: [AccountOutcome] = []
+            for await outcome in group { collected.append(outcome) }
+            return collected
+        }
+    }
+
+    /// The snapshot's items and preset results once the accounts of `outcomes` fetched, and what their searches found
+    /// out. An account of the configuration without an outcome was asked nothing and keeps its items as they were.
+    private struct Merged {
+        let items: [WorkItem]
+        let results: [PresetResult]
+        let findings: SearchFindings
+
+        init(_ outcomes: [AccountOutcome], config: AppConfig, previous: Snapshot?, timestamp: Date) {
+            var fresh: [WorkItem] = []
+            var presetOutcomes: [PresetOutcome] = []
+            var findings = SearchFindings.none
+            var gone: Set<String> = []
+            var refreshed: [String: WorkItem] = [:]
+            for outcome in outcomes {
+                fresh.append(contentsOf: outcome.items)
+                presetOutcomes.append(contentsOf: outcome.presets)
+                if outcome.searched { findings.accounts.insert(outcome.accountID) }
+                findings.comparedItemIDs.formUnion(outcome.compared)
+                findings.closedItemIDs.formUnion(outcome.lookup.closed)
+                gone.formUnion(outcome.lookup.gone)
+                for item in outcome.lookup.refreshed { refreshed[item.id] = item }
+            }
+            let asked = Set(outcomes.map(\.accountID))
+            let untouched = Set(config.accounts.map(\.id)).subtracting(asked)
+            fresh += (previous?.items ?? []).filter { untouched.contains($0.accountID) }
+
+            let presetIDs = Set(config.presets.map(\.id))
+            let accountIDs = Set(config.accounts.map(\.id))
+            let carried = (previous?.presetResults ?? []).filter {
+                presetIDs.contains($0.presetID) && accountIDs.contains($0.accountID)
+            }
+            results = PresetResult.merged(carried, with: presetOutcomes, at: timestamp).map {
+                SyncEngine.removing(gone, from: $0)
+            }
+            // A refreshed item takes the place of its previous copy, and stays only where a result still holds it.
+            let earlier = (previous?.items ?? []).map { refreshed[$0.id] ?? $0 }
+            items = FilterEngine.sort(SyncEngine.items(fresh, keepingFrom: earlier, heldBy: results), by: .lastActivity)
+            self.findings = findings
+        }
     }
 
     private struct AccountOutcome: Sendable {
@@ -169,11 +322,14 @@ public actor SyncEngine {
         let status: FetchStatus?
         /// What each preset search of the account came to.
         var presets: [PresetOutcome] = []
-        /// Preset searches sent, a repeat after a token refresh included, and the requests the successful ones took.
+        /// Preset searches sent, a repeat after a token refresh included.
         var searches = 0
+        /// Requests the successful searches took, and those of the item state lookup.
         var requests = 0
         /// Whether the account fetched through preset searches, whatever came of them.
         var searched = false
+        /// Whether an account error stopped the fetch, its token could not be read included.
+        var failed = false
         /// Items held by a result fetched now whose pair had an earlier result of the same selection.
         var compared: Set<String> = []
         /// What the provider said about the items that left a fresh result.
@@ -188,6 +344,9 @@ public actor SyncEngine {
         var gone: Set<String> = []
         /// Still open, with the provider's current data and, once the priorities are read, theirs.
         var refreshed: [WorkItem] = []
+        /// One for a lookup that was sent, answered or not. The provider does not say how many HTTP requests it split
+        /// the lookup into, so a lookup counts as one.
+        var requests = 0
     }
 
     /// What an account showed before this sync, which a failed fetch keeps.
@@ -348,7 +507,7 @@ public actor SyncEngine {
 
     private func fetch(account: Account, kinds: Set<ItemKind>, before: Before, timestamp: Date) async -> AccountOutcome {
         func failure(_ status: FetchStatus) -> AccountOutcome {
-            AccountOutcome(accountID: account.id, items: before.items, status: status)
+            AccountOutcome(accountID: account.id, items: before.items, status: status, failed: true)
         }
 
         let token: String
@@ -412,7 +571,7 @@ public actor SyncEngine {
         case .failed(let status):
             let presets = queries.map { PresetOutcome(preset: $0.preset, accountID: account.id, kind: .accountFailed) }
             return AccountOutcome(accountID: account.id, items: before.items, status: status, presets: presets,
-                                  searched: true)
+                                  searched: true, failed: true)
         }
 
         var found: [WorkItem] = []
@@ -484,7 +643,7 @@ public actor SyncEngine {
             // Nothing is looked up: the account failed, and it keeps every item it had anyway.
             return AccountOutcome(accountID: account.id, items: items, status: before.failed(by: accountError),
                                   presets: presets, searches: searches, requests: requests, searched: true,
-                                  compared: compared)
+                                  failed: true, compared: compared)
         }
         // Searches refused on their own say nothing about the account.
         guard fetchedAny else {
@@ -505,7 +664,7 @@ public actor SyncEngine {
             status: FetchStatus(state: .ok, lastSuccessAt: timestamp, message: nil, projectAccess: access),
             presets: presets,
             searches: searches,
-            requests: requests,
+            requests: requests + lookup.requests,
             searched: true,
             compared: compared,
             lookup: lookup
@@ -528,9 +687,9 @@ public actor SyncEngine {
                 Could not look up \(items.count, privacy: .public) items that left a preset result; \
                 they stay only where another result holds them
                 """)
-            return ItemLookup()
+            return ItemLookup(requests: 1)
         }
-        var lookup = ItemLookup()
+        var lookup = ItemLookup(requests: 1)
         for item in items {
             switch states[item.id] {
             case .closed, .merged:
