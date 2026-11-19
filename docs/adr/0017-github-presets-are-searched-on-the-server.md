@@ -189,8 +189,11 @@ lists, and answers with an `ItemState`:
 
 `SearchFindings` carries this to `SnapshotDiff.changes(from:to:accounts:searches:)`. For a searching account, an item
 that left the snapshot is `.closed` only when the lookup confirmed it. An item that joined is news only when a result
-fetched now had an earlier result of the same selection. The first result of a pair, the first sync after this change
-and the first search after a preset was edited are a baseline. They send no notification and set no "new" dot.
+fetched now had an earlier result of the same selection, and even then it is a new item only when it was opened after
+the previous sync, less ten minutes because GitHub's search index can lag. An older item joined because it started to
+match, through a review request, a label or recent activity, so it reports only a review request for me, if there is
+one. The first result of a pair, the first sync after this change and the first search after a preset was edited are a
+baseline. They send no notification and set no "new" dot.
 Accounts that download everything keep the old rules of the diff, except that the first full download after searching
 is a baseline too: it reaches neither all nor only what the searches found, so what it adds or leaves out reports
 nothing, a closed item included.

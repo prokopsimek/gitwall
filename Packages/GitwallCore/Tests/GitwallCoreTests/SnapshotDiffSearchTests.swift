@@ -13,14 +13,20 @@ struct SnapshotDiffSearchTests {
     let enterprise = Account(kind: .github, baseURL: URL(string: "https://github.acme.test")!, displayName: "Acme",
                              me: UserRef(login: "me"))
 
+    /// - Parameter created: When the item was opened; `now`, the moment the previous snapshot was fetched, by default.
     private func item(
         _ number: Int, in account: Account? = nil, review: ReviewState = .none, ci: CIState = .none,
-        labels: [String] = [], requested: [String] = []
+        labels: [String] = [], requested: [String] = [], created: Date? = nil
     ) -> WorkItem {
         WorkItem(accountID: (account ?? github).id, kind: .pullRequest, repoFullName: "acme/app", number: number,
                  title: "Item \(number)", url: URL(string: "https://example.com/\(number)")!, author: UserRef(login: "x"),
-                 createdAt: now, updatedAt: now, labels: labels.map { Label(name: $0) }, reviewState: review, ciState: ci,
-                 requestedReviewers: requested.map { UserRef(login: $0) })
+                 createdAt: created ?? now, updatedAt: now, labels: labels.map { Label(name: $0) }, reviewState: review,
+                 ciState: ci, requestedReviewers: requested.map { UserRef(login: $0) })
+    }
+
+    /// A moment that long before `now`, when the previous snapshot was fetched.
+    private func before(days: Double = 0, minutes: Double = 0) -> Date {
+        now.addingTimeInterval(-(days * 86_400 + minutes * 60))
     }
 
     /// A sync in which the GitHub.com account searched presets.
@@ -61,6 +67,40 @@ struct SnapshotDiffSearchTests {
     func newInAComparedResult() {
         let new = item(2, requested: ["me"])
         #expect(events([item(1)], [item(1), new], searched(compared: [new])) == [2: [.newItem, .reviewRequested]])
+    }
+
+    @Test("an old item that enters a compared result because my review was requested reports only the review request")
+    func oldItemWithAReviewRequest() {
+        // Opened three months before the previous sync; the request is what brought it into the search.
+        let old = item(2, requested: ["me"], created: before(days: 90))
+        #expect(events([item(1)], [item(1), old], searched(compared: [old])) == [2: [.reviewRequested]])
+    }
+
+    @Test("an old item that enters a compared result without asking me, by a label or recent activity, sends nothing")
+    func oldItemThatStartedToMatch() {
+        let old = item(2, labels: ["urgent"], created: before(days: 90))
+        #expect(events([item(1)], [item(1), old], searched(compared: [old])).isEmpty)
+    }
+
+    @Test("an item opened up to ten minutes before the previous sync is still new, because GitHub's search index can lag")
+    func searchIndexLag() {
+        let late = item(2, created: before(minutes: 5))
+        let older = item(3, created: before(minutes: 11))
+        #expect(events([item(1)], [item(1), late, older], searched(compared: [late, older])) == [2: [.newItem]])
+    }
+
+    @Test("an item opened after the previous sync in a compared result is new, with its review request")
+    func openedSinceThePreviousSync() {
+        let fresh = item(2, requested: ["me"], created: now.addingTimeInterval(5 * 60))
+        #expect(events([item(1)], [item(1), fresh], searched(compared: [fresh])) == [2: [.newItem, .reviewRequested]])
+    }
+
+    @Test("an old item new to the snapshot of an account that downloads everything is still a new item")
+    func oldItemOfAnAccountThatDownloadsEverything() {
+        let current = [item(4, in: gitlab, created: before(days: 90)),
+                       item(5, in: enterprise, requested: ["me"], created: before(days: 90))]
+        #expect(events([], current, searched()) == [4: [.newItem], 5: [.newItem, .reviewRequested]])
+        #expect(events([], [item(6, created: before(days: 90))], .none) == [6: [.newItem]])
     }
 
     @Test("an item in both snapshots of a searched account gets today's events: a review changes, a label does not")
