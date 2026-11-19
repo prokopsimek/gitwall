@@ -225,8 +225,8 @@ struct GraphQLFetchTests {
 
 /// GitHub.com sends each preset's own query to `ISSUE_ADVANCED` search, one item kind per query. Pull requests
 /// come 25 per page because 100 took GitHub ten seconds and ended in 502; issues stay at 100.
-@Suite("Preset search query")
-struct PresetSearchQueryTests {
+@Suite("Preset search document")
+struct PresetSearchDocumentTests {
     @Test("pull requests are searched 25 per page with only the pull request fragment")
     func pullRequests() {
         let query = GraphQLQueries.presetSearch(kind: .pullRequest)
