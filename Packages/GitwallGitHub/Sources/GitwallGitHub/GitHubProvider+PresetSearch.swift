@@ -29,15 +29,16 @@ extension GitHubProvider {
 
         // Every request of this fetch passes the counter: repeats after a gateway error and the team lookup too.
         let counter = RequestCounter(transport: client.transport)
-        let counted = GitHubProvider(client: GitHubClient(transport: counter, userAgent: client.userAgent, sleep: client.sleep))
+        let counted = GitHubProvider(client: GitHubClient(transport: counter, userAgent: client.userAgent, sleep: client.sleep), teamCache: teamCache)
         let found = try await counted.searchPreset(search, sources: sources, account: account, token: token, now: Date())
         return PresetFetch(items: found.items, totalCount: found.totalCount, isComplete: found.isComplete,
                            requests: await counter.count)
     }
 
     /// A provider that sends through `client`.
-    private init(client: GitHubClient) {
+    private init(client: GitHubClient, teamCache: TeamSlugCache) {
         self.client = client
+        self.teamCache = teamCache
     }
 
     private func searchPreset(

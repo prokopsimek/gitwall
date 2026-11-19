@@ -140,7 +140,10 @@ so excluding either on the server could hide what the preset shows.
   of 100 says there is no next page, and a request with its cursor returns no nodes.
 - Only items from the search's own sources are kept. When GitHub knows none of the sources of the OR group, it drops
   the group and searches all of GitHub.
-- Review requests addressed to a team are resolved once per `fetchPresetItems`, as `fetchItems` does once per fetch.
+- Review requests addressed to a team are resolved at most once per `fetchPresetItems`, `fetchItemStates` and
+  `fetchItems`, and a clean answer is also kept by the provider for five minutes per account and token
+  (`TeamSlugCache`), so the presets of one sync and their item-state lookups send one team query per account
+  instead of one each. A refused or partial answer is not kept and the next call asks again.
 
 ### A result per preset and account
 
@@ -360,7 +363,7 @@ Open points, marked NEOVĚŘENO (not verified):
 
 - NEOVĚŘENO: the cap of 1000 with pull requests in pages of 25, at the 40th page. It was checked with issues in pages
   of 100 (see *Checked against GitHub*).
-- NEOVĚŘENO: the GraphQL rate-limit cost of the team lookup that each preset fetch runs once. A preset search and a
+- NEOVĚŘENO: the GraphQL rate-limit cost of the team lookup, which runs once per account and five minutes. A preset search and a
   `nodes(ids:)` batch were measured (see *Checked against GitHub*).
 - NEOVĚŘENO: a sync cancelled while it waits for a retry writes `error` with a cancellation message for the account,
   as a sync cancelled during a request did before; whether this ever shows on screen.

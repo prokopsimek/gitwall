@@ -43,8 +43,11 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   already leaves archived projects out by default.
 - A GitHub review request addressed to a team resolves to the token owner when they are in that team. The
   membership query (`GraphQLQueries.viewerTeams`, classic tokens need `read:org`) runs at most once per
-  `fetchItems`, and only for a batch that actually contains a team request; a refusal is logged and leaves the
-  queue as it was.
+  `fetchItems`, `fetchPresetItems` or `fetchItemStates`, and only for a batch that actually contains a team request.
+  `GitHubProvider` also keeps a clean answer (`TeamSlugCache`, per account and token, five minutes), so preset
+  searches and item-state lookups of one sync share a single query per account. A refusal or an answer with errors
+  is not kept, so the next call asks again; it is logged by the number and types of the errors or the type of the
+  thrown error, never GitHub's text, which can name an organization.
 - Priority (`WorkItem.priority`) is the GitHub Projects field `Priority` (`projectPriority`), else the most urgent
   `p0`–`p3` label. The project value comes from `GitProvider.projectPriorities`, a separate request after
   `fetchItems` that never throws and never fails the sync: a refused scope is `.missingPermission`
