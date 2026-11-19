@@ -836,8 +836,13 @@ final class AppEnvironment {
         guard let preset else { return .empty(.noPresets) }
         // A preset without a count shows a spinner while its fetch runs and otherwise why it has nothing, also when
         // another of its parts, as from GitLab, has items, as the widget and the wall do; any other shows its last items.
-        switch PresetCountPresentation.listPlaceholder(presetCount(for: preset), isFetching: fetchingPresetIDs.contains(preset.id)) {
+        // While there is no snapshot or a regular sync runs, it is loading instead, as the sync may still fetch it.
+        switch PresetCountPresentation.listPlaceholder(
+            presetCount(for: preset), isFetching: fetchingPresetIDs.contains(preset.id),
+            isSyncing: snapshot == nil || isRefreshing
+        ) {
         case .fetching: return .fetching
+        case .loading: return .empty(.loading)
         case .waitingForSync: return .empty(.waitingForSync(presetID: preset.id))
         case .queryFailed: return .empty(.queryFailed(presetID: preset.id))
         case nil: break

@@ -51,6 +51,9 @@ public struct PresetCountPresentation: Equatable, Sendable {
     public enum ListPlaceholder: Equatable, Sendable {
         /// Nothing of the preset was fetched yet and a fetch runs: a spinner.
         case fetching
+        /// Nothing of the preset was fetched yet, and the app has no snapshot or a regular sync runs, which may still
+        /// bring the preset's result: "Loading…", without a way to try again.
+        case loading
         /// Nothing of the preset was fetched yet and none runs: "Waiting for sync", with a way to try again.
         case waitingForSync
         /// The query failed before the preset was ever fetched: "Query failed", with a way to try again.
@@ -59,10 +62,15 @@ public struct PresetCountPresentation: Equatable, Sendable {
 
     /// What the list of a preset shows instead of its items: nil when the preset has a count, so its items are listed,
     /// also after a failed query that follows a result. A preset without a count lists nothing, even when one of its
-    /// parts has items (a preset over GitLab and GitHub), as a widget and a wall tile do.
-    public static func listPlaceholder(_ display: PresetCountDisplay, isFetching: Bool) -> ListPlaceholder? {
+    /// parts has items (a preset over GitLab and GitHub), as a widget and a wall tile do. While the app is syncing
+    /// (`isSyncing`: no snapshot yet, or a regular sync runs), a preset without a count is loading rather than waiting
+    /// or failed, as the sync may still fetch it.
+    public static func listPlaceholder(
+        _ display: PresetCountDisplay, isFetching: Bool, isSyncing: Bool = false
+    ) -> ListPlaceholder? {
         guard display.count == nil else { return nil }
         if isFetching { return .fetching }
+        if isSyncing { return .loading }
         return display.failure != nil ? .queryFailed : .waitingForSync
     }
 

@@ -137,6 +137,21 @@ struct PresetCountPresentationTests {
         #expect(PresetCountPresentation.listPlaceholder(failed, isFetching: true) == .fetching)
     }
 
+    @Test("while the app has no snapshot or a regular sync runs, a preset without a count is loading, not waiting")
+    func listPlaceholderWhileSyncing() {
+        let waiting = display(count: 0, fetchedAt: nil, hasResult: false)
+        let failed = display(count: 0, fetchedAt: nil, failedAt: minutes(-1))
+        let counted = display(count: 12, fetchedAt: minutes(-5))
+
+        #expect(PresetCountPresentation.listPlaceholder(waiting, isFetching: false, isSyncing: true) == .loading)
+        #expect(PresetCountPresentation.listPlaceholder(failed, isFetching: false, isSyncing: true) == .loading)
+        #expect(PresetCountPresentation.listPlaceholder(waiting, isFetching: true, isSyncing: true) == .fetching)
+        #expect(PresetCountPresentation.listPlaceholder(failed, isFetching: true, isSyncing: true) == .fetching)
+        #expect(PresetCountPresentation.listPlaceholder(counted, isFetching: false, isSyncing: true) == nil)
+        #expect(PresetCountPresentation.listPlaceholder(waiting, isFetching: false, isSyncing: false) == .waitingForSync)
+        #expect(PresetCountPresentation.listPlaceholder(failed, isFetching: false, isSyncing: false) == .queryFailed)
+    }
+
     // MARK: - Editor summary
 
     @Test("the editor says how many items match now for a fetched preset, with a plus at the provider's cap")
