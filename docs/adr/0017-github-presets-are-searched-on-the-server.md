@@ -280,6 +280,9 @@ The first rows ran over organizations of a real account and are given as counts 
 | A preset search for pull requests, `first: 25` / for issues, `first: 100` | `rateLimit.cost` 1, about 5.7 s / cost 2, about 5 s |
 | `nodes(ids:)` with 100 ids, 80 issues and 20 pull requests of `cli/cli` | cost 5, 3.5 s, no node null |
 | `fetchItemStates` (`ItemStateLiveTests`) with 150 ids of open items a fetch had just returned, 75 pull requests and 75 issues, with the same token and repositories as the row above | two batches of 100, all 150 open and of the kind they were fetched as, none closed, missing or unanswered; 16.1 s |
+| `PresetSearchQueryLiveTests` and `ItemStateLiveTests` with a fine-grained token, read-only *Commit statuses*, *Contents*, *Issues*, *Metadata* and *Pull requests*, repository access `prokopsimek/gitwall` only, over the three public repositories of the classic run above (331 s) | every line the same as with the classic token: 46 rows, 42 subsets, none failed, the 12 rows with `@me` and the relations and both milestone rows included. `fetchItemStates`: 150 ids in two batches, all open and of their kind; 11.5 s |
+| The same two suites with the same fine-grained token, over 60 pull requests and 200 issues of `cli/cli` (235 s) | 46 rows, 32 subsets, none failed, both rows with a bot reviewer included. 12 rows kept no local item: the ten `@me` and relation rows that need an open item of the token owner, who has none there, and the two that keep none in the classic run either. 2 skipped, no milestone. `fetchItemStates`: 150 ids, 60 pull requests and 90 issues, in two batches, all open and of their kind; 10.0 s |
+| The same two suites and both `Integration` suites with the same fine-grained token, `GITWALL_GITHUB_REPO=prokopsimek/gitwall` | the identity call, discovery (156 repositories, no organization), the open pull requests of `apple/swift` with their states, and Detail of a public pull request and issue with every part, checks included, passed. `prokopsimek/gitwall` answered with no open item, so the two live suites and the test of the configured repository stopped at their check for data, not at a refusal. Over a public repository of the token's owner with 12 open items that test passed, and the priority lookup answered with no priority and no refusal |
 | `repo:cli/cli (is:pr` / `repo:cli/cli frobnicate:1` | 200, no `errors`, `issueCount` 0 |
 | Six levels of parentheses / a trailing `AND` | 200 with results |
 | A trailing `OR` | 502, twice, after about 11 s each |
@@ -305,7 +308,9 @@ REST endpoints available to fine-grained personal access tokens, and the list of
 permission for it. The REST documentation says a search returns only what the token can access. The GraphQL
 documentation says the data requested decides the permissions needed. The search returns issues and pull requests,
 read with *Issues* and *Pull requests*, and `nodes(ids:)` reads `state` on the same objects, so the token guide in the
-README asks for nothing new.
+README asks for nothing new. The live runs with a fine-grained token with the README's permissions (see the table)
+agree: GitHub answered `search(type: ISSUE_ADVANCED)` and `nodes(ids:)` over the repositories of the classic run with
+the same items as for the classic token, and refused no request.
 
 ## Consequences
 
@@ -345,8 +350,12 @@ Open points, marked NEOVĚŘENO (not verified):
 - NEOVĚŘENO: `totalCount` adds up the counts of a split search. When its source groups overlap, such as an
   organization in one and a repository of it in another, an item counts twice and the preset can be marked incomplete
   for nothing.
-- NEOVĚŘENO: a search and a lookup with a fine-grained token. The documentation above does not cover GraphQL
-  `ISSUE_ADVANCED` or `nodes(ids:)` by name. A live call of both with a fine-grained token settles it.
+- NEOVĚŘENO: a search and a lookup with a fine-grained token on a private repository. On 2026-11-19
+  `PresetSearchQueryLiveTests`, `ItemStateLiveTests` and both `Integration` suites ran with a read-only fine-grained
+  token with the README's five permissions, over public repositories: GitHub accepted `ISSUE_ADVANCED` and
+  `nodes(ids:)` from it, answered with the same items as for the classic token and refused nothing (see *Checked
+  against GitHub*). Every token may read public repositories, so this does not show that *Issues* and *Pull requests*
+  suffice where they are what grants access; the repository the token was granted has no open item.
 - NEOVĚŘENO: whether GitHub Enterprise Server accepts `ISSUE_ADVANCED`, which would let it search per preset too.
 - NEOVĚŘENO: what makes WidgetKit drop the configuration of a removed widget (see *What a sync fetches*). Quitting and
   opening Gitwall did not; a restart of chronod or a new login has not been tried.
