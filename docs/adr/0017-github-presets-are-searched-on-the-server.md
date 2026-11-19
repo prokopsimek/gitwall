@@ -52,10 +52,12 @@ A widget removed from the desktop can stay in WidgetKit's configurations after i
 removed with Remove Widget at 17:31 left the desktop at once: its render session ended, and both the desktop's list of
 widgets and chronod's stored host configuration named only the seven that were left. Yet `getCurrentConfigurations`
 kept returning it and WidgetKit kept asking the extension for its timeline after every reload, still at 19:06 (95
-minutes later), also after Gitwall was quit and opened again. `WidgetInfo` says nothing about whether a widget is on
-screen, so the app cannot tell such a configuration from a placed widget. Until macOS lets go of it, its preset is
-searched in every sync (at least one search per kind) and counted under widgets in the log line, which then reads one
-more than the desktop shows.
+minutes later), also after Gitwall was quit and opened again. A restart of chronod at 19:08
+(`make restore-registration`, which runs `killall chronod`) did not change that: the three regular syncs after it, at
+19:14, 19:21 and 19:28, still counted it under widgets. `WidgetInfo` says nothing about whether a widget is on screen,
+so the app cannot tell such a configuration from a placed widget. Until macOS lets go of it, its preset is searched in
+every sync (at least one search per kind) and counted under widgets in the log line, which then reads one more than
+the desktop shows.
 
 Every other preset is fetched when a window opens it. `AppEnvironment.fetchOnOpen(_:)` runs when the popover or the
 main window opens or switches preset, when the Walls window opens and when another wall comes up, by hand or by
@@ -283,6 +285,7 @@ The first rows ran over organizations of a real account and are given as counts 
 | `PresetSearchQueryLiveTests` and `ItemStateLiveTests` with a fine-grained token, read-only *Commit statuses*, *Contents*, *Issues*, *Metadata* and *Pull requests*, repository access `prokopsimek/gitwall` only, over the three public repositories of the classic run above (331 s) | every line the same as with the classic token: 46 rows, 42 subsets, none failed, the 12 rows with `@me` and the relations and both milestone rows included. `fetchItemStates`: 150 ids in two batches, all open and of their kind; 11.5 s |
 | The same two suites with the same fine-grained token, over 60 pull requests and 200 issues of `cli/cli` (235 s) | 46 rows, 32 subsets, none failed, both rows with a bot reviewer included. 12 rows kept no local item: the ten `@me` and relation rows that need an open item of the token owner, who has none there, and the two that keep none in the classic run either. 2 skipped, no milestone. `fetchItemStates`: 150 ids, 60 pull requests and 90 issues, in two batches, all open and of their kind; 10.0 s |
 | The same two suites and both `Integration` suites with the same fine-grained token, `GITWALL_GITHUB_REPO=prokopsimek/gitwall` | the identity call, discovery (156 repositories, no organization), the open pull requests of `apple/swift` with their states, and Detail of a public pull request and issue with every part, checks included, passed. `prokopsimek/gitwall` answered with no open item, so the two live suites and the test of the configured repository stopped at their check for data, not at a refusal. Over a public repository of the token's owner with 12 open items that test passed, and the priority lookup answered with no priority and no refusal |
+| The same two suites and the test of the configured repository with the same fine-grained token, its repository access widened to a private repository of the token owner, `GITWALL_GITHUB_REPO` set to that repository | 46 rows, 10 subsets, none failed; 18 rows kept no local item and 18 were skipped. The repository has 21 open pull requests and no issue. The row with kind and state only kept the 21 pull requests locally, and GitHub's answer held the same 21. `fetchItemStates`: 21 pull requests in one batch, all open and of their kind, none closed, missing or unanswered; 2.0 s. The test of the configured repository passed with 21 pull requests, none with a CI state, and no issue. No GraphQL error, no 403 and no "not accessible" in the output |
 | `repo:cli/cli (is:pr` / `repo:cli/cli frobnicate:1` | 200, no `errors`, `issueCount` 0 |
 | Six levels of parentheses / a trailing `AND` | 200 with results |
 | A trailing `OR` | 502, twice, after about 11 s each |
@@ -310,7 +313,10 @@ documentation says the data requested decides the permissions needed. The search
 read with *Issues* and *Pull requests*, and `nodes(ids:)` reads `state` on the same objects, so the token guide in the
 README asks for nothing new. The live runs with a fine-grained token with the README's permissions (see the table)
 agree: GitHub answered `search(type: ISSUE_ADVANCED)` and `nodes(ids:)` over the repositories of the classic run with
-the same items as for the classic token, and refused no request.
+the same items as for the classic token, and refused no request. On a private repository of the token owner, where the
+token's permissions are what grants access, both answered too: the search found the repository's 21 open pull
+requests, and the lookup read all 21 as open, with no error and no refusal. That repository has no issue, so no issue
+of a private repository was read.
 
 ## Consequences
 
@@ -350,12 +356,10 @@ Open points, marked NEOVĚŘENO (not verified):
 - NEOVĚŘENO: `totalCount` adds up the counts of a split search. When its source groups overlap, such as an
   organization in one and a repository of it in another, an item counts twice and the preset can be marked incomplete
   for nothing.
-- NEOVĚŘENO: a search and a lookup with a fine-grained token on a private repository. On 2026-11-19
-  `PresetSearchQueryLiveTests`, `ItemStateLiveTests` and both `Integration` suites ran with a read-only fine-grained
-  token with the README's five permissions, over public repositories: GitHub accepted `ISSUE_ADVANCED` and
-  `nodes(ids:)` from it, answered with the same items as for the classic token and refused nothing (see *Checked
-  against GitHub*). Every token may read public repositories, so this does not show that *Issues* and *Pull requests*
-  suffice where they are what grants access; the repository the token was granted has no open item.
+- NEOVĚŘENO: issues of a private repository with a fine-grained token. With the README's permissions the search and
+  the lookup answered for the pull requests of a private repository (see *Checked against GitHub*), but that
+  repository has no issue.
 - NEOVĚŘENO: whether GitHub Enterprise Server accepts `ISSUE_ADVANCED`, which would let it search per preset too.
 - NEOVĚŘENO: what makes WidgetKit drop the configuration of a removed widget (see *What a sync fetches*). Quitting and
-  opening Gitwall did not; a restart of chronod or a new login has not been tried.
+  opening Gitwall did not, and neither did a restart of chronod at 19:08; a new login or a restart of the Mac has not
+  been tried.
