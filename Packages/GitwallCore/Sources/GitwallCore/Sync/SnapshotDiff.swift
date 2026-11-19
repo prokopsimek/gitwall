@@ -17,9 +17,9 @@ public struct RoutedNotification: Hashable, Sendable {
 
 /// Detects what changed between two syncs and which presets want to be told about it.
 public enum SnapshotDiff {
-    /// How long before the previous sync an item of a searching account may have been opened and still be a new item.
-    /// GitHub's search index can lag behind, so an item opened just before the previous sync may first show up in a
-    /// search now.
+    /// How long before the earlier result of its pair an item of a searching account may have been opened and still be
+    /// a new item. GitHub's search index can lag behind, so an item opened just before that result was fetched may
+    /// first show up in a search now.
     static let searchIndexLag: TimeInterval = 10 * 60
 
     /// Nothing is reported for the very first sync (`previous == nil`), so a fresh install never produces a burst.
@@ -29,7 +29,8 @@ public enum SnapshotDiff {
     /// ``SearchFindings/accounts`` two of these rules are narrower, because its searches return only the open items that
     /// match: an item that left is `.closed` only when it is in ``SearchFindings/closedItemIDs``, and one that joined is
     /// news only when it is in ``SearchFindings/comparedItemIDs``. Even then it is `.newItem` only when it was opened
-    /// after the previous sync, less ``searchIndexLag``: an older item joined because it started to match, through a
+    /// after the earlier result of its pair (``SearchFindings/comparedSince``, the previous sync when the findings
+    /// carry no date for it), less ``searchIndexLag``: an older item joined because it started to match, through a
     /// review request, a label or recent activity, so it reports only `.reviewRequested`, when it asks me. An account in
     /// the previous snapshot's ``Snapshot/searchedAccounts`` that did not search now has a baseline instead: it
     /// downloaded the open items its download reaches, which are neither all nor only those its searches had found, so
@@ -52,7 +53,8 @@ public enum SnapshotDiff {
                 let searched = searches.accounts.contains(item.accountID)
                 if searched, !searches.comparedItemIDs.contains(item.id) { continue }
                 if stoppedSearching.contains(item.accountID) { continue }
-                if !searched || item.createdAt > previous.fetchedAt.addingTimeInterval(-searchIndexLag) {
+                let reference = searches.comparedSince[item.id] ?? previous.fetchedAt
+                if !searched || item.createdAt > reference.addingTimeInterval(-searchIndexLag) {
                     changes.append(ItemChange(item: item, event: .newItem))
                 }
                 if requestedNow { changes.append(ItemChange(item: item, event: .reviewRequested)) }

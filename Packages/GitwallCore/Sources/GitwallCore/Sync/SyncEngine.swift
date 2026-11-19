@@ -327,7 +327,7 @@ public actor SyncEngine {
                 fresh.append(contentsOf: outcome.items)
                 presetOutcomes.append(contentsOf: outcome.presets)
                 if outcome.searched { findings.accounts.insert(outcome.accountID) }
-                findings.comparedItemIDs.formUnion(outcome.compared)
+                findings.merge(compared: outcome.compared)
                 findings.closedItemIDs.formUnion(outcome.lookup.closed)
                 gone.formUnion(outcome.lookup.gone)
                 for item in outcome.lookup.refreshed { refreshed[item.id] = item }
@@ -371,8 +371,9 @@ public actor SyncEngine {
         var failed = false
         /// The line for the log when an account error stopped the fetch and the account rides it out unseen.
         var quietFailure: QuietFailure?
-        /// Items held by a result fetched now whose pair had an earlier result of the same selection.
-        var compared: Set<String> = []
+        /// Items held by a result fetched now whose pair had an earlier result of the same selection, with the date that
+        /// earlier result was fetched; the oldest when several pairs compared an item.
+        var compared: [String: Date] = [:]
         /// What the provider said about the items that left a fresh result.
         var lookup = ItemLookup()
     }
@@ -639,7 +640,7 @@ public actor SyncEngine {
         var fetchedAny = false
         var mayRefresh = true
         var accountError: (any Error)?
-        var compared: Set<String> = []
+        var compared: [String: Date] = [:]
         // Items that left a fresh result which can be compared with an earlier one, in the order they left.
         var left: [String] = []
 
@@ -668,7 +669,9 @@ public actor SyncEngine {
                 found += fetch.items.filter { foundIDs.insert($0.id).inserted }
                 let fetchedIDs = fetch.items.map(\.id)
                 if let earlier = before.comparableResult(for: query.preset) {
-                    compared.formUnion(fetchedIDs)
+                    if let since = earlier.fetchedAt {
+                        for id in fetchedIDs { compared[id] = compared[id].map { min($0, since) } ?? since }
+                    }
                     let returned = Set(fetchedIDs)
                     left += earlier.itemIDs.filter { !returned.contains($0) }
                 }

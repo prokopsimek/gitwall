@@ -12,17 +12,38 @@ public struct SearchFindings: Hashable, Sendable {
     public var accounts: Set<UUID>
     /// Items that left a fresh result and that the provider then confirmed closed or merged.
     public var closedItemIDs: Set<String>
-    /// Items held by a result fetched in the sync whose pair had an earlier result of the same selection. An item of
-    /// ``accounts`` that is new to the snapshot is news only when it is here; otherwise it came with the first result of
-    /// its pair, or of an edited preset, and is part of the baseline.
-    public var comparedItemIDs: Set<String>
+    /// For each item held by a result fetched in the sync whose pair had an earlier result of the same selection, the
+    /// date that earlier result was fetched. An item of ``accounts`` that is new to the snapshot is news only when it is
+    /// here or in ``comparedItemIDs``; otherwise it came with the first result of its pair, or of an edited preset, and
+    /// is part of the baseline. It is a new item only when it was opened after the earlier result of its pair, less
+    /// ``SnapshotDiff/searchIndexLag``. When several pairs compared the item, the oldest date is kept, so it is
+    /// reported rather than missed.
+    public private(set) var comparedSince: [String: Date]
+    /// Compared items that carry no date: they are judged by the previous snapshot's date instead.
+    private var comparedWithoutDate: Set<String>
 
-    public init(accounts: Set<UUID>, closedItemIDs: Set<String>, comparedItemIDs: Set<String>) {
+    /// Every item that was compared with an earlier result, dated or not.
+    public var comparedItemIDs: Set<String> { comparedWithoutDate.union(comparedSince.keys) }
+
+    public init(
+        accounts: Set<UUID>, closedItemIDs: Set<String>, comparedItemIDs: Set<String> = [],
+        comparedSince: [String: Date] = [:]
+    ) {
         self.accounts = accounts
         self.closedItemIDs = closedItemIDs
-        self.comparedItemIDs = comparedItemIDs
+        self.comparedSince = comparedSince
+        self.comparedWithoutDate = comparedItemIDs.subtracting(comparedSince.keys)
+    }
+
+    /// Adds items compared with an earlier result fetched at the date given for each; an item known already keeps the
+    /// older of the two dates.
+    public mutating func merge(compared dates: [String: Date]) {
+        for (id, date) in dates {
+            comparedWithoutDate.remove(id)
+            comparedSince[id] = comparedSince[id].map { min($0, date) } ?? date
+        }
     }
 
     /// A sync in which no account searched presets.
-    public static let none = SearchFindings(accounts: [], closedItemIDs: [], comparedItemIDs: [])
+    public static let none = SearchFindings(accounts: [], closedItemIDs: [])
 }

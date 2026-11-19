@@ -34,6 +34,13 @@ struct SnapshotDiffSearchTests {
         SearchFindings(accounts: [github.id], closedItemIDs: Set(closed.map(\.id)), comparedItemIDs: Set(compared.map(\.id)))
     }
 
+    /// A sync in which the GitHub.com account searched presets and each item of `compared` was compared with an
+    /// earlier result fetched at the date given for it.
+    private func searched(comparedSince dates: [(WorkItem, Date)]) -> SearchFindings {
+        SearchFindings(accounts: [github.id], closedItemIDs: [],
+                       comparedSince: Dictionary(uniqueKeysWithValues: dates.map { ($0.0.id, $0.1) }))
+    }
+
     /// - Parameter previousSearched: The accounts that searched presets in the sync that wrote the previous snapshot.
     private func events(
         _ previous: [WorkItem], _ current: [WorkItem], _ searches: SearchFindings,
@@ -101,6 +108,38 @@ struct SnapshotDiffSearchTests {
                        item(5, in: enterprise, requested: ["me"], created: before(days: 90))]
         #expect(events([], current, searched()) == [4: [.newItem], 5: [.newItem, .reviewRequested]])
         #expect(events([], [item(6, created: before(days: 90))], .none) == [6: [.newItem]])
+    }
+
+    @Test("an item opened after the earlier result of its pair but before the previous sync is a new item")
+    func openedAfterThePairsEarlierResult() {
+        let new = item(2, requested: ["me"], created: before(days: 1))
+        let findings = searched(comparedSince: [(new, before(days: 3))])
+        #expect(events([item(1)], [item(1), new], findings) == [2: [.newItem, .reviewRequested]])
+    }
+
+    @Test("an item opened before the earlier result of its pair, less the index lag, is no new item")
+    func openedBeforeThePairsEarlierResult() {
+        let old = item(2, requested: ["me"], created: before(days: 4))
+        let late = item(3, created: before(days: 3, minutes: 5))
+        let findings = searched(comparedSince: [(old, before(days: 3)), (late, before(days: 3))])
+        #expect(events([item(1)], [item(1), old, late], findings) == [2: [.reviewRequested], 3: [.newItem]])
+    }
+
+    @Test("an item two pairs compared is judged by the older of their dates")
+    func theOlderDateWins() {
+        let new = item(2, created: before(days: 2))
+        var findings = searched(comparedSince: [(new, before(days: 1))])
+        #expect(events([item(1)], [item(1), new], findings).isEmpty)
+        findings.merge(compared: [new.id: before(days: 3)])
+        findings.merge(compared: [new.id: before(days: 1)])
+        #expect(events([item(1)], [item(1), new], findings) == [2: [.newItem]])
+    }
+
+    @Test("a compared item without a date of its own is judged by the previous sync")
+    func fallsBackToThePreviousSync() {
+        let new = item(2, created: before(days: 1))
+        #expect(searched(compared: [new]).comparedItemIDs == [new.id])
+        #expect(events([item(1)], [item(1), new], searched(compared: [new])).isEmpty)
     }
 
     @Test("an item in both snapshots of a searched account gets today's events: a review changes, a label does not")

@@ -184,6 +184,26 @@ extension SyncEngineTests {
         #expect(events(second, env: env) == [2: [.newItem]])
     }
 
+    @Test("an item opened after the earlier result of its pair is new, though the snapshot is newer than that result")
+    func newAgainstTheEarlierResultOfThePair() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = review
+        let known = env.item(1, account: env.github)
+        var between = env.item(2, account: env.github)
+        between.createdAt = env.minutes(-24 * 60)
+        var earlier = earlierResult(review, holding: [known], env: env)
+        earlier.fetchedAt = env.minutes(-3 * 24 * 60)
+        try preparePresetSearch(env, presets: [review], items: [known], results: [earlier],
+                                status: [env.github.id: FetchStatus(state: .ok, lastSuccessAt: env.minutes(-5))])
+        env.githubProvider.presetFetches[search(review)] = found([known, between])
+
+        let result = try #require(try await env.engine().syncPresets([review.id]))
+
+        #expect(result.searches.comparedSince == [known.id: env.minutes(-3 * 24 * 60), between.id: env.minutes(-3 * 24 * 60)])
+        #expect(events(result, env: env) == [2: [.newItem]])
+    }
+
     @Test("an on-demand fetch adds the accounts it searched to those the snapshot named and keeps the snapshot's date")
     func namesSearchedAccountsAndKeepsDate() async throws {
         let env = try Env()
