@@ -68,6 +68,16 @@ Support URL: <https://github.com/prokopsimek/gitwall/issues>
 Marketing URL: <https://prokopsimek.github.io/gitwall/>
 Copyright: `2026 Prokop Simek`
 
+What's New (0.7.0):
+
+```
+Gitwall asks GitHub for less. Presets that are on screen are searched on GitHub's side, and the rest is fetched when you open it, so a busy account no longer hits GitHub's limits.
+
+A short GitHub outage no longer shows your account as disconnected: gateway errors are retried, and an account shows an error only after three failed syncs in a row.
+
+A preset that was never fetched now says "Not fetched yet", "Waiting for sync" or "Query failed" with a Try Again button, instead of "0 items".
+```
+
 What's New (0.6.0):
 
 ```
