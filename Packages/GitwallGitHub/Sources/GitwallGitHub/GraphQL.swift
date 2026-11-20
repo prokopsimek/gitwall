@@ -7,9 +7,27 @@ enum GraphQLQueries {
     static let maxRepositoriesPerBatch = 15
     static let pageSize = 50
     static let maxExtraPagesPerRepository = 3
+    /// Paging of ``search``, the `ISSUE` search of organization sources. GitHub Enterprise Server keeps exactly this.
     static let searchPageSize = 100
     static let maxSearchPages = 3
     static let maxSearchQueryLength = 256
+
+    /// Paging of ``presetSearch(kind:)`` on GitHub.com. 100 pull requests per page took GitHub 10 s and then
+    /// answered 502; 25 took 5–6 s. Issue nodes are lighter and stay at 100.
+    static let presetSearchPullRequestPageSize = 25
+    static let presetSearchIssuePageSize = 100
+    /// GitHub search never returns more than 1000 results for one query, so paging stops there.
+    static let maxPresetSearchResults = 1000
+    /// The longest search string `ISSUE_ADVANCED` accepts. Counted in UTF-8 bytes, the most any reading of the limit can
+    /// come to, so a name with accents makes a search split a little early rather than fail.
+    static let maxPresetSearchQueryLength = 4000
+
+    static func presetSearchPageSize(for kind: ItemKind) -> Int {
+        switch kind {
+        case .pullRequest: presetSearchPullRequestPageSize
+        case .issue: presetSearchIssuePageSize
+        }
+    }
 
     static let pullRequestFragment = """
     fragment PR on PullRequest {
@@ -107,22 +125,49 @@ enum GraphQLQueries {
         return "query {\n  \(rateLimitField)\n  nodes(ids: [\(ids)]) { ... on Issue { id \(items) } ... on PullRequest { id \(items) } }\n}\n"
     }
 
+    /// `nodes(ids:)` takes at most 100 ids per request.
+    static let maxItemStateLookupsPerRequest = 100
+
+    /// The state of up to ``maxItemStateLookupsPerRequest`` issues and pull requests, by node id, with the fields of the
+    /// list fragments, so an open item maps exactly like a search hit. `state` is OPEN, CLOSED or MERGED on a pull
+    /// request and OPEN or CLOSED on an issue, fields the lists already read with the same permissions. GitHub answers
+    /// in the order of the ids, with null for an id it cannot resolve or the token may not see.
+    static func itemStates(nodeIDs: [String]) -> String {
+        let ids = nodeIDs.map { "\"\($0)\"" }.joined(separator: ", ")
+        return "query {\n  \(rateLimitField)\n  nodes(ids: [\(ids)]) { __typename ... on PullRequest { state ...PR } "
+            + "... on Issue { state ...Issue } }\n}\n" + fragments(for: [.pullRequest, .issue])
+    }
+
     /// Node ids are base64-like (`I_kwDOAbc`, `PR_kwDO-x`, legacy `MDU6SXNzdWUx==`); anything else is not inlined.
     static func isNodeID(_ id: String) -> Bool {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-=+/"))
         return !id.isEmpty && id.unicodeScalars.allSatisfy { $0.isASCII && allowed.contains($0) }
     }
 
-    static let search = """
-    query($q: String!, $after: String) {
-      \(rateLimitField)
-      search(query: $q, type: ISSUE, first: \(searchPageSize), after: $after) {
-        issueCount
-        pageInfo { hasNextPage endCursor }
-        nodes { __typename ... on PullRequest { ...PR } ... on Issue { ...Issue } }
-      }
+    static let search = searchDocument(type: "ISSUE", first: searchPageSize, kinds: [.pullRequest, .issue])
+
+    /// One page of a preset's own query on GitHub.com, for one item kind. It answers in the shape of ``search``,
+    /// so ``SearchData`` decodes it.
+    static func presetSearch(kind: ItemKind) -> String {
+        searchDocument(type: "ISSUE_ADVANCED", first: presetSearchPageSize(for: kind), kinds: [kind])
     }
-    """ + fragments(for: [.pullRequest, .issue])
+
+    /// A `search` page whose nodes are only `kinds`, with only their fragments.
+    private static func searchDocument(type: String, first: Int, kinds: Set<ItemKind>) -> String {
+        var spreads: [String] = []
+        if kinds.contains(.pullRequest) { spreads.append("... on PullRequest { ...PR }") }
+        if kinds.contains(.issue) { spreads.append("... on Issue { ...Issue }") }
+        return """
+        query($q: String!, $after: String) {
+          \(rateLimitField)
+          search(query: $q, type: \(type), first: \(first), after: $after) {
+            issueCount
+            pageInfo { hasNextPage endCursor }
+            nodes { __typename \(spreads.joined(separator: " ")) }
+          }
+        }
+        """ + fragments(for: kinds)
+    }
 
     static func searchQuery(organization: String, kind: ItemKind, nativeQuery: String?) throws -> String {
         var parts = ["org:\(organization)", kind == .pullRequest ? "is:pr" : "is:issue", "is:open", "archived:false", "sort:updated-desc"]
@@ -228,9 +273,60 @@ struct PriorityNode: Decodable {
     }
 }
 
-struct SearchData: Decodable, RateLimitCarrying {
+struct ItemStatesData: Decodable, RateLimitCarrying {
     let rateLimitInfo: RateLimitInfo?
-    let search: Connection<ItemNode>
+    /// In the order of the ids asked for.
+    let nodes: [ItemStateNode?]
+
+    enum CodingKeys: String, CodingKey {
+        case rateLimitInfo = "rateLimit"
+        case nodes
+    }
+}
+
+/// One node of ``GraphQLQueries/itemStates(nodeIDs:)``. Only a pull request or an issue carries a state and the item;
+/// a node of any other type answers with its `__typename` alone and has neither.
+struct ItemStateNode: Decodable {
+    let typename: String?
+    let state: String?
+    let item: ItemNode?
+
+    private enum CodingKeys: String, CodingKey {
+        case typename = "__typename"
+        case state
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typename = try container.decodeIfPresent(String.self, forKey: .typename)
+        self.typename = typename
+        state = try container.decodeIfPresent(String.self, forKey: .state)
+        item = Self.kind(of: typename) == nil ? nil : try ItemNode(from: decoder)
+    }
+
+    var kind: ItemKind? { Self.kind(of: typename) }
+
+    private static func kind(of typename: String?) -> ItemKind? {
+        switch typename {
+        case "PullRequest": .pullRequest
+        case "Issue": .issue
+        default: nil
+        }
+    }
+}
+
+struct SearchData: Decodable, RateLimitCarrying {
+    /// One page of results, with GitHub's count of every match, which can be more than the 1000 a search returns.
+    struct Results: Decodable {
+        let issueCount: Int
+        let pageInfo: Connection<ItemNode>.PageInfo?
+        let nodes: [ItemNode?]
+
+        var items: [ItemNode] { nodes.compactMap { $0 } }
+    }
+
+    let rateLimitInfo: RateLimitInfo?
+    let search: Results
 
     enum CodingKeys: String, CodingKey {
         case rateLimitInfo = "rateLimit"
@@ -419,5 +515,22 @@ enum GraphQLMapping {
 
     private static func userRef(login: String?, name: String?, avatar: URL?) -> UserRef {
         userRef(login: login, name: name, avatar: avatar, optional: false)!
+    }
+}
+
+// MARK: - Errors beside data
+
+extension [GraphQLError] {
+    /// What is logged about errors that came beside data: how many and of which types, never a message, a path or
+    /// anything else that could carry a login or a name. An error without a type counts as `UNTYPED`.
+    var typeSummary: String {
+        let types = Set(map { $0.type?.uppercased() ?? "UNTYPED" }).sorted()
+        return "\(count) GraphQL errors of types \(types.joined(separator: ", "))"
+    }
+
+    /// Whether any error is of a type other than `FORBIDDEN`, the one an organization that refuses the token produces
+    /// for good. Such an error beside data means nodes may be missing for a reason that will pass.
+    var hasPartialFailure: Bool {
+        contains { $0.type?.uppercased() != "FORBIDDEN" }
     }
 }

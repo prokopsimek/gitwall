@@ -100,6 +100,17 @@ final class WallsModel {
         preset(for: tile).map { environment.items(for: $0) } ?? []
     }
 
+    /// The shown wall and the presets of its tiles, which change when another wall comes up, by hand or by rotation,
+    /// or when a tile is added; the window fetches its presets then (``fetchShownPresets()``).
+    var shownPresetKey: [UUID] {
+        currentWall.map { [$0.id] + $0.tiles.map(\.presetID) } ?? []
+    }
+
+    /// Fetches the presets of the shown wall whose result is missing or older than the sync interval.
+    func fetchShownPresets() {
+        environment.fetchOnOpen(currentWall?.tiles.compactMap(preset(for:)) ?? [])
+    }
+
     /// The rows a tile lists, in the order the arrow keys go through them.
     func visibleItems(for tile: Tile) -> [WorkItem] {
         TileRows(items: items(for: tile), size: tile.size).visible

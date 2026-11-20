@@ -3,7 +3,9 @@
 Date: 2026-09-16
 
 Partly superseded by [ADR 0009](0009-preset-queries-accept-and-or-and-parentheses.md): `AND`, `OR` and
-parentheses are accepted after all.
+parentheses are accepted after all. Partly superseded by
+[ADR 0017](0017-github-presets-are-searched-on-the-server.md): on GitHub.com the query also goes to GitHub, as the
+search that decides what is downloaded; it is still evaluated locally and decides what a preset shows.
 
 ## Context
 

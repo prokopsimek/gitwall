@@ -1,0 +1,1047 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4802,
+      "resetAt": "2026-11-19T21:46:44Z"
+    },
+    "search": {
+      "issueCount": 21,
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjIx"
+      },
+      "nodes": [
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABMnfJkQ",
+          "number": 24,
+          "title": "fix(walls,detail): full screen fills the screen, Detail closes on navigation, and four smaller fixes",
+          "url": "https://github.com/prokopsimek/gitwall/pull/24",
+          "isDraft": false,
+          "createdAt": "2026-11-03T17:28:01Z",
+          "updatedAt": "2026-11-03T17:40:32Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 388,
+          "deletions": 29,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABMfYt3g",
+          "number": 22,
+          "title": "feat(detail): read-only Detail panel with next step, latest word and what's new",
+          "url": "https://github.com/prokopsimek/gitwall/pull/22",
+          "isDraft": false,
+          "createdAt": "2026-11-03T06:58:28Z",
+          "updatedAt": "2026-11-03T14:57:23Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 6660,
+          "deletions": 122,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABMfb-fQ",
+          "number": 23,
+          "title": "feat(walls): Walls window with tiles, editing, rotation and a version 2 Gitwall file",
+          "url": "https://github.com/prokopsimek/gitwall/pull/23",
+          "isDraft": false,
+          "createdAt": "2026-11-03T07:03:56Z",
+          "updatedAt": "2026-11-03T07:36:23Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 4107,
+          "deletions": 200,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABMZwz0g",
+          "number": 21,
+          "title": "feat(presets): copy and paste presets as JSON",
+          "url": "https://github.com/prokopsimek/gitwall/pull/21",
+          "isDraft": false,
+          "createdAt": "2026-11-02T20:56:16Z",
+          "updatedAt": "2026-11-02T21:02:07Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 1186,
+          "deletions": 4,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABKjGzkA",
+          "number": 20,
+          "title": "chore(release): build 17 for the next upload",
+          "url": "https://github.com/prokopsimek/gitwall/pull/20",
+          "isDraft": false,
+          "createdAt": "2026-10-25T07:48:56Z",
+          "updatedAt": "2026-10-25T07:52:12Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 2,
+          "deletions": 2,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABKjC8xQ",
+          "number": 19,
+          "title": "chore(release): version 0.6.0, build 16",
+          "url": "https://github.com/prokopsimek/gitwall/pull/19",
+          "isDraft": false,
+          "createdAt": "2026-10-25T07:38:03Z",
+          "updatedAt": "2026-10-25T07:52:12Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 12,
+          "deletions": 2,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABKMHBDg",
+          "number": 18,
+          "title": "feat(priority): read P0–P3 from GitHub Projects, sort and filter by it",
+          "url": "https://github.com/prokopsimek/gitwall/pull/18",
+          "isDraft": false,
+          "createdAt": "2026-10-23T06:22:54Z",
+          "updatedAt": "2026-10-23T06:26:08Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 1069,
+          "deletions": 49,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABGo8OZw",
+          "number": 17,
+          "title": "fix(accounts): keep repositories and presets when the sign-in changes",
+          "url": "https://github.com/prokopsimek/gitwall/pull/17",
+          "isDraft": false,
+          "createdAt": "2026-10-05T05:25:19Z",
+          "updatedAt": "2026-10-05T05:28:13Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 776,
+          "deletions": 45,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABE75K-w",
+          "number": 16,
+          "title": "docs(agents): load AGENTS.md through CLAUDE.md, add ship recipe",
+          "url": "https://github.com/prokopsimek/gitwall/pull/16",
+          "isDraft": false,
+          "createdAt": "2026-09-24T13:04:30Z",
+          "updatedAt": "2026-09-24T19:15:49Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 14,
+          "deletions": 2,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABEH7vTw",
+          "number": 15,
+          "title": "chore(marketing): record the App Review demo with the DX Media SDK",
+          "url": "https://github.com/prokopsimek/gitwall/pull/15",
+          "isDraft": false,
+          "createdAt": "2026-09-18T18:15:22Z",
+          "updatedAt": "2026-09-18T18:17:39Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 240,
+          "deletions": 1,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABEGF8Dw",
+          "number": 14,
+          "title": "fix(review): offer sample data on every screen without an account",
+          "url": "https://github.com/prokopsimek/gitwall/pull/14",
+          "isDraft": false,
+          "createdAt": "2026-09-18T14:35:36Z",
+          "updatedAt": "2026-09-18T14:40:02Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 478,
+          "deletions": 61,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABD7aSkw",
+          "number": 13,
+          "title": "fix(status-item): open the popover under the menu bar icon",
+          "url": "https://github.com/prokopsimek/gitwall/pull/13",
+          "isDraft": false,
+          "createdAt": "2026-09-17T12:48:05Z",
+          "updatedAt": "2026-09-17T12:50:24Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 6,
+          "deletions": 1,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABD07kPA",
+          "number": 11,
+          "title": "feat(filters): accept AND, OR and parentheses in preset queries",
+          "url": "https://github.com/prokopsimek/gitwall/pull/11",
+          "isDraft": false,
+          "createdAt": "2026-09-16T20:18:03Z",
+          "updatedAt": "2026-09-16T20:26:38Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 414,
+          "deletions": 41,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABD07lMg",
+          "number": 12,
+          "title": "feat(notifications): switch preset notifications off by default",
+          "url": "https://github.com/prokopsimek/gitwall/pull/12",
+          "isDraft": false,
+          "createdAt": "2026-09-16T20:18:05Z",
+          "updatedAt": "2026-09-16T20:22:31Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 12,
+          "deletions": 11,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABDucBkw",
+          "number": 10,
+          "title": "fix(review): sample data mode so Gitwall can be used without an account",
+          "url": "https://github.com/prokopsimek/gitwall/pull/10",
+          "isDraft": false,
+          "createdAt": "2026-09-16T07:16:39Z",
+          "updatedAt": "2026-09-16T07:23:57Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 190,
+          "deletions": 7,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABDt5jvw",
+          "number": 9,
+          "title": "feat(filters): preset queries in GitHub search syntax, and editable filter fields",
+          "url": "https://github.com/prokopsimek/gitwall/pull/9",
+          "isDraft": false,
+          "createdAt": "2026-09-16T05:55:59Z",
+          "updatedAt": "2026-09-16T05:59:09Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 751,
+          "deletions": 30,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABDM0Jfw",
+          "number": 8,
+          "title": "fix(build): keep exactly one Gitwall.app registered, stop shipping AGENTS.md",
+          "url": "https://github.com/prokopsimek/gitwall/pull/8",
+          "isDraft": false,
+          "createdAt": "2026-09-11T21:04:20Z",
+          "updatedAt": "2026-09-11T21:09:36Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 61,
+          "deletions": 28,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABDKZg7g",
+          "number": 7,
+          "title": "feat(app): switch Launch at login on for a fresh installation",
+          "url": "https://github.com/prokopsimek/gitwall/pull/7",
+          "isDraft": false,
+          "createdAt": "2026-09-11T15:14:46Z",
+          "updatedAt": "2026-09-11T15:18:04Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 103,
+          "deletions": 8,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABDKU5xA",
+          "number": 6,
+          "title": "feat(providers): never list items from archived repositories",
+          "url": "https://github.com/prokopsimek/gitwall/pull/6",
+          "isDraft": false,
+          "createdAt": "2026-09-11T15:05:16Z",
+          "updatedAt": "2026-09-11T15:08:18Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 174,
+          "deletions": 6,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABDJ1_nQ",
+          "number": 5,
+          "title": "feat(github): count review requests addressed to my teams",
+          "url": "https://github.com/prokopsimek/gitwall/pull/5",
+          "isDraft": false,
+          "createdAt": "2026-09-11T14:06:28Z",
+          "updatedAt": "2026-09-11T14:09:50Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 175,
+          "deletions": 19,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "PullRequest",
+          "id": "PR_kwDOUUWeOM8AAAABDJtszg",
+          "number": 4,
+          "title": "feat(filters): keep agent drafts in the review queue and filter by author",
+          "url": "https://github.com/prokopsimek/gitwall/pull/4",
+          "isDraft": false,
+          "createdAt": "2026-09-11T13:50:31Z",
+          "updatedAt": "2026-09-11T14:01:07Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "reviewDecision": null,
+          "mergeable": "UNKNOWN",
+          "additions": 140,
+          "deletions": 6,
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS"
+                  }
+                }
+              }
+            ]
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        }
+      ]
+    }
+  }
+}

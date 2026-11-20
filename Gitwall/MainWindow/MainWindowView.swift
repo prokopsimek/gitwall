@@ -32,8 +32,10 @@ struct MainWindowView: View {
             // Once the list is in the window.
             Task { isListFocused = true }
         }
+        // The window opening fetches it too (`MainWindowController.show`).
         .onChange(of: environment.selectedPreset?.id) {
             detail.presetDidChange(visibleItemIDs: visibleItems.map(\.id))
+            environment.fetchSelectedPresetOnOpen()
         }
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $state.showingWidgetHelp) {
@@ -56,7 +58,7 @@ struct MainWindowView: View {
                             Label(preset.name, systemImage: preset.icon)
                                 .lineLimit(1)
                             Spacer()
-                            Text("\(environment.count(for: preset))")
+                            PresetCountLabel(PresetCountPresentation(environment.presetCount(for: preset), now: Date()))
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
                         }
@@ -153,15 +155,30 @@ struct MainWindowView: View {
         .padding(.vertical, 12)
     }
 
+    /// The count of the preset on screen, for its failed query.
+    private var selectedCount: PresetCountPresentation? {
+        environment.selectedPreset.map { PresetCountPresentation(environment.presetCount(for: $0), now: Date()) }
+    }
+
     /// The items of the selected preset that the search leaves.
     private var visibleItems: [WorkItem] {
         guard case .items(let items) = environment.listState(for: environment.selectedPreset) else { return [] }
         return ItemSearch.filter(items, query: query)
     }
 
+    private var fetchingLabel: String {
+        environment.selectedPreset.map { String(localized: "Fetching “\($0.name)”…") } ?? String(localized: "Fetching…")
+    }
+
     @ViewBuilder
     private var content: some View {
         switch environment.listState(for: environment.selectedPreset) {
+        case .fetching:
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel(fetchingLabel)
+                .help(fetchingLabel)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .items(let items):
             let visible = ItemSearch.filter(items, query: query)
             if visible.isEmpty {
@@ -177,9 +194,9 @@ struct MainWindowView: View {
 
     private var statusBar: some View {
         HStack(spacing: 10) {
-            if let preset = environment.selectedPreset {
-                // While a search narrows the list, how many of the preset's items it shows.
-                let count = environment.count(for: preset)
+            // The number of items the list holds, none before the preset was ever fetched; while a search narrows the
+            // list, how many of them it shows.
+            if let preset = environment.selectedPreset, let count = environment.presetCount(for: preset).count {
                 Group {
                     if ItemSearch.isActive(query) {
                         Text("\(visibleItems.count) of ^[\(count) item](inflect: true)")
@@ -189,7 +206,7 @@ struct MainWindowView: View {
                 }
                 .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
-            if let fetchedAt = environment.snapshot?.fetchedAt {
+            if let fetchedAt = environment.fetchedAt(for: environment.selectedPreset) {
                 Text("Synced \(fetchedAt, style: .relative) ago")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -205,6 +222,11 @@ struct MainWindowView: View {
                 .foregroundStyle(.orange)
             } else if let error = environment.lastError {
                 Text(error).font(.caption).foregroundStyle(.red).lineLimit(1).help(error)
+            } else if let count = selectedCount, count.isFailure {
+                Label("Query failed", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .help(count.help)
             }
             Spacer()
             Text("\(environment.config.accounts.count) account\(environment.config.accounts.count == 1 ? "" : "s")")

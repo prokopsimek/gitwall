@@ -7,10 +7,10 @@ private let github = URL(string: "https://github.com")!
 
 @Suite("HTTP error mapping")
 struct HTTPErrorMappingTests {
-    private func verifyError(_ response: StubTransport.Response) async throws -> ProviderError {
-        let transport = StubTransport([response])
+    private func verifyError(_ responses: StubTransport.Response...) async throws -> ProviderError {
+        let transport = StubTransport(responses)
         do {
-            _ = try await GitHubProvider(transport: transport).verify(baseURL: github, token: "t")
+            _ = try await GitHubProvider(transport: transport, sleep: { _ in }).verify(baseURL: github, token: "t")
         } catch let error as ProviderError {
             return error
         }
@@ -67,7 +67,9 @@ struct HTTPErrorMappingTests {
 
     @Test("5xx → server with status text when the body is not JSON")
     func serverError() async throws {
-        let error = try await verifyError(.json("<html>bad gateway</html>", status: 502))
+        // A 502 is tried three times before it counts (see RetryTests), so the outage answers every attempt.
+        let badGateway = StubTransport.Response.json("<html>bad gateway</html>", status: 502)
+        let error = try await verifyError(badGateway, badGateway, badGateway)
         guard case .server(let status, let message) = error else {
             Issue.record("Expected server, got \(error)")
             return
@@ -78,7 +80,8 @@ struct HTTPErrorMappingTests {
 
     @Test("Undecodable success body → invalidResponse")
     func invalidBody() async throws {
-        let error = try await verifyError(.json("not json at all"))
+        // JSON of the wrong shape. A body that is not JSON at all is repeated first (see RetryTests).
+        let error = try await verifyError(.json(#"{"unexpected":true}"#))
         guard case .invalidResponse = error else {
             Issue.record("Expected invalidResponse, got \(error)")
             return

@@ -31,6 +31,7 @@ final class WallsWindowController: ItemWindowController {
         window.setFrameAutosaveName("GitwallWalls")
         super.init(window: window, environment: environment, detail: model.detail)
         model.undoManager = window.undoManager
+        environment.shownWallID = { [weak self] in self?.shownWallID }
         // Someone using the window holds the rotation for two minutes (`WallRotation.pauseAfterInput`). The same
         // monitor answers the window's keys, see `handleKey`.
         inputMonitor = NSEvent.addLocalMonitorForEvents(
@@ -50,9 +51,26 @@ final class WallsWindowController: ItemWindowController {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     func show() {
+        let opens = !isOnScreen
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
+        // Another wall in a window already on screen is the view's to fetch (`WallsView`).
+        if opens { model.fetchShownPresets() }
+    }
+
+    /// Open and not in the Dock, also behind other windows: only then does a regular sync fetch the wall's presets.
+    private var isOnScreen: Bool {
+        window?.isVisible == true && window?.isMiniaturized == false
+    }
+
+    private var shownWallID: Wall.ID? {
+        isOnScreen ? model.currentWall?.id : nil
+    }
+
+    /// Back from the Dock, the window shows its wall again.
+    @objc func windowDidDeminiaturize(_ notification: Notification) {
+        model.fetchShownPresets()
     }
 
     // MARK: Keys

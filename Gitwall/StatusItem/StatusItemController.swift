@@ -38,6 +38,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.contentViewController = NSHostingController(rootView: PopoverView(environment: environment))
 
         environment.onShowPopover = { [weak self] in self?.showPopover() }
+        environment.isPopoverShown = { [weak self] in self?.popover.isShown ?? false }
         observeBadge()
     }
 
@@ -64,6 +65,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         if popover.isShown { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
+        environment.fetchSelectedPresetOnOpen()
         if environment.isDemo { addDemoBackdrop() }
     }
 

@@ -44,6 +44,21 @@ struct GitLabCapabilitiesTests {
         #expect(!provider.capabilities.supportsOrganizationSources)
         #expect(provider.capabilities.supportsGroupSources)
     }
+
+    @Test("neither gitlab.com nor a self-managed instance searches per preset; both keep fetching everything",
+          arguments: [cloud, URL(string: "https://gitlab.acme.test")!])
+    func noPresetSearch(baseURL: URL) async {
+        let transport = StubTransport()
+        let provider = GitLabProvider(transport: transport)
+        let account = account([.group(fullPath: "acme", includeSubgroups: true)], baseURL: baseURL)
+        #expect(!provider.capabilities(for: account).presetSearch)
+
+        let search = PresetSearch(filter: .any, repositories: nil, sort: .lastActivity, kinds: [.pullRequest])
+        await #expect(throws: ProviderError.unsupported("Preset search")) {
+            _ = try await provider.fetchPresetItems(account: account, token: "glpat-x", search: search)
+        }
+        #expect(await transport.requests.isEmpty)
+    }
 }
 
 @Suite("REST: verify and discovery")
@@ -176,6 +191,21 @@ struct GitLabGraphQLTests {
     private let emptyProject = #"{"data":{"project":{"fullPath":"a/b","mergeRequests":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]},"issues":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}"#
     /// Real fixtures report further pages; these answer the follow-up page requests.
     private var lastPages: [StubTransport.Response] { [.json(emptyProject), .json(emptyProject), .json(emptyProject)] }
+
+    @Test("every request of a download counts for the sync that asked, one per page of each list")
+    func requestsAreCounted() async throws {
+        let transport = StubTransport([.json(try Fixtures.data("graphql_project.json"))] + lastPages)
+
+        let (_, requests) = try await RequestTally.counting {
+            try await GitLabProvider(transport: transport).fetchItems(
+                account: account([.repository(fullName: "gitlab-org/gitlab-runner")], baseURL: cloud), token: "t",
+                kinds: [.pullRequest, .issue]
+            )
+        }
+
+        #expect(requests > 0)
+        #expect(requests == (await transport.requests.count))
+    }
 
     @Test("maps the captured project fixture: merge requests and issues")
     func mapsProject() async throws {

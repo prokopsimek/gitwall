@@ -55,10 +55,19 @@ extension PresetEntry {
         guard let preset else {
             return PresetEntry(date: now, preset: nil, items: [], fetchedAt: snapshot?.fetchedAt, staleAfter: staleAfter, container: container, problem: .noPreset, attention: false, isDefaultPreset: true, presetCount: 0)
         }
-        let items = snapshot.map { FilterEngine.items(matching: preset, in: $0.items, accounts: config.accounts, now: now) } ?? []
+        // The preset's own items and fetch time; without a snapshot nothing was fetched yet.
+        let source = snapshot ?? Snapshot(fetchedAt: .distantPast, items: [])
+        let items = PresetFreshness.items(for: preset, in: source, accounts: config.accounts, now: now)
+        let display = PresetFreshness.display(for: preset, in: source, accounts: config.accounts, itemCount: items.count)
+        let presentation = PresetCountPresentation(display, now: now)
         let attention = snapshot?.accountStatus.values.contains { $0.state != .ok } ?? false
-        log.info("Widget rendered preset \(preset.name, privacy: .public) with \(items.count) items")
-        return PresetEntry(date: now, preset: preset, items: items, fetchedAt: snapshot?.fetchedAt, staleAfter: staleAfter, container: container, problem: nil, attention: attention, isDefaultPreset: chosen == nil, presetCount: config.presets.count)
+        log.info("Widget rendered a preset with \(items.count) items")
+        return PresetEntry(date: now, preset: preset, items: items,
+                           fetchedAt: PresetCountPresentation.fetchedAt(display, snapshotFetchedAt: snapshot?.fetchedAt),
+                           staleAfter: staleAfter, container: container,
+                           problem: presentation.placeholder.map(PresetEntry.Problem.preset), attention: attention,
+                           isDefaultPreset: chosen == nil, presetCount: config.presets.count,
+                           queryFailed: presentation.showsFailureNotice)
     }
 }
 

@@ -1,0 +1,114 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 2,
+      "remaining": 4804,
+      "resetAt": "2026-11-19T21:46:44Z"
+    },
+    "search": {
+      "issueCount": 3,
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjM="
+      },
+      "nodes": [
+        {
+          "__typename": "Issue",
+          "id": "I_kwDOUUWeOM8AAAABQ1mSsg",
+          "number": 3,
+          "title": "Count GitHub team review requests in \"Waiting for my review\"",
+          "url": "https://github.com/prokopsimek/gitwall/issues/3",
+          "createdAt": "2026-09-11T13:32:55Z",
+          "updatedAt": "2026-09-11T14:09:50Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "enhancement",
+                "color": "a2eeef"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 1
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "Issue",
+          "id": "I_kwDOUUWeOM8AAAABQ1mRvQ",
+          "number": 2,
+          "title": "Preset filter by author (agent and bot pull requests)",
+          "url": "https://github.com/prokopsimek/gitwall/issues/2",
+          "createdAt": "2026-09-11T13:32:54Z",
+          "updatedAt": "2026-09-11T14:01:07Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "enhancement",
+                "color": "a2eeef"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        },
+        {
+          "__typename": "Issue",
+          "id": "I_kwDOUUWeOM8AAAABQ1mQ8Q",
+          "number": 1,
+          "title": "Waiting for my review: show drafts that ask for my review",
+          "url": "https://github.com/prokopsimek/gitwall/issues/1",
+          "createdAt": "2026-09-11T13:32:52Z",
+          "updatedAt": "2026-09-11T14:01:06Z",
+          "author": {
+            "login": "prokopsimek",
+            "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+            "name": "Prokop Simek"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "enhancement",
+                "color": "a2eeef"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "milestone": null,
+          "comments": {
+            "totalCount": 0
+          },
+          "repository": {
+            "nameWithOwner": "prokopsimek/gitwall"
+          }
+        }
+      ]
+    }
+  }
+}

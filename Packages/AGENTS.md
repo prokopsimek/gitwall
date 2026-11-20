@@ -17,6 +17,9 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
 | `GitwallCore` · Detail | `ItemDetail`, `DetailFetcher` (on-demand fetch, shared while in flight), `DetailCache` (the one cache, kept by the app), `NextStep`, `LatestWord`, `WhatsNew`, `SeenStore` (`seen.json`), `FilterEngine.explain` (`MatchReason`), `DetailVisibility` (navigation that leaves nothing selected closes Detail). |
 | `GitwallUI` · Detail | `DetailView` and its wording (`DetailPresentation`), `MarkdownView` and the native Markdown parser (`MarkdownBlock`). |
 | `GitwallGitHub` · Detail | Item detail in two read-only GraphQL queries (`GraphQL+ItemDetail.swift`, `GitHubProvider+ItemDetail.swift`). |
+| `GitwallCore` · Preset search | `PresetResult` (the last search per preset and account, with `PresetQueryFailure`), `Snapshot.presetResults` and `Snapshot.searchedAccounts`, `Preset.selectionFingerprint`, `PresetOutcome` and `PresetResult.merged`, `SyncSelection` (the presets a regular sync fetches), `PresetFreshness` and `PresetCountDisplay` (what a preset shows, its count, fetch on open), `SearchFindings` (what the diff learns from the searches), `ProviderCapabilities.presetSearch` with `GitProvider.capabilities(for:)`, `PresetSearch`/`PresetFetch` for `fetchPresetItems`, `ItemState` for `fetchItemStates`, `SyncEngine.syncPresets`. See `docs/adr/0017`. |
+| `GitwallUI` · Preset search | `PresetCountPresentation`: the words for a preset's count ("12", "1000+", "–", "Query failed") and the placeholder of a list with nothing fetched yet. |
+| `GitwallGitHub` · Preset search | `PresetSearchQuery` (a preset as an `ISSUE_ADVANCED` query, at least as wide as the local filter), the preset search with splitting and paging to 1000 (`GitHubProvider+PresetSearch.swift`), the item-state lookup over `nodes(ids:)` in batches of 100 (`GitHubProvider+ItemStates.swift`). |
 
 ## Rules
 
@@ -40,26 +43,56 @@ GitwallCore ◀── GitwallUI, GitwallAuth, GitwallGitHub, GitwallGitLab
   already leaves archived projects out by default.
 - A GitHub review request addressed to a team resolves to the token owner when they are in that team. The
   membership query (`GraphQLQueries.viewerTeams`, classic tokens need `read:org`) runs at most once per
-  `fetchItems`, and only for a batch that actually contains a team request; a refusal is logged and leaves the
-  queue as it was.
+  `fetchItems`, `fetchPresetItems` or `fetchItemStates`, and only for a batch that actually contains a team request.
+  `GitHubProvider` also keeps a clean answer (`TeamSlugCache`, per account and token, five minutes), so preset
+  searches and item-state lookups of one sync share a single query per account. A refusal or an answer with errors
+  is not kept, so the next call asks again; it is logged by the number and types of the errors or the type of the
+  thrown error, never GitHub's text, which can name an organization.
 - Priority (`WorkItem.priority`) is the GitHub Projects field `Priority` (`projectPriority`), else the most urgent
   `p0`–`p3` label. The project value comes from `GitProvider.projectPriorities`, a separate request after
   `fetchItems` that never throws and never fails the sync: a refused scope is `.missingPermission`
   (`FetchStatus.projectAccess = .denied`, a hint in Settings), anything else `.failed`, which keeps the previous
   values. Never put `projectItems` into the list queries: a token without `read:project` would lose the whole list
   (see `docs/adr/0012`).
+- The request count in `SyncReport` is every request the accounts send, counted by `RequestTally` (GitwallCore): each
+  provider client calls `RequestTally.record()` just before it hands a request to its transport, repeats included, and
+  `SyncEngine` runs each account's work inside one tally. A new client, or a new place that calls a transport directly,
+  must record too, or its requests are missing from the line. The line is written at `SyncReport.logLevel` (notice, so
+  the unified log keeps it); do not lower it to info.
+- Only `GitHubClient.send(_:decoding:)` repeats a request, and only after 502, 503 or 504 or a 2xx answer whose body
+  is not JSON at all (an empty body included): twice at most, after 1 s and 2 s (`retryDelays`). A body still not
+  JSON after the last attempt is thrown as `ProviderError.network`. A 401, a rate limit, any other status, GraphQL
+  errors in a 200 answer, JSON of the wrong shape (`invalidResponse`) and network errors fail at once, and the GitLab
+  client repeats nothing. A 502–504 or a network error that reaches `SyncEngine` counts in
+  `FetchStatus.consecutiveFailures`: the first two failed syncs in a row leave the account's state and message as they
+  were and write a `QuietFailure` line to the log (provider, kind of error, place in the series, no message), the
+  third writes `error` (`SyncEngine.quietFailures`). Keep the quiet period in `FetchStatus`, because Settings, the
+  popover, the main window and the widget all read `FetchStatus.state` (see `docs/adr/0016`).
 - Filter categories combine with AND, values inside one category with OR. Two deliberate exceptions live in
   `FilterEngine`: a draft that names me as a reviewer passes a review preset even when drafts are off (cloud
   agents cannot mark their pull requests ready), and author logins are compared without a trailing `[bot]`,
   because GitHub GraphQL returns `renovate` where REST returns `renovate[bot]` (`LoginMatch`).
-- `ItemFilter.query` is GitHub search syntax read by `SearchQuery` and evaluated **locally**, over the snapshot,
-  for both providers; it is never sent to a server. A space or `AND` is AND, `OR` is OR, AND binds tighter, and
+- `ItemFilter.query` is GitHub search syntax read by `SearchQuery` and evaluated **locally** by `FilterEngine`, for
+  both providers, and that local reading decides what a preset shows. On GitHub.com `PresetSearchQuery` also sends it,
+  with the preset's other fields, as the search that decides what is downloaded; that search must find at least what
+  the local reading matches (see `docs/adr/0017`). A space or `AND` is AND, `OR` is OR, AND binds tighter, and
   parentheses nest at most five levels; a leading `-` excludes one term. `-(…)` and a bare `@login` are errors and
   `NOT` is no operator — all checked against GitHub's own search (see `docs/adr/0009`). Commas inside a term are
   OR, which GitHub only honours for `label:`. Only qualifiers `WorkItem` can answer are accepted; anything else is
   a parse error, and an unreadable query matches nothing so a typo cannot widen a preset. Adding a qualifier means
-  adding it to `SearchQuery.Qualifier`, to `SearchQueryTests` and to the table in the README. `priority:` is the one
-  qualifier taken from GitHub Projects' filter syntax rather than issue search.
+  adding it to `SearchQuery.Qualifier`, to `SearchQueryTests` and to the table in the README, and deciding in
+  `PresetSearchQuery` (where the switch stops the build) whether GitHub can answer it at least as wide, with a row in
+  `PresetSearchQueryTests`; when it cannot, it stays local. `priority:` is the one qualifier taken from GitHub
+  Projects' filter syntax rather than issue search.
+- On GitHub.com a regular sync fetches only the presets `SyncSelection` picks, at least one search per preset, account
+  and kind, and keeps a `PresetResult` per preset and account; everything else is fetched on open (`syncPresets`).
+  GHES and GitLab download everything as before (`ProviderCapabilities.presetSearch`). A change must keep these: the
+  search is never narrower than `FilterEngine`; readers of the snapshot learn which accounts search from
+  `Snapshot.searchedAccounts` and do not branch on the provider kind; an item missing from a search is `.closed` only
+  when `fetchItemStates` confirms it; the first result of a pair or of an edited preset (`selectionFingerprint`)
+  reports nothing; a failed search keeps the previous result and a refused query (`PresetSearchFailure`) never changes
+  the account's `FetchStatus`; the log (`SyncReport`) holds only counts, with no query or login in it (see
+  `docs/adr/0017`).
 - The preset JSON of `PresetTransfer` is a public contract (`docs/adr/0013`, README *Sharing presets*): `id`, `name`,
   `query`, `icon`, `sort`, `kinds` under `"version": 1`. Unknown keys are errors, everything is validated before
   anything is written, a paste never deletes, and an export round-trips exactly. A new key or a changed meaning needs

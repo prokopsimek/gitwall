@@ -172,6 +172,10 @@ enum EmptyStateKind: Equatable {
     case loading
     /// `idle` is an account of the preset that watches nothing: its items are missing whatever the filter says.
     case nothingMatches(presetName: String, idle: Account?)
+    /// The preset was never fetched and no fetch runs.
+    case waitingForSync(presetID: UUID)
+    /// The provider refused the preset's query before it was ever fetched.
+    case queryFailed(presetID: UUID)
 }
 
 struct EmptyStateView: View {
@@ -210,6 +214,14 @@ struct EmptyStateView: View {
                       action: ("Choose Repositories…", { environment.openSettings(.repositories, accountID: account.id) }))
         case .loading:
             self.init(title: "Loading…", symbol: "arrow.triangle.2.circlepath", message: "Fetching the latest activity.")
+        case .waitingForSync(let presetID):
+            self.init(title: "Waiting for sync", symbol: "clock",
+                      message: "This preset has not been fetched yet.",
+                      action: ("Try Again", { Self.retry(presetID, in: environment) }))
+        case .queryFailed(let presetID):
+            self.init(title: "Query failed", symbol: "exclamationmark.triangle",
+                      message: "The provider refused this preset's query, so nothing was fetched. Check the query in Settings › Presets or try again.",
+                      action: ("Try Again", { Self.retry(presetID, in: environment) }))
         case .nothingMatches(let presetName, nil):
             self.init(title: "Nothing here", symbol: "checkmark.circle", message: "No open items match “\(presetName)”.")
         case .nothingMatches(let presetName, let idle?):
@@ -217,6 +229,11 @@ struct EmptyStateView: View {
                       message: "No open items match “\(presetName)”. \(idle.displayName) watches no repositories yet, so its items are not fetched.",
                       action: ("Choose Repositories…", { environment.openSettings(.repositories, accountID: idle.id) }))
         }
+    }
+
+    private static func retry(_ presetID: UUID, in environment: AppEnvironment) {
+        guard let preset = environment.config.presets.first(where: { $0.id == presetID }) else { return }
+        environment.retryFetch(of: preset)
     }
 
     var body: some View {

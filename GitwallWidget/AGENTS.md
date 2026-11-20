@@ -1,13 +1,18 @@
 # Widget extension
 
 Four widgets, one per size, sharing `GitwallWidgetView`. Each reads `config.json` and `snapshot.json` from the
-App Group and applies the preset chosen for that widget instance. It never touches the network or the Keychain.
+App Group and shows the preset chosen for that widget instance through `PresetFreshness`: on GitHub.com only the items
+of that preset's own result, with "Waiting for sync" before its first fetch and "Query failed" after a refused query
+(see `docs/adr/0017`). It never touches the network or the Keychain.
 
 - `GitwallWidgetBundle.swift` – the four `Widget` types.
 - `GitwallWidget.swift` – timeline provider, `PresetWidgetSpec` (kind, name, description per size).
 - `WidgetViews.swift` – the views and `PresetEntry`. **Also compiled into the app target** so `--debug-demo-widgets`
   can render the same views into windows for screenshots (see `project.yml`).
-- `PresetIntent.swift` – `SelectPresetIntent`, `PresetEntity`, `PresetQuery`.
+- `PresetIntent.swift` – `SelectPresetIntent`, `PresetEntity`, `PresetQuery`. Also compiled into the app target, so
+  a sync can read which preset each placed widget shows (`AppEnvironment.widgetPresets()`, `project.yml`), and so it
+  must build in both. A regular sync on GitHub.com fetches only the presets on screen: a change here that loses a
+  widget's preset leaves that widget without fresh data.
 
 ## Traps, learned the hard way
 

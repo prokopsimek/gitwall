@@ -45,6 +45,9 @@ public struct ProviderCapabilities: Hashable, Sendable {
     /// Whether ``GitProvider/itemDetail(account:token:item:)`` fetches anything. Without it Detail shows what the
     /// snapshot holds and a link.
     public var fetchesItemDetail: Bool
+    /// Whether ``GitProvider/fetchPresetItems(account:token:search:)`` can fetch one preset's items with a search of
+    /// their own. It depends on the account, so ask ``GitProvider/capabilities(for:)``, never the provider kind.
+    public var presetSearch: Bool
 
     public init(
         pullRequestTerm: String,
@@ -53,7 +56,8 @@ public struct ProviderCapabilities: Hashable, Sendable {
         supportsGroupSources: Bool,
         resolvesTeamReviewRequests: Bool,
         hostName: String,
-        fetchesItemDetail: Bool = false
+        fetchesItemDetail: Bool = false,
+        presetSearch: Bool = false
     ) {
         self.pullRequestTerm = pullRequestTerm
         self.pullRequestAbbreviation = pullRequestAbbreviation
@@ -62,6 +66,7 @@ public struct ProviderCapabilities: Hashable, Sendable {
         self.resolvesTeamReviewRequests = resolvesTeamReviewRequests
         self.hostName = hostName
         self.fetchesItemDetail = fetchesItemDetail
+        self.presetSearch = presetSearch
     }
 }
 
@@ -72,6 +77,9 @@ public enum ProviderError: Error, Hashable, Sendable, LocalizedError {
     case server(status: Int, message: String)
     case invalidResponse(String)
     case notFound(String)
+    /// The provider cannot do this for the account, such as ``GitProvider/fetchPresetItems(account:token:search:)``
+    /// where ``ProviderCapabilities/presetSearch`` is false.
+    case unsupported(String)
 
     public var errorDescription: String? {
         switch self {
@@ -86,6 +94,7 @@ public enum ProviderError: Error, Hashable, Sendable, LocalizedError {
         case .server(let status, let message): "Server error \(status): \(message)"
         case .invalidResponse(let message): "Unexpected response: \(message)"
         case .notFound(let what): "Not found: \(what)"
+        case .unsupported(let what): "\(what) is not supported for this account."
         }
     }
 }
@@ -94,6 +103,9 @@ public enum ProviderError: Error, Hashable, Sendable, LocalizedError {
 public protocol GitProvider: Sendable {
     var kind: ProviderKind { get }
     var capabilities: ProviderCapabilities { get }
+
+    /// What the provider can do for `account`, which can be less or more than ``capabilities`` says for the kind.
+    func capabilities(for account: Account) -> ProviderCapabilities
 
     /// Validates the token and returns the identity it belongs to.
     func verify(baseURL: URL, token: String) async throws -> UserRef
@@ -106,6 +118,15 @@ public protocol GitProvider: Sendable {
 
     /// All open items of the requested kinds for the account's sources.
     func fetchItems(account: Account, token: String, kinds: Set<ItemKind>) async throws -> [WorkItem]
+
+    /// The open items of one preset in `account`, found by a search of their own instead of downloading everything.
+    /// Only where ``ProviderCapabilities/presetSearch`` is true for the account. The search may return more than the
+    /// preset shows, never less; `FilterEngine` still decides what the preset shows.
+    func fetchPresetItems(account: Account, token: String, search: PresetSearch) async throws -> PresetFetch
+
+    /// What became of `items` of `account`, which left a fresh preset result: closed, merged, not found, or open with
+    /// current data. Keyed by ``WorkItem/id``; an item the provider has no answer for is left out. Read-only.
+    func fetchItemStates(account: Account, token: String, items: [WorkItem]) async throws -> [String: ItemState]
 
     /// When the credential stops working, when the provider can tell. Never throws: an unknown expiry is `nil`,
     /// so settings can warn about an expiring personal access token without turning it into a sync failure.
@@ -124,6 +145,19 @@ public protocol GitProvider: Sendable {
 }
 
 extension GitProvider {
+    /// The same for every account of the kind.
+    public func capabilities(for account: Account) -> ProviderCapabilities { capabilities }
+
+    /// Providers without a search of their own fetch every item with ``fetchItems(account:token:kinds:)``.
+    public func fetchPresetItems(account: Account, token: String, search: PresetSearch) async throws -> PresetFetch {
+        throw ProviderError.unsupported("Preset search")
+    }
+
+    /// Providers without a lookup by item: nothing that left a result can be confirmed closed.
+    public func fetchItemStates(account: Account, token: String, items: [WorkItem]) async throws -> [String: ItemState] {
+        throw ProviderError.unsupported("Item state lookup")
+    }
+
     public func tokenExpiry(baseURL: URL, token: String) async -> Date? { nil }
 
     /// Providers without planning boards; their items rely on labels.

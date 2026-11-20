@@ -74,6 +74,7 @@ struct GitLabClient: Sendable {
     // MARK: Errors
 
     private func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        RequestTally.record()
         let (data, response) = try await transport.send(request)
         guard 200..<300 ~= response.statusCode else {
             throw Self.map(status: response.statusCode, data: data, response: response)

@@ -48,10 +48,12 @@ struct WallTileView: View {
     private func content(_ preset: Preset) -> some View {
         let items = model.items(for: tile)
         let environment = model.environment
+        let display = environment.presetCount(for: preset)
+        let presentation = PresetCountPresentation(display, now: Date())
         return TileView(
             icon: preset.icon,
             title: preset.name,
-            count: items.count,
+            count: display.count,
             items: items,
             size: tile.size,
             now: Date(),
@@ -68,11 +70,18 @@ struct WallTileView: View {
                 )
             },
             headerAction: { environment.openMainWindow(presetID: preset.id) },
-            replacement: EmptyView?.none
+            replacement: presentation.placeholder.map {
+                TilePlaceholder(placeholder: $0, isFetching: environment.fetchingPresetIDs.contains(preset.id))
+            }
         ) {
             EmptyView()
         } notice: {
-            EmptyView()
+            if presentation.showsFailureNotice {
+                Text("Query failed")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .help(presentation.help)
+            }
         }
     }
 
@@ -121,6 +130,30 @@ struct WallTileView: View {
             .fixedSize()
         }
         .padding(10)
+    }
+}
+
+/// A tile of a preset with nothing fetched yet: a spinner while its fetch on open runs, otherwise why it is empty.
+private struct TilePlaceholder: View {
+    let placeholder: PresetCountPresentation.Placeholder
+    let isFetching: Bool
+
+    var body: some View {
+        VStack(spacing: 6) {
+            if isFetching {
+                ProgressView().controlSize(.small)
+            } else {
+                switch placeholder {
+                case .waitingForSync:
+                    Text("Waiting for sync").font(.callout).foregroundStyle(.secondary)
+                case .queryFailed:
+                    Label("Query failed", systemImage: "exclamationmark.triangle")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

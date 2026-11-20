@@ -1,4 +1,5 @@
 import GitwallCore
+import GitwallUI
 import SwiftUI
 
 /// First-run walkthrough: connect an account, pick repositories, review the default presets, decide about
@@ -208,7 +209,7 @@ struct OnboardingView: View {
                         Text(description(of: preset)).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text("\(environment.count(for: preset))")
+                    PresetCountLabel(PresetCountPresentation(environment.presetCount(for: preset), now: Date()))
                         .font(.callout.weight(.semibold)).monospacedDigit()
                         .padding(.horizontal, 8).padding(.vertical, 2)
                         .background(.quaternary, in: Capsule())

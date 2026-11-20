@@ -29,6 +29,7 @@ final class MainWindowController: ItemWindowController {
         window.center()
         window.setFrameAutosaveName("GitwallMain")
         super.init(window: window, environment: environment, detail: detail)
+        environment.isMainWindowVisible = { [weak self] in self?.isOnScreen ?? false }
         #if DEBUG
         // `--debug-detail owner/repo#123` opens Detail of that item, for screenshots without clicking.
         let args = CommandLine.arguments
@@ -40,12 +41,25 @@ final class MainWindowController: ItemWindowController {
     }
 
     func show(presetID: UUID?) {
+        let opens = !isOnScreen
         if let presetID, environment.config.preset(id: presetID) != nil {
             environment.selectedPresetID = presetID
         }
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
+        // Another preset in a window already on screen is the view's to fetch (`MainWindowView`).
+        if opens { environment.fetchSelectedPresetOnOpen() }
+    }
+
+    /// Open and not in the Dock: only then does a regular sync fetch the window's preset.
+    private var isOnScreen: Bool {
+        window?.isVisible == true && window?.isMiniaturized == false
+    }
+
+    /// Back from the Dock, the window shows its preset again.
+    @objc func windowDidDeminiaturize(_ notification: Notification) {
+        environment.fetchSelectedPresetOnOpen()
     }
 
     func showWidgetHelp() {

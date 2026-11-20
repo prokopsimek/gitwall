@@ -4,10 +4,13 @@ import OSLog
 
 let gitHubLog = Logger(subsystem: "cz.prokopsimek.gitwall", category: "github")
 
-/// Builds authenticated requests and maps HTTP failures to `ProviderError`.
+/// Builds authenticated requests, decodes their answers and maps HTTP failures to `ProviderError`.
 struct GitHubClient: Sendable {
     let transport: any HTTPTransport
     let userAgent: String
+    /// Waits before a request is sent again after a gateway error or a body that is not JSON. Tests inject one that
+    /// returns at once.
+    var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
 
     static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
@@ -34,8 +37,7 @@ struct GitHubClient: Sendable {
 
     /// GET returning the decoded body and the raw response (for pagination headers).
     func get<T: Decodable>(_ type: T.Type, url: URL, token: String) async throws -> (T, HTTPURLResponse) {
-        let (data, response) = try await send(request(url, token: token))
-        return (try decode(type, from: data), response)
+        try await send(request(url, token: token), decoding: type)
     }
 
     /// Follows `Link: rel="next"` up to `maxPages` pages, concatenating array bodies.
@@ -57,8 +59,8 @@ struct GitHubClient: Sendable {
         let vars = variables.compactMapValues { $0 }
         if !vars.isEmpty { payload["variables"] = vars }
         let body = try JSONSerialization.data(withJSONObject: payload)
-        let (data, _) = try await send(request(endpoint, token: token, method: "POST", body: body))
-        let decoded = try decode(GraphQLResponse<T>.self, from: data)
+        let (decoded, _) = try await send(request(endpoint, token: token, method: "POST", body: body),
+                                          decoding: GraphQLResponse<T>.self)
         if let rateLimit = decoded.data?.rateLimitInfo {
             gitHubLog.debug("GraphQL cost \(rateLimit.cost) remaining \(rateLimit.remaining)")
         }
@@ -70,22 +72,64 @@ struct GitHubClient: Sendable {
 
     // MARK: Errors
 
-    private func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await transport.send(request)
-        guard 200..<300 ~= response.statusCode else {
-            throw Self.map(status: response.statusCode, data: data, response: response)
+    /// The waits before the first and the second repeat of a request that ended in 502, 503 or 504, or in a 2xx answer
+    /// whose body is not JSON.
+    private static let retryDelays: [Duration] = [.seconds(1), .seconds(2)]
+
+    /// What a request fails with when every attempt got a 2xx answer whose body is not JSON. It is a passing failure
+    /// like a lost connection, because the request itself is fine, so the sync's quiet period covers it.
+    private static let unreadableAnswer = ProviderError.network("GitHub sent an answer that could not be read.")
+
+    /// Every request goes through here, and its answer is decoded here. A gateway error, or a 2xx answer whose body is
+    /// not JSON at all, is repeated after each of `retryDelays`, so a request gets at most three attempts; any other
+    /// failure, and the failure of the last attempt, is thrown at once.
+    private func send<T: Decodable>(_ request: URLRequest, decoding type: T.Type) async throws -> (T, HTTPURLResponse) {
+        var delays = Self.retryDelays[...]
+        while true {
+            RequestTally.record()
+            let (data, response) = try await transport.send(request)
+            let failure: ProviderError
+            // What the log says GitHub answered: the status, and the size of a body that is not JSON.
+            let answer: String
+            if 200..<300 ~= response.statusCode {
+                if let value = try Self.decode(type, from: data) { return (value, response) }
+                failure = Self.unreadableAnswer
+                answer = "\(response.statusCode) with \(data.count) bytes that are not JSON"
+            } else {
+                failure = Self.map(status: response.statusCode, data: data, response: response)
+                guard Self.isGatewayError(failure) else { throw failure }
+                answer = "\(response.statusCode)"
+            }
+            guard let delay = delays.popFirst() else { throw failure }
+            gitHubLog.info("GitHub answered \(answer, privacy: .public), trying again in \(delay, privacy: .public)")
+            try await sleep(delay)
+            try Task.checkCancellation()
         }
-        return (data, response)
     }
 
-    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+    /// Bad gateway, service unavailable and gateway timeout: GitHub is briefly unreachable, the request itself is fine.
+    /// Network errors are left to the sync's own handling, and everything else would fail the same way again.
+    private static func isGatewayError(_ error: ProviderError) -> Bool {
+        guard case .server(let status, _) = error else { return false }
+        return [502, 503, 504].contains(status)
+    }
+
+    /// `data` as `type`, or nil when it is not JSON at all, such as an empty or cut-off body, which a repeat may fix.
+    /// JSON of another shape would come back the same, so it throws `invalidResponse` at once.
+    private static func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T? {
         do {
-            return try Self.decoder.decode(type, from: data)
+            return try decoder.decode(type, from: data)
         } catch {
-            let detail = Self.describe(error)
+            guard isJSON(data) else { return nil }
+            let detail = describe(error)
             gitHubLog.error("Undecodable GitHub response: \(detail, privacy: .public)")
             throw ProviderError.invalidResponse("GitHub returned data in an unexpected format (\(detail)).")
         }
+    }
+
+    /// Whether `data` parses as JSON of any shape, a bare value such as `null` or `42` included.
+    private static func isJSON(_ data: Data) -> Bool {
+        (try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)) != nil
     }
 
     static func describe(_ error: Error) -> String {

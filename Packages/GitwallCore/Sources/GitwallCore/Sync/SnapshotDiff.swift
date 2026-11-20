@@ -17,18 +17,46 @@ public struct RoutedNotification: Hashable, Sendable {
 
 /// Detects what changed between two syncs and which presets want to be told about it.
 public enum SnapshotDiff {
+    /// How long before the earlier result of its pair an item of a searching account may have been opened and still be
+    /// a new item. GitHub's search index can lag behind, so an item opened just before that result was fetched may
+    /// first show up in a search now.
+    static let searchIndexLag: TimeInterval = 10 * 60
+
     /// Nothing is reported for the very first sync (`previous == nil`), so a fresh install never produces a burst.
-    public static func changes(from previous: Snapshot?, to current: Snapshot, accounts: [Account]) -> [ItemChange] {
+    ///
+    /// An item that left the snapshot is `.closed`, one that joined it `.newItem` (and `.reviewRequested` when it asks
+    /// me), and an item in both gets an event for each change it went through. For the items of an account in
+    /// ``SearchFindings/accounts`` two of these rules are narrower, because its searches return only the open items that
+    /// match: an item that left is `.closed` only when it is in ``SearchFindings/closedItemIDs``, and one that joined is
+    /// news only when it is in ``SearchFindings/comparedItemIDs``. Even then it is `.newItem` only when it was opened
+    /// after the earlier result of its pair (``SearchFindings/comparedSince``, the previous sync when the findings
+    /// carry no date for it), less ``searchIndexLag``: an older item joined because it started to match, through a
+    /// review request, a label or recent activity, so it reports only `.reviewRequested`, when it asks me. An account in
+    /// the previous snapshot's ``Snapshot/searchedAccounts`` that did not search now has a baseline instead: it
+    /// downloaded the open items its download reaches, which are neither all nor only those its searches had found, so
+    /// neither an item that joined it nor one that left it says anything. Closed and merged are both `.closed`.
+    public static func changes(
+        from previous: Snapshot?, to current: Snapshot, accounts: [Account], searches: SearchFindings = .none
+    ) -> [ItemChange] {
         guard let previous else { return [] }
         let identities = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0.me) })
         let previousByID = Dictionary(uniqueKeysWithValues: previous.items.map { ($0.id, $0) })
+        let stoppedSearching = previous.searchedAccounts.subtracting(searches.accounts)
         var changes: [ItemChange] = []
 
         for item in current.items {
             let me = identities[item.accountID] ?? nil
             let requestedNow = isRequested(me, in: item)
             guard let old = previousByID[item.id] else {
-                changes.append(ItemChange(item: item, event: .newItem))
+                // The first result of a pair, or of an edited preset, is the baseline its later results are compared
+                // to, and so is the first full download after the account searched.
+                let searched = searches.accounts.contains(item.accountID)
+                if searched, !searches.comparedItemIDs.contains(item.id) { continue }
+                if stoppedSearching.contains(item.accountID) { continue }
+                let reference = searches.comparedSince[item.id] ?? previous.fetchedAt
+                if !searched || item.createdAt > reference.addingTimeInterval(-searchIndexLag) {
+                    changes.append(ItemChange(item: item, event: .newItem))
+                }
                 if requestedNow { changes.append(ItemChange(item: item, event: .reviewRequested)) }
                 continue
             }
@@ -48,6 +76,10 @@ public enum SnapshotDiff {
 
         let currentIDs = Set(current.items.map(\.id))
         for old in previous.items where !currentIDs.contains(old.id) {
+            // It may only have stopped matching, or belong to a preset this sync did not search, or lie beyond the
+            // reach of the first full download after the account searched.
+            if searches.accounts.contains(old.accountID), !searches.closedItemIDs.contains(old.id) { continue }
+            if stoppedSearching.contains(old.accountID) { continue }
             changes.append(ItemChange(item: old, event: .closed))
         }
         return changes

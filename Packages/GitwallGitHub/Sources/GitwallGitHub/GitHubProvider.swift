@@ -1,5 +1,6 @@
 import Foundation
 import GitwallCore
+import OSLog
 
 /// `GitProvider` for GitHub.com and GitHub Enterprise Server.
 /// REST for identity and discovery, GraphQL for pull requests and issues.
@@ -18,9 +19,22 @@ public struct GitHubProvider: GitProvider {
     static let maxRepositoryPages = 5
 
     let client: GitHubClient
+    /// Shared by every copy of this provider, so searches and item-state lookups of one sync ask GitHub for the viewer's
+    /// teams once per account.
+    let teamCache: TeamSlugCache
 
     public init(transport: any HTTPTransport = URLSessionTransport(), userAgent: String = "Gitwall") {
         client = GitHubClient(transport: transport, userAgent: userAgent)
+        teamCache = TeamSlugCache()
+    }
+
+    /// For tests: `sleep` stands in for the wait before a 502, 503 or 504 is tried again.
+    init(
+        transport: any HTTPTransport, userAgent: String = "Gitwall", sleep: @escaping @Sendable (Duration) async throws -> Void,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        client = GitHubClient(transport: transport, userAgent: userAgent, sleep: sleep)
+        teamCache = TeamSlugCache(now: now)
     }
 
     // MARK: REST
@@ -116,7 +130,8 @@ public struct GitHubProvider: GitProvider {
         return items.filter { seen.insert($0.id).inserted }
     }
 
-    /// One lookup per `fetchItems`, shared by every batch and page.
+    /// One lookup per fetch, shared by every batch and page; the provider's ``TeamSlugCache`` is asked at most once
+    /// through it.
     actor TeamSlugs {
         private var slugs: Set<String>?
 
@@ -129,7 +144,7 @@ public struct GitHubProvider: GitProvider {
     }
 
     /// Nothing to resolve unless the token owner is known and GitHub asked one of their teams for a review.
-    private func teamSlugs(
+    func teamSlugs(
         for nodes: [ItemNode],
         account: Account,
         token: String,
@@ -141,22 +156,27 @@ public struct GitHubProvider: GitProvider {
             node.reviewRequests?.items.contains { $0.requestedReviewer?.__typename == "Team" } ?? false
         }
         guard asksATeam else { return [] }
-        return await teams.resolve { await viewerTeamSlugs(endpoints: endpoints, token: token) }
+        let key = TeamSlugCache.Key(accountID: account.id, token: token)
+        return await teams.resolve {
+            await teamCache.slugs(for: key) { await viewerTeamSlugs(endpoints: endpoints, token: token) }
+        }
     }
 
     /// Teams the token owner belongs to, as `owner/slug`. Empty when the token may not read them, which leaves
-    /// team review requests out of the queue exactly as before.
-    private func viewerTeamSlugs(endpoints: GitHubEndpoints, token: String) async -> Set<String> {
+    /// team review requests out of the queue exactly as before; only an answer without errors is worth keeping.
+    private func viewerTeamSlugs(endpoints: GitHubEndpoints, token: String) async -> TeamLookup {
         do {
             let response = try await client.graphQL(ViewerTeamsData.self, endpoint: endpoints.graphQL, token: token,
                                                     query: GraphQLQueries.viewerTeams)
-            if let first = response.errors?.first {
-                gitHubLog.info("Team review requests stay unresolved: \(first.message, privacy: .public)")
+            let slugs = response.data?.slugs ?? []
+            if let errors = response.errors, !errors.isEmpty {
+                gitHubLog.info("\(TeamLookupLog.unresolved(errors), privacy: .public)")
+                return .unreliable(slugs)
             }
-            return response.data?.slugs ?? []
+            return .resolved(slugs)
         } catch {
-            gitHubLog.info("Could not read the viewer's teams: \(error.localizedDescription, privacy: .public)")
-            return []
+            gitHubLog.info("\(TeamLookupLog.failed(error), privacy: .public)")
+            return .unreliable([])
         }
     }
 
@@ -273,15 +293,15 @@ extension GitHubProvider {
             } catch ProviderError.unauthorized {
                 // `INSUFFICIENT_SCOPES` or `FORBIDDEN` without data. The lists were just read with this token, so it
                 // is the projects the token may not read, not the token itself.
-                gitHubLog.info("Project priorities skipped for \(account.displayName, privacy: .public): the token may not read projects")
+                gitHubLog.info("\(ProjectPriorityLog.skipped, privacy: .public)")
                 return .missingPermission
             } catch {
-                gitHubLog.info("Project priorities unavailable: \(error.localizedDescription, privacy: .public)")
+                gitHubLog.error("\(ProjectPriorityLog.unavailable(error, items: itemIDs.count), privacy: .public)")
                 return .failed(error.localizedDescription)
             }
         }
         if refused, priorities.isEmpty {
-            gitHubLog.info("Project priorities refused for \(account.displayName, privacy: .public)")
+            gitHubLog.info("\(ProjectPriorityLog.refused, privacy: .public)")
             return .missingPermission
         }
         return .found(priorities)
@@ -314,4 +334,83 @@ private struct RESTRepository: Decodable {
 private struct RESTOrganization: Decodable {
     let login: String
     let avatar_url: URL?
+}
+
+// MARK: - Team lookup
+
+/// What one look at the viewer's teams came to.
+enum TeamLookup: Sendable {
+    /// GitHub answered without errors; worth keeping for a while.
+    case resolved(Set<String>)
+    /// The request failed or came with errors; used for this fetch only, so the next one asks again.
+    case unreliable(Set<String>)
+}
+
+/// The viewer's teams per account and token, kept for ``lifetime``. Only a clean answer is kept, so a refusal that
+/// may pass is asked again by the next fetch. The token is only a key in memory and is never logged.
+actor TeamSlugCache {
+    struct Key: Hashable, Sendable {
+        let accountID: UUID
+        let token: String
+    }
+
+    static let lifetime: TimeInterval = 5 * 60
+
+    private var entries: [Key: (slugs: Set<String>, loadedAt: Date)] = [:]
+    private let now: @Sendable () -> Date
+
+    init(now: @escaping @Sendable () -> Date = { Date() }) {
+        self.now = now
+    }
+
+    func slugs(for key: Key, load: () async -> TeamLookup) async -> Set<String> {
+        if let entry = entries[key], now().timeIntervalSince(entry.loadedAt) < Self.lifetime {
+            return entry.slugs
+        }
+        switch await load() {
+        case .resolved(let slugs):
+            entries[key] = (slugs, now())
+            return slugs
+        case .unreliable(let slugs):
+            entries[key] = nil
+            return slugs
+        }
+    }
+}
+
+/// What the unified log says about the project priority lookup: the kind of failure and counts, never an account, a
+/// message or a name. The returned `PriorityLookup` carries the message for the UI; the log does not.
+enum ProjectPriorityLog {
+    static let skipped = "Project priorities skipped: the token may not read projects"
+    static let refused = "Project priorities refused: GitHub refused the Priority field"
+
+    static func unavailable(_ error: Error, items: Int) -> String {
+        "Project priorities unavailable (\(kind(of: error))) for \(items) items"
+    }
+
+    /// The error by its case, with the status of a server error, or by its type when it is no ``ProviderError``.
+    static func kind(of error: Error) -> String {
+        switch error as? ProviderError {
+        case .server(let status, _): "server \(status)"
+        case .network: "network"
+        case .unauthorized: "unauthorized"
+        case .rateLimited: "rateLimited"
+        case .invalidResponse: "invalidResponse"
+        case .notFound: "notFound"
+        case .unsupported: "unsupported"
+        case nil: String(describing: type(of: error))
+        }
+    }
+}
+
+/// What the unified log says about the team lookup: counts and types, never GitHub's text, which can name an
+/// organization.
+enum TeamLookupLog {
+    static func unresolved(_ errors: [GraphQLError]) -> String {
+        "Team review requests stay unresolved: \(errors.typeSummary)"
+    }
+
+    static func failed(_ error: Error) -> String {
+        "Could not read the viewer's teams: \(String(describing: type(of: error)))"
+    }
 }

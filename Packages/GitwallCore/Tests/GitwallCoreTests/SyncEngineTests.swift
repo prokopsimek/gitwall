@@ -6,15 +6,53 @@ import Testing
 struct SyncEngineTests {
     /// Scripted provider: returns items per account or throws.
     final class FakeProvider: GitProvider, @unchecked Sendable {
-        // @unchecked: mutated only before the engine runs; tests are single-threaded per instance.
+        // @unchecked: the script is set before the engine runs and only read while it runs. What the engine's calls
+        // record is written under `lock`, because accounts of one kind share this provider and sync concurrently.
         let kind: ProviderKind
         var results: [UUID: Result<[WorkItem], ProviderError>] = [:]
         /// Overrides `results` when the call arrives with this token, so a retry after a refresh can succeed.
         var resultsAfterToken: [String: [WorkItem]] = [:]
+        /// Like `resultsAfterToken`, for a retry after a refresh that fails too.
+        var failuresAfterToken: [String: ProviderError] = [:]
         var requestedKinds: [UUID: Set<ItemKind>] = [:]
         var priorityLookup: PriorityLookup = .unsupported
         /// Tokens the priority lookup was called with, in order.
         var priorityTokens: [String] = []
+        /// Ids of the items each priority lookup was asked about, in order.
+        var priorityItemIDs: [[String]] = []
+        /// Accounts that search each preset on the server.
+        var presetSearchAccounts: Set<UUID> = []
+        /// What a preset search returns, by its search; one that is not scripted finds nothing in one request.
+        var presetFetches: [PresetSearch: Result<PresetFetch, ProviderError>] = [:]
+        /// Overrides `presetFetches` when the search arrives with this token, so a retry after a refresh can succeed.
+        var presetFetchesAfterToken: [String: Result<PresetFetch, ProviderError>] = [:]
+        /// Every preset search the engine sent, in order.
+        var presetSearches: [PresetSearchCall] = []
+        /// What an item state lookup answers, by item id; an item that is not scripted gets no answer.
+        var itemStates: [String: ItemState] = [:]
+        /// Makes every item state lookup fail.
+        var itemStateFailure: ProviderError?
+        /// Every item state lookup the engine sent, in order.
+        var itemStateLookups: [ItemStateLookup] = []
+        /// HTTP requests each call takes, which the fake records the way a real provider's client does. A preset search
+        /// counts those of its scripted fetch; one that fails counts `presetFailureRequests`.
+        var presetFailureRequests = 0
+        var itemStateRequests = 1
+        var priorityRequests = 0
+        var fetchItemsRequests = 0
+        private let lock = NSLock()
+
+        struct PresetSearchCall: Equatable {
+            let accountID: UUID
+            let token: String
+            let search: PresetSearch
+        }
+
+        struct ItemStateLookup: Equatable {
+            let accountID: UUID
+            let token: String
+            let itemIDs: [String]
+        }
 
         init(kind: ProviderKind) { self.kind = kind }
 
@@ -23,17 +61,47 @@ struct SyncEngineTests {
                                  supportsOrganizationSources: true, supportsGroupSources: false,
                                  resolvesTeamReviewRequests: false, hostName: "GitHub")
         }
+        func capabilities(for account: Account) -> ProviderCapabilities {
+            var capabilities = self.capabilities
+            capabilities.presetSearch = presetSearchAccounts.contains(account.id)
+            return capabilities
+        }
         func verify(baseURL: URL, token: String) async throws -> UserRef { UserRef(login: "me") }
         func discoverRepositories(baseURL: URL, token: String, query: String?) async throws -> [RepoRef] { [] }
         func discoverContainers(baseURL: URL, token: String) async throws -> [ContainerRef] { [] }
         func fetchItems(account: Account, token: String, kinds: Set<ItemKind>) async throws -> [WorkItem] {
-            requestedKinds[account.id] = kinds
+            lock.withLock { requestedKinds[account.id] = kinds }
+            RequestTally.record(fetchItemsRequests)
+            if let error = failuresAfterToken[token] { throw error }
             if let items = resultsAfterToken[token] { return items }
             guard let result = results[account.id] else { return [] }
             return try result.get()
         }
+        func fetchPresetItems(account: Account, token: String, search: PresetSearch) async throws -> PresetFetch {
+            lock.withLock { presetSearches.append(PresetSearchCall(accountID: account.id, token: token, search: search)) }
+            let result = presetFetchesAfterToken[token]
+                ?? presetFetches[search] ?? .success(PresetFetch(items: [], totalCount: 0, isComplete: true, requests: 1))
+            switch result {
+            case .success(let fetch): RequestTally.record(fetch.requests)
+            case .failure: RequestTally.record(presetFailureRequests)
+            }
+            return try result.get()
+        }
+        func fetchItemStates(account: Account, token: String, items: [WorkItem]) async throws -> [String: ItemState] {
+            lock.withLock {
+                itemStateLookups.append(ItemStateLookup(accountID: account.id, token: token, itemIDs: items.map(\.id)))
+            }
+            RequestTally.record(itemStateRequests)
+            if let itemStateFailure { throw itemStateFailure }
+            let asked = Set(items.map(\.id))
+            return itemStates.filter { asked.contains($0.key) }
+        }
         func projectPriorities(account: Account, token: String, items: [WorkItem]) async -> PriorityLookup {
-            priorityTokens.append(token)
+            lock.withLock {
+                priorityTokens.append(token)
+                priorityItemIDs.append(items.map(\.id))
+            }
+            RequestTally.record(priorityRequests)
             return priorityLookup
         }
     }
@@ -78,15 +146,23 @@ struct SyncEngineTests {
             try configStore.save(AppConfig(accounts: [github, gitlab], presets: Preset.defaults()))
         }
 
-        func engine(tokens: [UUID: String]? = nil) -> SyncEngine {
-            SyncEngine(
+        func engine(tokens: [UUID: String]? = nil, at time: Date? = nil) -> SyncEngine {
+            engine(reading: StaticTokens(tokens: tokens ?? [github.id: "gh", gitlab.id: "gl"]), at: time)
+        }
+
+        /// An engine whose clock reads `time`, `now` by default, so a later sync can be told apart from an earlier one.
+        func engine(reading tokens: any TokenReading, at time: Date? = nil) -> SyncEngine {
+            let time = time ?? now
+            return SyncEngine(
                 providers: [.github: githubProvider, .gitlab: gitlabProvider],
-                tokens: StaticTokens(tokens: tokens ?? [github.id: "gh", gitlab.id: "gl"]),
+                tokens: tokens,
                 configStore: configStore,
                 snapshotStore: snapshotStore,
-                now: { now }
+                now: { time }
             )
         }
+
+        func minutes(_ minutes: Double) -> Date { now.addingTimeInterval(minutes * 60) }
 
         func item(_ n: Int, account: Account) -> WorkItem {
             WorkItem(accountID: account.id, kind: .pullRequest, repoFullName: "acme/app", number: n, title: "PR \(n)",
@@ -284,7 +360,8 @@ struct SyncEngineTests {
         env.gitlabProvider.results[env.gitlab.id] = .success([env.item(2, account: env.gitlab)])
         _ = try await env.engine().sync()
 
-        env.githubProvider.results[env.github.id] = .failure(.network("offline"))
+        // Not a passing outage, which would keep the account ok; see the quiet period tests below.
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 500, message: "boom"))
         let result = try await env.engine().sync()
 
         #expect(result.snapshot.accountStatus[env.gitlab.id]?.projectAccess == nil)
@@ -306,5 +383,385 @@ struct SyncEngineTests {
         _ = try await engine.sync()
 
         #expect(env.githubProvider.priorityTokens == ["gh-new"])
+    }
+
+    // MARK: - Quiet period
+
+    /// Hands out stored tokens, except for accounts whose read throws.
+    struct FailingTokens: TokenReading {
+        var tokens: [UUID: String]
+        var failures: [UUID: ProviderError]
+        func token(for accountID: UUID) async throws -> String? {
+            if let error = failures[accountID] { throw error }
+            return tokens[accountID]
+        }
+    }
+
+    @Test("the first failure caused by a gateway error or a lost connection keeps the account ok with its data",
+          arguments: [
+              ProviderError.server(status: 502, message: "Bad Gateway"),
+              .server(status: 503, message: "Service Unavailable"),
+              .server(status: 504, message: "Gateway Timeout"),
+              .network("The network connection was lost."),
+          ])
+    func firstTransientFailureIsQuiet(error: ProviderError) async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        env.githubProvider.priorityLookup = .found([:])
+        _ = try await env.engine().sync()
+
+        env.githubProvider.results[env.github.id] = .failure(error)
+        let result = try await env.engine(at: env.minutes(5)).sync()
+
+        let status = try #require(result.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .ok)
+        #expect(status.message == nil)
+        #expect(status.lastSuccessAt == env.now)
+        #expect(status.consecutiveFailures == 1)
+        #expect(status.projectAccess == .granted)
+        #expect(result.snapshot.items.map(\.number) == [1])
+    }
+
+    @Test("the second failure in a row stays quiet; the third shows the error as before and the count goes on")
+    func thirdTransientFailureShows() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        _ = try await env.engine().sync()
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 503, message: "Service Unavailable"))
+        _ = try await env.engine(at: env.minutes(5)).sync()
+
+        let second = try await env.engine(at: env.minutes(10)).sync().snapshot.accountStatus[env.github.id]
+        #expect(second?.state == .ok)
+        #expect(second?.message == nil)
+        #expect(second?.lastSuccessAt == env.now)
+        #expect(second?.consecutiveFailures == 2)
+
+        let third = try await env.engine(at: env.minutes(15)).sync()
+        let status = try #require(third.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .error)
+        #expect(status.message == "Server error 503: Service Unavailable")
+        #expect(status.lastSuccessAt == env.now)
+        #expect(status.consecutiveFailures == 3)
+        #expect(third.snapshot.items.map(\.number) == [1])
+
+        let fourth = try await env.engine(at: env.minutes(20)).sync().snapshot.accountStatus[env.github.id]
+        #expect(fourth?.state == .error)
+        #expect(fourth?.consecutiveFailures == 4)
+    }
+
+    @Test("a success after failed syncs resets the count, so the next outage starts quiet again")
+    func successResetsTheCount() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        _ = try await env.engine().sync()
+        env.githubProvider.results[env.github.id] = .failure(.network("The request timed out."))
+        _ = try await env.engine(at: env.minutes(5)).sync()
+
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github), env.item(2, account: env.github)])
+        let recovered = try await env.engine(at: env.minutes(10)).sync()
+        let status = try #require(recovered.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .ok)
+        #expect(status.consecutiveFailures == 0)
+        #expect(status.lastSuccessAt == env.minutes(10))
+        #expect(recovered.snapshot.items.map(\.number).sorted() == [1, 2])
+
+        env.githubProvider.results[env.github.id] = .failure(.network("The request timed out."))
+        let next = try await env.engine(at: env.minutes(15)).sync().snapshot.accountStatus[env.github.id]
+        #expect(next?.state == .ok)
+        #expect(next?.consecutiveFailures == 1)
+        #expect(next?.lastSuccessAt == env.minutes(10))
+    }
+
+    @Test("a rejected token and a rate limit show at once in the middle of a series and end it")
+    func authAndRateLimitInterruptTheSeries() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let tokens = RefreshingTokens(first: [env.github.id: "gh", env.gitlab.id: "gl"], refreshed: [env.github.id: "gh-new"])
+        _ = try await env.engine(reading: tokens).sync()
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 502, message: "Bad Gateway"))
+        env.gitlabProvider.results[env.gitlab.id] = .failure(.network("The request timed out."))
+        let series = try await env.engine(reading: tokens, at: env.minutes(5)).sync()
+        #expect(series.snapshot.accountStatus[env.github.id]?.consecutiveFailures == 1)
+        #expect(series.snapshot.accountStatus[env.gitlab.id]?.consecutiveFailures == 1)
+
+        // The refreshed token is rejected too, so the silent refresh does not help.
+        env.githubProvider.results[env.github.id] = .failure(.unauthorized)
+        env.githubProvider.failuresAfterToken["gh-new"] = .unauthorized
+        env.gitlabProvider.results[env.gitlab.id] = .failure(.rateLimited(resetAt: nil))
+        let result = try await env.engine(reading: tokens, at: env.minutes(10)).sync()
+
+        #expect(tokens.refreshCalls == 1)
+        let github = try #require(result.snapshot.accountStatus[env.github.id])
+        #expect(github.state == .needsReauth)
+        #expect(github.message == "The token was rejected. Check that it is valid and has the required scopes.")
+        #expect(github.lastSuccessAt == env.now)
+        #expect(github.consecutiveFailures == 0)
+        let gitlab = try #require(result.snapshot.accountStatus[env.gitlab.id])
+        #expect(gitlab.state == .rateLimited)
+        #expect(gitlab.message == "API rate limit reached.")
+        #expect(gitlab.consecutiveFailures == 0)
+    }
+
+    @Test("a gateway error on the retry after a token refresh stays quiet like any other")
+    func transientFailureAfterRefreshIsQuiet() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let tokens = RefreshingTokens(first: [env.github.id: "gh", env.gitlab.id: "gl"], refreshed: [env.github.id: "gh-new"])
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        _ = try await env.engine(reading: tokens).sync()
+
+        env.githubProvider.results[env.github.id] = .failure(.unauthorized)
+        env.githubProvider.failuresAfterToken["gh-new"] = .server(status: 504, message: "Gateway Timeout")
+        let result = try await env.engine(reading: tokens, at: env.minutes(5)).sync()
+
+        #expect(tokens.refreshCalls == 1)
+        let status = try #require(result.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .ok)
+        #expect(status.message == nil)
+        #expect(status.consecutiveFailures == 1)
+        #expect(result.snapshot.items.map(\.number) == [1])
+    }
+
+    @Test("any other provider error shows at once and ends the series; a gateway error after it keeps it on screen",
+          arguments: [
+              ProviderError.server(status: 500, message: "Internal Server Error"),
+              .invalidResponse("missing data"),
+              .notFound("acme/app"),
+          ])
+    func otherErrorsInterruptTheSeries(error: ProviderError) async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        _ = try await env.engine().sync()
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 502, message: "Bad Gateway"))
+        let series = try await env.engine(at: env.minutes(5)).sync()
+        #expect(series.snapshot.accountStatus[env.github.id]?.consecutiveFailures == 1)
+
+        env.githubProvider.results[env.github.id] = .failure(error)
+        let result = try await env.engine(at: env.minutes(10)).sync()
+        let status = try #require(result.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .error)
+        #expect(status.message == error.localizedDescription)
+        #expect(status.lastSuccessAt == env.now)
+        #expect(status.consecutiveFailures == 0)
+        #expect(result.snapshot.items.map(\.number) == [1])
+
+        // A passing outage now must not hide the error already on screen, nor swap its message for a vaguer one.
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 502, message: "Bad Gateway"))
+        let again = try await env.engine(at: env.minutes(15)).sync().snapshot.accountStatus[env.github.id]
+        #expect(again?.state == .error)
+        #expect(again?.message == error.localizedDescription)
+        #expect(again?.lastSuccessAt == env.now)
+        #expect(again?.consecutiveFailures == 1)
+    }
+
+    @Test("a lost connection after a rejected token keeps asking to sign in until the third failure in a row")
+    func transientFailureKeepsVisibleError() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .success([env.item(1, account: env.github)])
+        env.githubProvider.priorityLookup = .missingPermission
+        _ = try await env.engine().sync()
+        env.githubProvider.results[env.github.id] = .failure(.unauthorized)
+        let rejected = try await env.engine(at: env.minutes(5)).sync().snapshot.accountStatus[env.github.id]
+        #expect(rejected?.state == .needsReauth)
+
+        env.githubProvider.results[env.github.id] = .failure(.network("The Internet connection appears to be offline."))
+        let first = try await env.engine(at: env.minutes(10)).sync()
+        let status = try #require(first.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .needsReauth)
+        #expect(status.message == "The token was rejected. Check that it is valid and has the required scopes.")
+        #expect(status.lastSuccessAt == env.now)
+        #expect(status.projectAccess == .denied)
+        #expect(status.consecutiveFailures == 1)
+        #expect(first.snapshot.items.map(\.number) == [1])
+
+        let second = try await env.engine(at: env.minutes(15)).sync().snapshot.accountStatus[env.github.id]
+        #expect(second?.state == .needsReauth)
+        #expect(second?.message == "The token was rejected. Check that it is valid and has the required scopes.")
+        #expect(second?.consecutiveFailures == 2)
+
+        let third = try await env.engine(at: env.minutes(20)).sync().snapshot.accountStatus[env.github.id]
+        #expect(third?.state == .error)
+        #expect(third?.message == "Network error: The Internet connection appears to be offline.")
+        #expect(third?.lastSuccessAt == env.now)
+        #expect(third?.consecutiveFailures == 3)
+    }
+
+    @Test("a rate limit on the retry after a token refresh is reported as a rate limit")
+    func rateLimitAfterRefresh() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let tokens = RefreshingTokens(first: [env.github.id: "gh", env.gitlab.id: "gl"], refreshed: [env.github.id: "gh-new"])
+        env.githubProvider.results[env.github.id] = .failure(.unauthorized)
+        env.githubProvider.failuresAfterToken["gh-new"] = .rateLimited(resetAt: nil)
+
+        let result = try await env.engine(reading: tokens).sync()
+
+        #expect(tokens.refreshCalls == 1)
+        let status = try #require(result.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .rateLimited)
+        #expect(status.message == "API rate limit reached.")
+        #expect(status.consecutiveFailures == 0)
+    }
+
+    @Test("a token that cannot be read and a missing provider show at once in the middle of a series")
+    func setupFailuresInterruptTheSeries() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        _ = try await env.engine().sync()
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 503, message: "Service Unavailable"))
+        env.gitlabProvider.results[env.gitlab.id] = .failure(.server(status: 503, message: "Service Unavailable"))
+        let series = try await env.engine(at: env.minutes(5)).sync()
+        #expect(series.snapshot.accountStatus[env.github.id]?.consecutiveFailures == 1)
+
+        // Even a read that fails like a lost connection is no outage of the provider, so it is not held back.
+        let later = env.minutes(10)
+        let engine = SyncEngine(
+            providers: [.github: env.githubProvider],
+            tokens: FailingTokens(tokens: [env.gitlab.id: "gl"], failures: [env.github.id: .network("offline")]),
+            configStore: env.configStore, snapshotStore: env.snapshotStore, now: { later }
+        )
+        let result = try await engine.sync()
+
+        let github = result.snapshot.accountStatus[env.github.id]
+        #expect(github?.state == .error)
+        #expect(github?.message == "Could not read the token: Network error: offline")
+        #expect(github?.consecutiveFailures == 0)
+        let gitlab = result.snapshot.accountStatus[env.gitlab.id]
+        #expect(gitlab?.state == .error)
+        #expect(gitlab?.message == "No provider registered for gitlab.")
+        #expect(gitlab?.consecutiveFailures == 0)
+    }
+
+    // MARK: - Preset results
+
+    /// A result fetched five minutes before `env.now` that holds `items`.
+    func presetResult(_ presetID: UUID, _ account: Account, holding items: [WorkItem], env: Env) -> PresetResult {
+        PresetResult(presetID: presetID, accountID: account.id, itemIDs: items.map(\.id), fetchedAt: env.minutes(-5),
+                     totalCount: items.count, isComplete: true, selection: "selection")
+    }
+
+    /// Saves `presets` into the configuration and a previous snapshot with `items` and `results`.
+    func prepare(_ env: Env, presets: [Preset], items: [WorkItem], results: [PresetResult]) throws {
+        var config = try env.configStore.load()
+        config.presets = presets
+        try env.configStore.save(config)
+        try env.snapshotStore.save(Snapshot(fetchedAt: env.minutes(-5), items: items, presetResults: results))
+    }
+
+    @Test("results are carried into the new snapshot, except those of a deleted preset or a removed account")
+    func resultsCarriedForward() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let removed = Account(kind: .github, baseURL: URL(string: "https://github.com")!, displayName: "Old",
+                              me: UserRef(login: "me"))
+        let kept = [presetResult(review.id, env.github, holding: [], env: env),
+                    presetResult(review.id, env.gitlab, holding: [], env: env)].sorted(by: PresetResult.precedes)
+        try prepare(env, presets: [review], items: [], results: kept + [
+            presetResult(UUID(), env.github, holding: [], env: env),
+            presetResult(review.id, removed, holding: [], env: env),
+        ])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.presetResults == kept)
+        #expect(try env.snapshotStore.load()?.presetResults == kept)
+    }
+
+    @Test("an item a kept result holds stays although the account fetch did not return it; an item nobody holds goes")
+    func heldItemStays() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review"), docs = docs
+        let held = env.item(1, account: env.github)
+        try preparePresetSearch(env, presets: [review, docs], items: [held, env.item(2, account: env.github)],
+                                results: [presetResult(review.id, env.github, holding: [held], env: env)])
+        env.githubProvider.presetFetches[search(docs)] = found([env.item(3, account: env.github)])
+
+        // Only the account's searches hold items, so the account searches one preset and keeps the other's result.
+        let result = try await env.engine().sync(selection: try showing([docs], env: env))
+
+        #expect(result.snapshot.items.map(\.number).sorted() == [1, 3])
+    }
+
+    @Test("an item held only by the result of a deleted preset goes with it")
+    func itemOfDeletedPresetGoes() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let orphan = env.item(2, account: env.github)
+        try preparePresetSearch(env, presets: [review], items: [orphan],
+                                results: [presetResult(UUID(), env.github, holding: [orphan], env: env)])
+        env.githubProvider.presetFetches[search(review)] = found([env.item(3, account: env.github)])
+
+        let result = try await env.engine().sync(selection: try showing([review], env: env))
+
+        #expect(result.snapshot.items.map(\.number) == [3])
+    }
+
+    @Test("an item that is both fetched and held appears once, as fetched")
+    func fetchedCopyWins() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review"), docs = docs
+        var stale = env.item(1, account: env.github)
+        stale.title = "Old title"
+        try preparePresetSearch(env, presets: [review, docs], items: [stale],
+                                results: [presetResult(review.id, env.github, holding: [stale], env: env)])
+        env.githubProvider.presetFetches[search(docs)] = found([env.item(1, account: env.github)])
+
+        let result = try await env.engine().sync(selection: try showing([docs], env: env))
+
+        #expect(result.snapshot.items.map(\.title) == ["PR 1"])
+    }
+
+    @Test("a failed account keeps its items once, including those a result holds")
+    func failedAccountKeepsHeldItemsOnce() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let held = env.item(1, account: env.github)
+        try prepare(env, presets: [review], items: [held, env.item(2, account: env.github)],
+                    results: [presetResult(review.id, env.github, holding: [held], env: env)])
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 500, message: "boom"))
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.map(\.number).sorted() == [1, 2])
+    }
+
+    @Test("a result holds an item of its own account only")
+    func heldItemMatchesAccount() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        let review = Preset(name: "Waiting for my review")
+        let githubItem = env.item(1, account: env.github)
+        try prepare(env, presets: [review], items: [githubItem],
+                    results: [presetResult(review.id, env.gitlab, holding: [githubItem], env: env)])
+
+        let result = try await env.engine().sync()
+
+        #expect(result.snapshot.items.isEmpty)
+    }
+
+    @Test("an account that never synced stays quiet on a gateway error and has no date yet")
+    func neverSyncedAccountIsQuiet() async throws {
+        let env = try Env()
+        defer { env.cleanup() }
+        env.githubProvider.results[env.github.id] = .failure(.server(status: 502, message: "Bad Gateway"))
+
+        let result = try await env.engine().sync()
+
+        let status = try #require(result.snapshot.accountStatus[env.github.id])
+        #expect(status.state == .ok)
+        #expect(status.message == nil)
+        #expect(status.lastSuccessAt == nil)
+        #expect(status.consecutiveFailures == 1)
+        #expect(result.snapshot.items.isEmpty)
     }
 }

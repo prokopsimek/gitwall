@@ -1,0 +1,194 @@
+{
+  "data": {
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4794,
+      "resetAt": "2026-11-19T21:46:44Z"
+    },
+    "nodes": [
+      {
+        "__typename": "Issue",
+        "state": "CLOSED",
+        "id": "I_kwDOUUWeOM8AAAABQ1mQ8Q",
+        "number": 1,
+        "title": "Waiting for my review: show drafts that ask for my review",
+        "url": "https://github.com/prokopsimek/gitwall/issues/1",
+        "createdAt": "2026-09-11T13:32:52Z",
+        "updatedAt": "2026-09-11T14:01:06Z",
+        "author": {
+          "login": "prokopsimek",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+          "name": "Prokop Simek"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "enhancement",
+              "color": "a2eeef"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 0
+        },
+        "repository": {
+          "nameWithOwner": "prokopsimek/gitwall"
+        }
+      },
+      {
+        "__typename": "Issue",
+        "state": "CLOSED",
+        "id": "I_kwDOUUWeOM8AAAABQ1mRvQ",
+        "number": 2,
+        "title": "Preset filter by author (agent and bot pull requests)",
+        "url": "https://github.com/prokopsimek/gitwall/issues/2",
+        "createdAt": "2026-09-11T13:32:54Z",
+        "updatedAt": "2026-09-11T14:01:07Z",
+        "author": {
+          "login": "prokopsimek",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+          "name": "Prokop Simek"
+        },
+        "labels": {
+          "nodes": [
+            {
+              "name": "enhancement",
+              "color": "a2eeef"
+            }
+          ]
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 0
+        },
+        "repository": {
+          "nameWithOwner": "prokopsimek/gitwall"
+        }
+      },
+      null,
+      {
+        "__typename": "PullRequest",
+        "state": "MERGED",
+        "id": "PR_kwDOUUWeOM8AAAABMfb-fQ",
+        "number": 23,
+        "title": "feat(walls): Walls window with tiles, editing, rotation and a version 2 Gitwall file",
+        "url": "https://github.com/prokopsimek/gitwall/pull/23",
+        "isDraft": false,
+        "createdAt": "2026-11-03T07:03:56Z",
+        "updatedAt": "2026-11-03T07:36:23Z",
+        "author": {
+          "login": "prokopsimek",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+          "name": "Prokop Simek"
+        },
+        "labels": {
+          "nodes": []
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 0
+        },
+        "reviewDecision": null,
+        "mergeable": "UNKNOWN",
+        "additions": 4107,
+        "deletions": 200,
+        "reviewRequests": {
+          "nodes": []
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            }
+          ]
+        },
+        "repository": {
+          "nameWithOwner": "prokopsimek/gitwall"
+        }
+      },
+      {
+        "__typename": "PullRequest",
+        "state": "MERGED",
+        "id": "PR_kwDOUUWeOM8AAAABMnfJkQ",
+        "number": 24,
+        "title": "fix(walls,detail): full screen fills the screen, Detail closes on navigation, and four smaller fixes",
+        "url": "https://github.com/prokopsimek/gitwall/pull/24",
+        "isDraft": false,
+        "createdAt": "2026-11-03T17:28:01Z",
+        "updatedAt": "2026-11-03T17:40:32Z",
+        "author": {
+          "login": "prokopsimek",
+          "avatarUrl": "https://avatars.githubusercontent.com/u/5487217?u=6b99394dab1c6172f6f696ff8d99cce1a005f65a&v=4",
+          "name": "Prokop Simek"
+        },
+        "labels": {
+          "nodes": []
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "milestone": null,
+        "comments": {
+          "totalCount": 0
+        },
+        "reviewDecision": null,
+        "mergeable": "UNKNOWN",
+        "additions": 388,
+        "deletions": 29,
+        "reviewRequests": {
+          "nodes": []
+        },
+        "latestReviews": {
+          "nodes": []
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            }
+          ]
+        },
+        "repository": {
+          "nameWithOwner": "prokopsimek/gitwall"
+        }
+      }
+    ]
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": [
+        "nodes",
+        2
+      ],
+      "locations": [
+        {
+          "line": 3,
+          "column": 3
+        }
+      ],
+      "message": "Could not resolve to a node with the global id of 'I_kwDOUUWeOM8AAAABQ1mZZZ'"
+    }
+  ]
+}

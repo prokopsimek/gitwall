@@ -37,3 +37,6 @@ __pycache__/
 *.key
 *.csr
 *.cer
+
+# Flow plan packages stay on the author's machine
+docs/plans/

@@ -54,9 +54,12 @@ public enum SearchQueryError: Error, Equatable, Hashable, Sendable {
 /// levels deep. A leading `-` negates one term. There is no `NOT` keyword, and a minus in front of a group or a bare
 /// `@login` is an error, as it is on GitHub. Comma separated values inside one term are OR here; GitHub only honours
 /// that for `label:` and ignores it for `assignee:`, so the comma form does not paste into GitHub.
+///
+/// The parsed tree is readable from other packages, so a provider can translate it for its own search; parsing stays
+/// the only way to build one.
 public struct SearchQuery: Equatable, Sendable {
     /// Named after GitHub's own qualifiers; only the ones the snapshot can answer are here.
-    enum Qualifier: String, CaseIterable, Sendable {
+    public enum Qualifier: String, CaseIterable, Sendable {
         case assignee
         case author
         case label
@@ -74,7 +77,7 @@ public struct SearchQuery: Equatable, Sendable {
 
     /// The `is:` and `type:` values the snapshot can answer. Gitwall only ever fetches open items, so
     /// `is:open` is always true and `is:closed` would be a lie — it is rejected instead.
-    enum State: String, CaseIterable, Sendable {
+    public enum State: String, CaseIterable, Sendable {
         case pr
         case pullRequest = "pull-request"
         case issue
@@ -82,21 +85,23 @@ public struct SearchQuery: Equatable, Sendable {
         case open
     }
 
-    struct Term: Equatable, Sendable {
-        var qualifier: Qualifier?
+    public struct Term: Equatable, Sendable {
+        public let qualifier: Qualifier?
         /// Free text when `qualifier` is nil, otherwise the comma separated values of that qualifier.
-        var values: [String]
-        var isNegated: Bool
+        public let values: [String]
+        public let isNegated: Bool
     }
 
-    indirect enum Expression: Equatable, Sendable {
+    public indirect enum Expression: Equatable, Sendable {
         case term(Term)
+        /// AND
         case all([Expression])
+        /// OR
         case any([Expression])
     }
 
     /// Nil for an empty query.
-    var root: Expression?
+    public let root: Expression?
 
     public var isEmpty: Bool { root == nil }
 
